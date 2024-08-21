@@ -1,0 +1,80 @@
+#include <SPI.h>
+
+#define XDATA3                   0x08
+#define XDATA2                   0x09
+#define XDATA1                   0x0A
+#define YDATA3                   0x0B
+#define YDATA2                   0x0C
+#define YDATA1                   0x0D
+#define ZDATA3                   0x0E
+#define ZDATA2                   0x0F
+#define ZDATA1                   0x10
+
+const int ID = 0x00;
+const int POWER = 0x2D;//1 for standby, 0 for go
+const int RANGE = 0x2C;// for range
+const int SYNC = 0x2B;
+const int STATUS = 0x04;
+const int FILTER = 0x28;
+const int chipSelectPin = 10;
+const int SELF_TEST = 0x2E;
+const int Reset = 0x2F;
+int values[10], x, y, z;
+
+
+void setup() {
+
+  pinMode(chipSelectPin, OUTPUT);
+
+  writeRegister(POWER, 0x00);
+  writeRegister(RANGE, 0x01);
+  writeRegister(SELF_TEST, 0x00);
+  //writeRegister(Reset, 0x52);
+  
+
+  delay(100);
+}
+
+void loop() {
+
+  values[0] = readRegister(XDATA3);
+  values[1] = readRegister(XDATA2);
+  values[2] = readRegister(YDATA3);
+  values[3] = readRegister(YDATA2);
+  values[4] = readRegister(ZDATA3);
+  values[5] = readRegister(ZDATA2);
+
+  values[6] = readRegister(XDATA1);
+  values[7] = readRegister(YDATA1);
+  values[8] = readRegister(ZDATA1);
+
+  x = (values[0] << 12) + (values[1]<<4) + (values[6]>>4);
+  y = (values[2] << 12) + (values[3]<<4) + (values[7]>>4);
+  z = (values[4] << 12) + (values[5]<<4) + (values[8]>>4);
+
+  /*x = (values[0] << 8) + values[1];
+  y = (values[2] << 8) + values[3];
+  z = (values[4] << 8) + values[5];*/
+  
+  Serial.print(x);
+  Serial.print(',');
+  Serial.print(y);
+  Serial.print(',');
+  Serial.println(z);
+  delay(10);
+}
+
+byte readRegister (byte thisRegister) {
+  byte inByte = 0 ;
+  digitalWrite(chipSelectPin, LOW);
+  SPI.transfer((thisRegister << 1) | 1);
+  inByte = SPI.transfer(0x00);
+  digitalWrite(chipSelectPin, HIGH);
+  return inByte;
+}
+void writeRegister (byte thisRegister, byte value) {
+  digitalWrite(chipSelectPin, LOW);
+  SPI.transfer(thisRegister << 1);
+  SPI.transfer(value);
+  digitalWrite(chipSelectPin, HIGH);
+}
