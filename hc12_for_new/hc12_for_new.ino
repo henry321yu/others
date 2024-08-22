@@ -17,8 +17,8 @@
 */
 
 #include <SoftwareSerial.h> //HC12(mcu's rx、hc-12's tx,   mcu's tx、hc-12's rx) 
-//SoftwareSerial HC12(7, 8); int setpin = 9; //old box
-SoftwareSerial HC12(21, 20); int setpin = 22; //small box
+SoftwareSerial HC12(7, 8); int setpin = 9; //old box
+//SoftwareSerial HC12(21, 20); int setpin = 22; //small box
 //SoftwareSerial HC12(13, 12);int setpin = 11; //pico
 void setup()
 {

@@ -30,12 +30,14 @@
 SoftwareSerial mySerial(7, 8); // RX, TX
 
 void powerUp() {
+  Serial.println("powerUp");
   digitalWrite(9, HIGH);
   delay(2000);
   digitalWrite(9, LOW);
   delay(2000);
 }
 void powerDown() {
+  Serial.println("powerDown");
   digitalWrite(9, HIGH);
   delay(2000);
   digitalWrite(9, LOW);
@@ -78,7 +80,6 @@ void setup() {
 }
 
 void loop() { // run over and over
-  /*powerUp();
   mySerial.println("*   wait 15 seconds for signal   *");
   delay(15000);
   send_at("AT+CPSI?");
@@ -87,5 +88,10 @@ void loop() { // run over and over
   send_at("AT+SNPING4=\"www.baidu.com\",3,16,1000");
   send_at("AT+CNACT=0,0");
   powerDown();
-  delay(2000);*/
+  delay(2000);
+
+  while (mySerial.available()) {
+    String response = mySerial.readString();
+    Serial.println(response);  // 输出模块的响应
+  }
 }
