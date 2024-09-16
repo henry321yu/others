@@ -17,8 +17,8 @@
 */
 
 #include <SoftwareSerial.h> //HC12(mcu's rx、hc-12's tx,   mcu's tx、hc-12's rx) 
-SoftwareSerial HC12(7, 8); int setpin = 9; //old box
-//SoftwareSerial HC12(21, 20); int setpin = 22; //small box
+//SoftwareSerial HC12(7, 8); int setpin = 9; //old box
+SoftwareSerial HC12(21, 20); int setpin = 22; //small box
 //SoftwareSerial HC12(13, 12);int setpin = 11; //pico
 void setup()
 {
@@ -37,7 +37,7 @@ void setup()
   delay(100);
   HC12.print("AT+B115200");
   delay(100);
-  HC12.print("AT+C127"); //127 for imu //117 for mag sensor //107 for gps
+  HC12.print("AT+C097"); //127 for imu //117 for mag sensor //107 for gps//097 for rtk // 087 for rasp power
   delay(100);
   HC12.print("AT+P8");
   delay(100);
