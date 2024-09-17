@@ -28,7 +28,7 @@ void setup()
 
   Serial.println(F("HC12.reset"));
   pinMode(setpin, OUTPUT); digitalWrite(setpin, LOW); // for reset// reset 不會重置至9600
-  HC12.begin(115200); 
+  HC12.begin(9600); 
   delay(100);
   HC12.print("AT+B9600");
   delay(100);
@@ -43,9 +43,9 @@ void setup()
   delay(100);
   digitalWrite(setpin, HIGH);
   Serial.println(F("HC12.set"));
-//  while (HC12.available()) {
-//    Serial.write(HC12.read());
-//  }
+  while (HC12.available()) {
+    Serial.write(HC12.read());
+  }
   Serial.println("done initial");
   HC12.println("done initialize");
 }

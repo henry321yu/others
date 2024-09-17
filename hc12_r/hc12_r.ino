@@ -28,7 +28,7 @@ void setup()
 
   Serial.println(F("HC12.reset"));
   pinMode(setpin, OUTPUT); digitalWrite(setpin, LOW); // for reset// reset 不會重置至9600
-  HC12.begin(9600);  // reset 不會重置至9600 要先改至目前baudrate
+  HC12.begin(115200);  // reset 不會重置至9600 要先改至目前baudrate
   delay(100);
   HC12.print("AT+B9600");
   delay(100);
