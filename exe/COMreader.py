@@ -41,13 +41,15 @@ def read_config():
     return com_port, baud_rate
 
 def list_available_ports():
-    ports = list_ports.comports()
-    available_ports = [port.device for port in ports]
-    
-    if available_ports:
+    ports = list_ports.comports()  # 從 list_ports.comports() 獲取串口資訊
+    if ports:
         print("Available COM ports:")
-        for port in available_ports:
-            print(f"- {port}")
+        for port in ports:
+            # 確認每個 port 是 ListPortInfo 對象，才能安全地訪問 device 和 description
+            if hasattr(port, 'device') and hasattr(port, 'description'):
+                print(f"- {port.device} : {port.description}")
+            else:
+                print(f"- {port}")  # 如果不是預期的對象，則簡單輸出
     else:
         print("No available COM ports detected ... please check connection ...")
 
