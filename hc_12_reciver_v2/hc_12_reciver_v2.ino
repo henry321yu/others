@@ -6,7 +6,7 @@ SoftwareSerial HC12(21, 20); int setpin = 22; //small box
 
 String temp;
 String logdata = "";
-float data[14];
+float data[15];
 int i = 0; int j = 0; int k = 0;
 int tag[20];
 char buf[300];
@@ -28,17 +28,17 @@ void setup()
   delay(100);
   HC12.print("AT+B115200");
   delay(100);
-  HC12.print("AT+C127"); //imu
-  //HC12.print("AT+C117"); //power_sensor_90393
+  HC12.print("AT+C127"); //127 for imu //117 for mag sensor //107 for gps//097 for rtk // 087 for rasp power
   delay(100);
   HC12.print("AT+P8");
   delay(100);
   digitalWrite(setpin, HIGH);
-  //digitalWrite(setpin,LOW);
-  Serial.println("done initial");
-  while (!Serial) {
-    ; // wait for serial port to connect. Needed for Leonardo only
+  Serial.println(F("HC12.set"));
+  while (HC12.available()) {
+    Serial.write(HC12.read());
   }
+  Serial.println("done initial");
+  HC12.println("done initialize");
 }
 
 void loop() // run over and over
@@ -47,19 +47,12 @@ void loop() // run over and over
     getdata();
   }
 
-
-  /*while (HC12.available()) {
-      Serial.write(HC12.read());
-    if (millis() < 2000) {
-      Serial.write(HC12.read());
-    }
-    else {
-      getdata();
-    }
-    }
-    while (Serial.available()) {
-    //HC12.write(Serial.read());
-    }*/
+//  while (HC12.available()) {
+//    Serial.write(HC12.read());
+//  }
+//  while (Serial.available()) {
+//    HC12.write(Serial.read());
+//  }
   delay(1);
 }
 
@@ -109,10 +102,14 @@ void getdata() {
     logdataa += data[8]; //my
     logdataa += ",";
     logdataa += data[9]; //mz
+    
+    double ms;
+    ms = sqrt(data[7] * data[7] + data[8] * data[8] + data[9] * data[9]);
 
-    accdata = String(data[1],7) + "," + String(data[2],3) + "," + String(data[3],3);
-    gyrdata = String(data[4],6) + "," + String(data[5],6) + "," + String(data[6],6);
-    magdata = String(data[7],5) + "," + String(data[8],3) + "," + String(data[9],3);
+//    accdata = String(data[1],7) + "," + String(data[2],3) + "," + String(data[3],3);
+//    gyrdata = String(data[4],6) + "," + String(data[5],6) + "," + String(data[6],6);
+//    magdata = String(data[7],5) + "," + String(data[8],3) + "," + String(data[9],3);
+    magdata = String(data[7],5) + "," + String(data[8],3) + "," + String(data[9],3) + "," + String(ms,3);
 
     //Serial.print(logdata);
     //Serial.println(logdataa);
