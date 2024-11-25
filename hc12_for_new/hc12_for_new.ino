@@ -20,6 +20,7 @@
 //SoftwareSerial HC12(7, 8); int setpin = 9; //old box
 SoftwareSerial HC12(21, 20); int setpin = 22; //small box
 //SoftwareSerial HC12(13, 12);int setpin = 11; //pico
+//SoftwareSerial HC12(0, 1); int setpin = 2; //nano
 void setup()
 {
   // Open serial communications and wait for port to open:
@@ -37,7 +38,7 @@ void setup()
   delay(100);
   HC12.print("AT+B115200");
   delay(100);
-  HC12.print("AT+C097"); //127 for imu //117 for mag sensor //107 for gps//097 for rtk // 087 for rasp power
+  HC12.print("AT+C117"); //127 for imu //117 for mag sensor //107 for gps//097 for rtk // 087 for rasp power
   delay(100);
   HC12.print("AT+P8");
   delay(100);
