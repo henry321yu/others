@@ -27,18 +27,36 @@ void setup()
   Serial.begin(115200);
 
 
-  Serial.println(F("HC12.reset"));
+//  Serial.println(F("HC12.reset"));  //115200
+//  pinMode(setpin, OUTPUT); digitalWrite(setpin, LOW); // for reset
+//  HC12.begin(9600);
+//  delay(100);
+//  HC12.print("AT+B115200");
+//  delay(100);
+//  Serial.println(F("HC12.begin and set"));
+//  HC12.begin(115200);
+//  delay(100);
+//  HC12.print("AT+B115200");
+//  delay(100);
+//  HC12.print("AT+C117"); //127 for imu //117 for mag sensor //107 for gps//097 for rtk // 087 for rasp power
+//  delay(100);
+//  HC12.print("AT+P8");
+//  delay(100);
+//  digitalWrite(setpin, HIGH);
+//  Serial.println(F("HC12.set"));
+  
+  Serial.println(F("HC12.reset"));  //9600
   pinMode(setpin, OUTPUT); digitalWrite(setpin, LOW); // for reset
-  HC12.begin(9600);
-  delay(100);
-  HC12.print("AT+B115200");
-  delay(100);
-  Serial.println(F("HC12.begin and set"));
   HC12.begin(115200);
   delay(100);
-  HC12.print("AT+B115200");
+  HC12.print("AT+B9600");
   delay(100);
-  HC12.print("AT+C117"); //127 for imu //117 for mag sensor //107 for gps//097 for rtk // 087 for rasp power
+  Serial.println(F("HC12.begin and set"));
+  HC12.begin(9600);
+  delay(100);
+  HC12.print("AT+B9600");
+  delay(100);
+  HC12.print("AT+C077"); //127 for imu //117 for mag sensor //107 for gps//097 for rtk // 087 for rasp power // 077 for mag power
   delay(100);
   HC12.print("AT+P8");
   delay(100);
