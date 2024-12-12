@@ -1,27 +1,27 @@
 import cv2
 
-# 啟動攝像頭 (預設為攝像頭編號 0)
+# Start the camera (default camera index 0)
 cap = cv2.VideoCapture(0)
 
 if not cap.isOpened():
-    print("無法啟動攝像頭")
+    print("Unable to start the camera")
     exit()
 
 while True:
-    # 讀取攝像頭影像
+    # Capture frame from the camera
     ret, frame = cap.read()
 
     if not ret:
-        print("無法獲取影像")
+        print("Unable to retrieve frame")
         break
 
-    # 顯示影像
+    # Display the frame
     cv2.imshow("Webcam", frame)
 
-    # 按下 'q' 鍵退出
+    # Press 'ESC' key to exit
     if cv2.waitKey(1) & 0xFF == 27:
         break
 
-# 釋放攝像頭並關閉視窗
+# Release the camera and close the window
 cap.release()
 cv2.destroyAllWindows()
