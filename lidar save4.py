@@ -50,6 +50,16 @@ with open(csv_filename, mode="a", newline="") as file:
                         temp_line = []
 
                 # **寫入 CSV 檔案**
-                writer.writerows(formatted_data)  # 逐行寫入
+                # writer.writerows(formatted_data)  # 逐行寫入
+
+                tt=formatted_data[-1][0]-formatted_data[0][0]
+                ctt=elapsed_time-tt
+
+                print("")
+                print(f"t start: {formatted_data[0][0]:.3f}")
+                print(f"t end: {formatted_data[-1][0]:.3f}")
+                print("")
+                print(f"programe t: {elapsed_time:.3f}")
+                print(f"data t: {tt:.3f}")
             except:
                 continue
