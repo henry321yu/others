@@ -7,7 +7,7 @@ import time
 ser = serial.Serial('COM7', 2000000, timeout=1)
 
 # 限制每批資料數量
-max_points = 500
+max_points = 1600
 width = 300
 
 # 初始化 Matplotlib
@@ -38,7 +38,6 @@ while True:
             fields = part.strip().split("\t")  # 根據制表符分割數據
             if len(fields) != 46:
                 continue  # 確保欄位數
-
             try:
                 timee, angle, distance= map(float, fields[:3])  # 只取前三個欄位
             except ValueError:
@@ -50,28 +49,27 @@ while True:
             y = distance * np.sin(angle_rad)
             
             data_list.append((x, y))  # 加入新數據
-            count +=1
+            count += 1
 
             # 當數據達到 max_points 時，更新繪圖並清空舊數據
             if len(data_list) >= max_points:
                 print(fields[0:46])
                 
                 elapsed = time.perf_counter() - start_time
-                f=count / elapsed
+                f = count / elapsed
+                fp = max_points/f
                 count = 0
-                start_time = time.perf_counter()
 
                 current_time = time.strftime("%H:%M:%S") + f".{(time.time() % 1):.2f}"[2:]  # 取得當前時間
 
                 x_vals, y_vals = zip(*data_list)  # 轉換為 x, y 陣列
-                sc.set_offsets(np.c_[x_vals, y_vals])  # 更新點座標
+                sc.set_offsets(np.c_[x_vals, y_vals])  # 更新點座標                
+                ax.set_title(f"{max_points} points in last {fp:.2f} s\n{current_time} - {timee:.2f} s - {f:.2f} Hz") # 更新標題
                 plt.draw()
-                plt.pause(0.001)  # 避免 CPU 過載
-
-                # 更新標題
-                ax.set_title(f"Real-time LiDAR Data - Last {max_points} Points\n[{current_time}] - {f:.2f} Hz")
+                plt.pause(0.01)  # 避免 CPU 過載
 
                 data_list.clear()  # 清空舊數據，開始收集下一批
+                start_time = time.perf_counter()
 
     except KeyboardInterrupt:
         print("程序終止")
