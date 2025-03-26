@@ -5,18 +5,18 @@
 #include <TimeLib.h>
 
 time_t RTCTime;
+double setf = 0.033; /////////////設定頻率 30s=0.033  60s=0.016
 const int MPU_addr = 0x68;
 long values[50];
-String logdata, accdata, gyrdata, datadate, logFileName;
+String logdata, accdata, gyrdata, datadate, datedata, logFileName;
 double x[3], y[3], z[3], gx[3], gy[3], gz[3], ta[3];
 int ID, delayy, beeper = 13;
 unsigned long i = 0;
 String mon, dayy;
 double timee, f;
-int maxsize = 209715200;//209715200=200mb=200*2^20;
+int maxsize = 52428800;//52428800=50mb=50*2^20;
 
-//const int SD_CS = BUILTIN_SDCARD;
-const int SD_CS = 10;
+const int SD_CS = BUILTIN_SDCARD;
 File logFile;
 
 void setup() {
@@ -38,15 +38,14 @@ void setup() {
     Serial.println(F("Card failed, or not present"));
   }
 
-  //  while (!SD.begin(SD_CS)) {
-  //    Serial.println(F("Card failed, or not present"));
-  //    digitalWrite(beeper, HIGH);
-  //    delay(500);
-  //    digitalWrite(beeper, LOW);
-  //    delay(500);
-  //  }
+  while (!SD.begin(SD_CS)) {
+    Serial.println(F("Card failed, or not present"));
+    digitalWrite(beeper, HIGH);
+    delay(500);
+    digitalWrite(beeper, LOW);
+    delay(500);
+  }
 
-  Serial.println(F("file naming"));
   mon = String(month());
   dayy = String(day());
   if (mon.length() < 2) {
@@ -57,8 +56,8 @@ void setup() {
   }
   datadate = mon + dayy;
   logFileName = nextLogFile_date();
-
-  logFile = SD.open(logFileName, FILE_WRITE);
+  Serial.println(logFileName);
+  logFile = SD.open(logFileName.c_str(), FILE_WRITE);
   if (!logFile)
     Serial.println(F("error opening file"));
 
@@ -67,6 +66,8 @@ void setup() {
   delay(100);
   writeRegister(MPU_addr, 0x6B, 0x00);// set to zero (wakes up the MPU-6050)
   delay(30);
+
+  setf = 1 / setf * 1000;
 
   Serial.println(F("done initialize"));
   digitalWrite(beeper, HIGH);
@@ -82,8 +83,9 @@ void setup() {
 void loop() {
   imu6050_data();
   accdata = String(x[0], 5) + ", " + String(y[0], 5) + ", " + String(z[0], 5);
+  datedata = String(hour()) + ":" +  String(minute()) + ":" +  String(second());
 
-  logdata = accdata + ", " + f;
+  logdata = String(timee, 3) + ", " + datedata + "," + accdata + ", " + String(ta[0], 2);
 
   Serial.println(logdata);
 
@@ -92,7 +94,7 @@ void loop() {
   //timer
   timer_v2();
 
-  delay(100);
+  delay(setf);
 }
 
 void imu6050_data() {
@@ -103,7 +105,7 @@ void imu6050_data() {
   x[0] = values[0] << 8 | values[1];
   y[0] = values[2] << 8 | values[3];
   z[0] = values[4] << 8 | values[5];
-  ta[10] = values[6] << 8 | values[7];
+  ta[0] = values[6] << 8 | values[7];
   gx[0] = values[8] << 8 | values[9];
   gy[0] = values[10] << 8 | values[11];
   gz[0] = values[12] << 8 | values[13];
@@ -132,7 +134,7 @@ void imu6050_data() {
   gy[0] = gy[0] / 131;
   gz[0] = gz[0] / 131;
 
-  ta[0] = (ta[10] / 340) - 160.87 + 3.63;
+  ta[0] = (ta[0] / 340) - 160.87 + 3.63;
 }
 void writeRegister(int ID, int reg, int data)
 {
@@ -140,18 +142,6 @@ void writeRegister(int ID, int reg, int data)
   Wire.write(reg);
   Wire.write(data);
   Wire.endTransmission();
-}
-
-int readRegister(int reg)
-{
-  Wire.beginTransmission(ID);
-  Wire.write(reg);
-  Wire.endTransmission();
-  Wire.requestFrom(ID, 1);
-  if (Wire.available() <= 1)
-  {
-    return Wire.read();
-  }
 }
 
 void readmultiRegister(int fst, int num)
@@ -173,7 +163,7 @@ void timer_v2() {
   timee = millis() * 0.001;
   f = i / timee;
 
-  if (i % 60 == 0) { //設每幾筆資料儲存至SD卡
+  if (i % 4 == 0) { //設每幾筆資料儲存至SD卡
     if (logFile.size() > maxsize) {
       logFileName = nextLogFile_date();
     }
@@ -190,7 +180,7 @@ String nextLogFile_date(void) {
   int logn = 0;
   for (int i = 0; i < 999; i++) {
     filename = datadate + "_" + String(logn) + String(".csv");
-    if (!SD.exists(filename))    {
+    if (!SD.exists(filename.c_str()))    {
       return filename;
     }
     logn++;
@@ -200,7 +190,7 @@ String nextLogFile_date(void) {
 
 void savedata() {
   if (!logFile) {
-    logFile = SD.open(logFileName, FILE_WRITE);
+    logFile = SD.open(logFileName.c_str(), FILE_WRITE);
   }
   if (logFile)
     logFile.println(logdata);
