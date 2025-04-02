@@ -5,7 +5,7 @@
 #include <TimeLib.h>
 
 time_t RTCTime;
-double setf = 0.033; /////////////設定頻率 30s=0.033  60s=0.016
+double setf = 0.1; /////////////設定頻率 0.1hz(18.75kb/hr) 1hz(187.5kb/hr) 30s=0.033hz(6.25kb/hr)
 const int MPU_addr = 0x68;
 long values[50];
 String logdata, accdata, gyrdata, datadate, datedata, logFileName;
@@ -14,7 +14,10 @@ int ID, delayy, beeper = 13;
 unsigned long i = 0;
 String mon, dayy;
 double timee, f;
-int maxsize = 52428800;//52428800=50mb=50*2^20;
+//int maxsize = 4718592;//4718592=4.5mb(~1day/1hz)=4.5*2^20 52428800=50mb=50*2^20(不超過excel)
+int maxsize = 460800;//460800=450kb(~1day/0.1hz)=450*2^10 52428800=50mb=50*2^20(不超過excel)
+//int maxsize = 19200;//19200=18.75kb(~1hr/0.1hz)
+//int maxsize = 1600;//1600=(~5min/0.1hz)
 
 const int SD_CS = BUILTIN_SDCARD;
 File logFile;
@@ -46,16 +49,7 @@ void setup() {
     delay(500);
   }
 
-  mon = String(month());
-  dayy = String(day());
-  if (mon.length() < 2) {
-    mon = "0" + mon;
-  }
-  if (dayy.length() < 2) {
-    dayy = "0" + dayy;
-  }
-  datadate = mon + dayy;
-  logFileName = nextLogFile_date();
+  logFileName = nextLogFile_date_v2();
   Serial.println(logFileName);
   logFile = SD.open(logFileName.c_str(), FILE_WRITE);
   if (!logFile)
@@ -81,6 +75,9 @@ void setup() {
 }
 
 void loop() {
+  //timer
+  timer_v2();
+
   imu6050_data();
   accdata = String(x[0], 5) + ", " + String(y[0], 5) + ", " + String(z[0], 5);
   datedata = String(hour()) + ":" +  String(minute()) + ":" +  String(second());
@@ -91,8 +88,6 @@ void loop() {
 
   savedata();
 
-  //timer
-  timer_v2();
 
   delay(setf);
 }
@@ -135,6 +130,9 @@ void imu6050_data() {
   gz[0] = gz[0] / 131;
 
   ta[0] = (ta[0] / 340) - 160.87 + 3.63;
+  if (ta[0] <= -90)
+    ta[0] += 192.67;
+
 }
 void writeRegister(int ID, int reg, int data)
 {
@@ -163,9 +161,10 @@ void timer_v2() {
   timee = millis() * 0.001;
   f = i / timee;
 
-  if (i % 4 == 0) { //設每幾筆資料儲存至SD卡
+  if (i % 12 == 0) { //設每幾筆資料儲存至SD卡
     if (logFile.size() > maxsize) {
-      logFileName = nextLogFile_date();
+      logFileName = nextLogFile_date_v2();
+      Serial.println(logFileName);
     }
     logFile.close(); // close the file
   }
@@ -175,7 +174,16 @@ time_t getTeensy3Time() {
   return Teensy3Clock.get();
 }
 
-String nextLogFile_date(void) {
+String nextLogFile_date_v2(void) {
+  mon = String(month());
+  dayy = String(day());
+  if (mon.length() < 2) {
+    mon = "0" + mon;
+  }
+  if (dayy.length() < 2) {
+    dayy = "0" + dayy;
+  }
+  datadate = mon + dayy;
   String filename;
   int logn = 0;
   for (int i = 0; i < 999; i++) {
@@ -192,8 +200,12 @@ void savedata() {
   if (!logFile) {
     logFile = SD.open(logFileName.c_str(), FILE_WRITE);
   }
-  if (logFile)
+  if (logFile) {
     logFile.println(logdata);
-  else
+    digitalWriteFast(beeper, LOW);
+  }
+  else {
     Serial.println(F("error opening file"));
+    digitalWriteFast(beeper, HIGH);
+  }
 }
