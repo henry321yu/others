@@ -70,17 +70,15 @@ class MontyHallGame:
 
         self.guest_choice = index
         self.info_label.config(text=f"來賓選擇了門 {index+1}，主持人開門中...")
+        self.doors[index].config(bg="lightblue")
 
         self.reveal_goat_doors()
         self.update_probabilities()
 
     def reveal_goat_doors(self):
         remaining = [i for i in range(self.num_doors) if i != self.guest_choice and i != self.car_door]
-        if self.num_doors == 3:
-            to_reveal = random.choice(remaining)
-            self.revealed_doors = [to_reveal]
-        else:
-            self.revealed_doors = remaining[:-1]  # 留下1個門+玩家選的
+        num_to_reveal = self.num_doors - 2
+        self.revealed_doors = random.sample(remaining, num_to_reveal)
 
         for i in self.revealed_doors:
             self.doors[i].config(state=tk.DISABLED, text=f"門 {i+1}\n🐐")
@@ -121,6 +119,8 @@ class MontyHallGame:
                 btn.config(bg="gold", text=f"門 {i+1}\n🚗")
             elif i in self.revealed_doors:
                 continue
+            elif i == self.guest_choice:
+                btn.config(bg="lightgreen")
             else:
                 btn.config(bg="gray")
 
