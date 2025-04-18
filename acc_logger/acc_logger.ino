@@ -3,6 +3,7 @@
 #include <Wire.h>
 #include <Arduino.h>
 #include <TimeLib.h>
+#include "Watchdog_t4.h"
 
 time_t RTCTime;
 double setf = 0.1; /////////////設定頻率 0.1hz(18.75kb/hr) 1hz(187.5kb/hr) 30s=0.033hz(6.25kb/hr)
@@ -13,14 +14,16 @@ double x[3], y[3], z[3], gx[3], gy[3], gz[3], ta[3];
 int ID, delayy, beeper = 13;
 unsigned long i = 0;
 String mon, dayy;
-double timee, f;
+double timee, f, t0;
 //int maxsize = 4718592;//4718592=4.5mb(~1day/1hz)=4.5*2^20 52428800=50mb=50*2^20(不超過excel)
 int maxsize = 460800;//460800=450kb(~1day/0.1hz)=450*2^10 52428800=50mb=50*2^20(不超過excel)
 //int maxsize = 19200;//19200=18.75kb(~1hr/0.1hz)
 //int maxsize = 1600;//1600=(~5min/0.1hz)
+//int maxsize = 320;//320=(~1min/0.1hz)
 
 const int SD_CS = BUILTIN_SDCARD;
 File logFile;
+WDT_T4<WDT3> wdt;
 
 void setup() {
   Serial.begin(115200); // Initialize serial output via USB
@@ -63,6 +66,10 @@ void setup() {
 
   setf = 1 / setf * 1000;
 
+  WDT_timings_t config;
+  config.timeout = 30000; /* in seconds, 32ms to 522.232s */
+  wdt.begin(config);
+
   Serial.println(F("done initialize"));
   digitalWrite(beeper, HIGH);
   delay(100);
@@ -72,11 +79,14 @@ void setup() {
   delay(100);
   digitalWrite(beeper, LOW);
   delay(2000);
+  t0 = millis() * 0.001;
 }
 
 void loop() {
+  wdt.feed(); // reset watchdog
+
   //timer
-  timer_v2();
+  timer_v3();
 
   imu6050_data();
   accdata = String(x[0], 5) + ", " + String(y[0], 5) + ", " + String(z[0], 5);
@@ -87,7 +97,6 @@ void loop() {
   Serial.println(logdata);
 
   savedata();
-
 
   delay(setf);
 }
@@ -159,14 +168,37 @@ void readmultiRegister(int fst, int num)
 void timer_v2() {
   i++;
   timee = millis() * 0.001;
+  timee = timee - t0;
   f = i / timee;
 
   if (i % 12 == 0) { //設每幾筆資料儲存至SD卡
     if (logFile.size() > maxsize) {
       logFileName = nextLogFile_date_v2();
       Serial.println(logFileName);
+      t0 = millis() * 0.001;
     }
     logFile.close(); // close the file
+  }
+}
+
+void timer_v3() {
+  i++;
+  timee = millis() * 0.001;
+  timee = timee - t0;
+  f = i / timee;
+
+  if (i % 12 == 0) {
+    if (logFile && logFile.size() > maxsize) {
+      logFile.flush();
+      logFile.close();
+      logFileName = nextLogFile_date_v2();
+      Serial.println("Switching to new file: " + logFileName);
+      t0 = millis() * 0.001;
+      timee = 0;
+    } else if (logFile) {
+      logFile.flush(); // 確保寫入
+      logFile.close(); // 強制釋放記憶體
+    }
   }
 }
 
@@ -202,10 +234,10 @@ void savedata() {
   }
   if (logFile) {
     logFile.println(logdata);
-    digitalWriteFast(beeper, LOW);
+    digitalWriteFast(beeper, HIGH);
   }
   else {
     Serial.println(F("error opening file"));
-    digitalWriteFast(beeper, HIGH);
+    digitalWriteFast(beeper, LOW);
   }
 }
