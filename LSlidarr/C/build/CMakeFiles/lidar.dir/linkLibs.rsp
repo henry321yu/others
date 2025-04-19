@@ -1,0 +1,1 @@
+  -L"C:/Users/sgrc-325/vcpkg/installed/x64-windows/lib"  "C:/Users/sgrc-325/vcpkg/installed/x64-windows/debug/lib/boost_system-vc143-mt-gd-x64-1_86.lib" -lws2_32 -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 
