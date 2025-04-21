@@ -7,11 +7,11 @@ import queue
 import numpy as np
 import open3d as o3d
 
-# LiDAR 網路設定
+# LiDAR 設定
 UDP_IP = "0.0.0.0"
 UDP_PORT = 2368
 PACKET_SIZE = 1212
-DISTANCE_RESOLUTION = 0.4  # meters
+DISTANCE_RESOLUTION = 0.004
 
 VERTICAL_ANGLES = [
     -16, 0, -14, 2, -12, 4, -10, 6,
@@ -19,54 +19,65 @@ VERTICAL_ANGLES = [
 ]
 
 packet_queue = queue.Queue(maxsize=1000)
-
-# Open3D 設定
 pcd = o3d.geometry.PointCloud()
-vis = o3d.visualization.Visualizer()
-vis.create_window(window_name="Real-time 3D LiDAR Point Cloud", width=800, height=600)
-vis.add_geometry(pcd)
-render_option = vis.get_render_option()
-render_option.point_size = 2.0  # 可調整點大小
-
-# 資料收集
 data_list = []
 intensity_list = []
-max_points = 320000 #初始輸出點 用以定義繪圖中心座標
+max_points = 320000
 count = 0
 start_time = time.perf_counter()
 gotnp = 0
+
+# 建立視窗
+vis = o3d.visualization.Visualizer()
+vis.create_window("Real-time 3D LiDAR Point Cloud", width=800, height=600)
+vis.add_geometry(pcd)
+render_option = vis.get_render_option()
+render_option.point_size = 2.0
+
+# 畫格線
+def draw_grid_lines(grid_size=1, extent=15): #設定網格長度
+    lines = []
+    points = []
+    for i in range(-extent, extent + 1):
+        points.append([i * grid_size, -extent * grid_size, 0])
+        points.append([i * grid_size, extent * grid_size, 0])
+        lines.append([len(points) - 2, len(points) - 1])
+        points.append([-extent * grid_size, i * grid_size, 0])
+        points.append([extent * grid_size, i * grid_size, 0])
+        lines.append([len(points) - 2, len(points) - 1])
+    line_set = o3d.geometry.LineSet()
+    line_set.points = o3d.utility.Vector3dVector(points)
+    line_set.lines = o3d.utility.Vector2iVector(lines)
+    line_set.colors = o3d.utility.Vector3dVector([[0.7, 0.7, 0.7]] * len(lines))
+    vis.add_geometry(line_set)
+
+draw_grid_lines()
 
 def parse_packet(data):
     blocks = 12
     channels = 16
     points = []
     intensities = []
-
     for block_idx in range(blocks):
         base = 100 * block_idx
         if data[base:base+2] != b'\xFF\xEE':
             continue
         azimuth = struct.unpack_from("<H", data, base + 2)[0] / 100.0
         azimuth_rad = math.radians(azimuth)
-
         for ch in range(channels):
             offset = base + 4 + ch * 3
             distance_raw = struct.unpack_from("<H", data, offset)[0]
-            intensity = data[offset+2]        
-
+            intensity = data[offset + 2]
             distance = distance_raw * DISTANCE_RESOLUTION
             if distance == 0:
                 continue
             vert_angle = VERTICAL_ANGLES[ch]
             vert_rad = math.radians(vert_angle)
-
             x = distance * math.cos(vert_rad) * math.sin(azimuth_rad)
             y = distance * math.cos(vert_rad) * math.cos(azimuth_rad)
             z = distance * math.sin(vert_rad)
-
             points.append([x, y, z])
             intensities.append(intensity)
-
     return points, intensities
 
 def receiver_thread(sock):
@@ -78,7 +89,7 @@ def receiver_thread(sock):
             except queue.Full:
                 pass
 
-def plotter_thread():
+def pointcloud_updater():
     global count, start_time, gotnp, max_points
     while True:
         data = packet_queue.get()
@@ -97,65 +108,44 @@ def plotter_thread():
             np_points = np.array(data_list, dtype=np.float32)
             np_intensity = np.array(intensity_list, dtype=np.float32)
 
-            # Normalize intensity (0~1)，避免除以0
             if np_intensity.max() > 0:
                 norm_intensity = np.clip(np_intensity / np_intensity.max(), 0, 1)
             else:
                 norm_intensity = np.zeros_like(np_intensity)
 
-            # 轉換為 RGB 彩色（可改為更複雜 colormap）
-            colors = np.stack([norm_intensity]*3, axis=1)  # 灰階 (R=G=B)
+            colors = np.zeros((len(norm_intensity), 3), dtype=np.float32)
+            for i, val in enumerate(norm_intensity):
+                if val < 0.25:
+                    t = val * 4
+                    colors[i] = [0.0, t, 1.0]
+                elif val < 0.5:
+                    t = (val - 0.25) * 4
+                    colors[i] = [t, 1.0, 0.0]
+                elif val < 1.0:
+                    t = (val - 0.5) * 2
+                    colors[i] = [1.0, 1.0 - t, 0.0]
+                else:
+                    colors[i] = [1.0, 0.0, 0.0]
 
-            if np_points.size > 0:
-                pcd.points = o3d.utility.Vector3dVector(np_points)
+            new_pcd = o3d.geometry.PointCloud()
+            new_pcd.points = o3d.utility.Vector3dVector(np_points)
+            new_pcd.colors = o3d.utility.Vector3dVector(colors)
 
-                # ==== 彩色映射根據 intensity（指定閥值）====
-                intensities_np = np.array(intensity_list, dtype=np.float32)
-                # intensities_np = np.array(intensities, dtype=np.float32) #顏色錯誤但頻率很快
+            pcd.points = new_pcd.points
+            pcd.colors = new_pcd.colors
 
-                threshold = 255.0  # 設定強度閥值
-                norm_intensity = np.clip(intensities_np / threshold, 0, 1)
-
-                # 漸變：黃（高）→ 綠（中）→ 藍（低），超過閥值為紅
-                colors = np.zeros((len(norm_intensity), 3), dtype=np.float32)
-                for i, val in enumerate(norm_intensity):
-                    if val < 0.25:
-                        # 藍 → 綠
-                        t = val * 4  # 0~1
-                        colors[i] = [0.0, t, 1.0]  # B→G
-                    elif val < 0.5:
-                        # 綠 → 黃
-                        t = (val - 0.25) * 4  # 0~1
-                        colors[i] = [t, 1.0, 0.0]  # G→Y
-                    elif val < 1.0:
-                        # 黃 → 紅
-                        t = (val - 0.5) * 2  # 0~1
-                        colors[i] = [1.0, 1.0 - t, 0.0]  # Y→R
-                    else:
-                        # 超過閥值，設為紅
-                        colors[i] = [1.0, 0.0, 0.0]
-
-                pcd.colors = o3d.utility.Vector3dVector(colors)
-
-                vis.update_geometry(pcd)
-                vis.poll_events()
-                vis.update_renderer()
-
-                # ==== 視角設定（只跑一次）====
-                if gotnp != 1:
-                    vis.reset_view_point(True)
-                    vc = vis.get_view_control()
-                    vc.set_lookat([0, 0, 0])    # 看中心點
-                    vc.set_zoom(0.5)              #起始鏡頭縮放
-                    gotnp = 1
-                    max_points = 64000  #5hz
-
-            print(f"{max_points} points in {fp:.2f}s | {current_time} | {f/1000:.2f}k Hz")
+            if gotnp != 1:
+                vc = vis.get_view_control()
+                vc.set_lookat([0, 0, 0])
+                vc.set_zoom(0.5)
+                gotnp = 1
+                max_points = 160000
 
             data_list.clear()
             intensity_list.clear()
             count = 0
             start_time = time.perf_counter()
+            print(f"{max_points} points in {fp:.2f}s | {current_time} | {f/1000:.2f}k Hz")
 
 def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -163,7 +153,14 @@ def main():
     print(f"Listening on UDP port {UDP_PORT}...")
 
     threading.Thread(target=receiver_thread, args=(sock,), daemon=True).start()
-    plotter_thread()
+    threading.Thread(target=pointcloud_updater, daemon=True).start()
+
+    # 🧠 這裡維持在主執行緒
+    while True:
+        vis.poll_events()
+        vis.update_renderer()
+        vis.update_geometry(pcd)  # 強制更新 PointCloud
+        time.sleep(0.01)
 
 if __name__ == "__main__":
     main()
