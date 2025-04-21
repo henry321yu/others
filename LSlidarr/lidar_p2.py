@@ -31,9 +31,10 @@ render_option.point_size = 2.0  # 可調整點大小
 # 資料收集
 data_list = []
 intensity_list = []
-max_points = 80000
+max_points = 320000
 count = 0
 start_time = time.perf_counter()
+gotnp = 0
 
 def parse_packet(data):
     blocks = 12
@@ -51,7 +52,7 @@ def parse_packet(data):
         for ch in range(channels):
             offset = base + 4 + ch * 3
             distance_raw = struct.unpack_from("<H", data, offset)[0]
-            intensity = data[offset + 2]
+            intensity = data[offset+2]
             distance = distance_raw * DISTANCE_RESOLUTION
             if distance == 0:
                 continue
@@ -77,7 +78,7 @@ def receiver_thread(sock):
                 pass
 
 def plotter_thread():
-    global count, start_time
+    global count, start_time, gotnp, max_points
     while True:
         data = packet_queue.get()
         points, intensities = parse_packet(data)
@@ -104,13 +105,43 @@ def plotter_thread():
             # 轉換為 RGB 彩色（可改為更複雜 colormap）
             colors = np.stack([norm_intensity]*3, axis=1)  # 灰階 (R=G=B)
 
-            pcd.points = o3d.utility.Vector3dVector(np_points)
-            pcd.colors = o3d.utility.Vector3dVector(colors)
-            vis.update_geometry(pcd)
-            vis.poll_events()
-            vis.update_renderer()
+            if np_points.size > 0:
+                pcd.points = o3d.utility.Vector3dVector(np_points)
 
-            print(f"{max_points} points in {fp:.2f}s | {current_time} | {f/1000:.2f}k Hz")
+                # ==== 彩色映射根據 intensity ====
+                intensities_np = np.array(intensities, dtype=np.float32)
+                norm_intensity = (intensities_np - intensities_np.min()) / (np.ptp(intensities_np) + 1e-6)
+
+                # 漸變：綠（低）→ 藍（中）→ 紅（高）
+                colors = np.zeros((len(norm_intensity), 3), dtype=np.float32)
+                for i, val in enumerate(norm_intensity):
+                    if val < 0.5:
+                        # 綠 → 藍
+                        t = val * 2  # 0~1
+                        colors[i] = [0, t, 1 - t]  # G→B
+                    else:
+                        # 藍 → 紅
+                        t = (val - 0.5) * 2  # 0~1
+                        colors[i] = [t, 0, 1 - t]  # B→R
+
+                pcd.colors = o3d.utility.Vector3dVector(colors)
+
+                vis.update_geometry(pcd)
+                vis.poll_events()
+                vis.update_renderer()
+
+                # ==== 視角設定（只跑一次）====
+                if gotnp != 1:
+                    vis.reset_view_point(True)
+                    vc = vis.get_view_control()
+                    vc.set_lookat([0, 0, 0])     # 看中心點
+                    vc.set_front([0, 1, 0])     # 從 Y- 看過去
+                    vc.set_up([0, 0, 1])         # Z 軸向上
+                    vc.set_zoom(0.75)
+                    gotnp = 1
+                    max_points = 32000
+
+            print(f"{max_points} points in {fp:.2f}s | {current_time} | {f/1000:.2f}k Hz | First point: ({np_points[0,0]:.3f}, {np_points[0,1]:.3f}, {np_points[0,2]:.3f})")
 
             data_list.clear()
             intensity_list.clear()
