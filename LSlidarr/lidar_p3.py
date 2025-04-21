@@ -10,8 +10,8 @@ import open3d as o3d
 # LiDAR 網路設定
 UDP_IP = "0.0.0.0"
 UDP_PORT = 2368
-PACKET_SIZE = 1212  # 根據手冊，應為 1200 data + 6 extra info
-DISTANCE_RESOLUTION = 0.0025  # 0.25 cm = 0.0025 m
+PACKET_SIZE = 1212
+DISTANCE_RESOLUTION = 0.4  # 單位公尺
 
 VERTICAL_ANGLES = [
     -16, 0, -14, 2, -12, 4, -10, 6,
@@ -35,8 +35,12 @@ count = 0
 start_time = time.perf_counter()
 gotnp = 0
 
-# 設定 intensity 顏色的最大值閥值
-MAX_INTENSITY = 128
+# intensity 顏色映射最大值
+MAX_INTENSITY = 100
+
+# 頻率統計變數
+data_count_lock = threading.Lock()
+per_second_counter = 0
 
 def parse_packet(data):
     blocks = 12
@@ -51,7 +55,7 @@ def parse_packet(data):
         azimuth = struct.unpack_from("<H", data, base + 2)[0] / 100.0
         azimuth_rad = math.radians(azimuth)
 
-        for firing in range(2):  # 每個 block 有兩組 16 通道
+        for firing in range(2):
             for ch in range(channels):
                 idx = firing * channels + ch
                 offset = base + 4 + idx * 3
@@ -71,11 +75,7 @@ def parse_packet(data):
                 points.append([x, y, z])
                 intensities.append(intensity)
 
-    # 解析封包最後的 Timestamp 與 Factory
-    timestamp = struct.unpack_from("<I", data, 1200)[0]
-    factory = struct.unpack_from("<H", data, 1204)[0]
-
-    return points, intensities, timestamp, factory
+    return points, intensities
 
 def receiver_thread(sock):
     while True:
@@ -88,20 +88,29 @@ def receiver_thread(sock):
 
 def plotter_thread():
     global count, start_time, gotnp, max_points
+    FREQ_INTERVAL = 5.0  # 每 2 秒顯示一次頻率資訊
+    last_time = time.perf_counter()
+    freq_point_counter = 0
+
     while True:
         data = packet_queue.get()
-        points, intensities, timestamp, factory = parse_packet(data)
+        points, intensities = parse_packet(data)
         if len(points) > 0:
             data_list.extend(points)
             intensity_list.extend(intensities)
             count += len(points)
+            freq_point_counter += len(points)
+
+        current = time.perf_counter()
+        if current - last_time >= FREQ_INTERVAL:
+            elapsed = current - last_time
+            points_per_sec = freq_point_counter / elapsed
+            current_time = time.strftime("%H:%M:%S")
+            print(f"[{current_time}] {freq_point_counter} points in {elapsed:.2f}s | {points_per_sec/1000:.2f}k Hz")
+            last_time = current
+            freq_point_counter = 0
 
         if len(data_list) >= max_points:
-            elapsed = time.perf_counter() - start_time
-            f = count / elapsed
-            fp = max_points / f
-            current_time = time.strftime("%H:%M:%S")
-
             np_points = np.array(data_list, dtype=np.float32)
             np_intensity = np.array(intensity_list, dtype=np.float32)
 
@@ -131,12 +140,9 @@ def plotter_thread():
                 vc.set_lookat([0, 0, 0])
                 vc.set_zoom(0.75)
                 gotnp = 1
-                max_points = 120000
+                max_points = 32000
 
-            print(f"{max_points} points in {fp:.2f}s | {current_time} | {f/1000:.2f}k Hz")
-            print(f"First point: ({np_points[0,0]:.3f}, {np_points[0,1]:.3f}, {np_points[0,2]:.3f})")
-            print(f"Timestamp: {timestamp} | Factory: 0x{factory:04X}\n")
-
+            # 清除暫存並重置
             data_list.clear()
             intensity_list.clear()
             count = 0
@@ -146,6 +152,7 @@ def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((UDP_IP, UDP_PORT))
     print(f"Listening on UDP port {UDP_PORT}...")
+
     threading.Thread(target=receiver_thread, args=(sock,), daemon=True).start()
     plotter_thread()
 

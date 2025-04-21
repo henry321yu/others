@@ -109,22 +109,31 @@ def plotter_thread():
             if np_points.size > 0:
                 pcd.points = o3d.utility.Vector3dVector(np_points)
 
-                # ==== 彩色映射根據 intensity ====
-                # intensities_np = np.array(intensities, dtype=np.float32)
+                # ==== 彩色映射根據 intensity（指定閥值）====
                 intensities_np = np.array(intensity_list, dtype=np.float32)
-                norm_intensity = (intensities_np - intensities_np.min()) / (np.ptp(intensities_np) + 1e-6)
+                # intensities_np = np.array(intensities, dtype=np.float32) #顏色錯誤但頻率很快
 
-                # 漸變：綠（低）→ 藍（中）→ 紅（高）
+                threshold = 255.0  # 設定強度閥值
+                norm_intensity = np.clip(intensities_np / threshold, 0, 1)
+
+                # 漸變：黃（高）→ 綠（中）→ 藍（低），超過閥值為紅
                 colors = np.zeros((len(norm_intensity), 3), dtype=np.float32)
                 for i, val in enumerate(norm_intensity):
-                    if val < 0.5:
-                        # 綠 → 藍
-                        t = val * 2  # 0~1
-                        colors[i] = [0, t, 1 - t]  # G→B
-                    else:
-                        # 藍 → 紅
+                    if val < 0.25:
+                        # 藍 → 綠
+                        t = val * 4  # 0~1
+                        colors[i] = [0.0, t, 1.0]  # B→G
+                    elif val < 0.5:
+                        # 綠 → 黃
+                        t = (val - 0.25) * 4  # 0~1
+                        colors[i] = [t, 1.0, 0.0]  # G→Y
+                    elif val < 1.0:
+                        # 黃 → 紅
                         t = (val - 0.5) * 2  # 0~1
-                        colors[i] = [t, 0, 1 - t]  # B→R
+                        colors[i] = [1.0, 1.0 - t, 0.0]  # Y→R
+                    else:
+                        # 超過閥值，設為紅
+                        colors[i] = [1.0, 0.0, 0.0]
 
                 pcd.colors = o3d.utility.Vector3dVector(colors)
 
@@ -136,14 +145,12 @@ def plotter_thread():
                 if gotnp != 1:
                     vis.reset_view_point(True)
                     vc = vis.get_view_control()
-                    vc.set_lookat([0, 0, 0])     # 看中心點
-                    # vc.set_front([1, 0, 0])     # 從 Y- 看過去
-                    # vc.set_up([0, 0, 1])         # Z 軸向上
-                    vc.set_zoom(0.75)
+                    vc.set_lookat([0, 0, 0])    # 看中心點
+                    vc.set_zoom(0.5)              #起始鏡頭縮放
                     gotnp = 1
-                    max_points = 32000
+                    max_points = 320000
 
-            print(f"{max_points} points in {fp:.2f}s | {current_time} | {f/1000:.2f}k Hz | First point: ({np_points[0,0]:.3f}, {np_points[0,1]:.3f}, {np_points[0,2]:.3f})")
+            print(f"{max_points} points in {fp:.2f}s | {current_time} | {f/1000:.2f}k Hz")
 
             data_list.clear()
             intensity_list.clear()
