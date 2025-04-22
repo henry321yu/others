@@ -58,26 +58,34 @@ def parse_packet(data):
     channels = 16
     points = []
     intensities = []
+
     for block_idx in range(blocks):
         base = 100 * block_idx
         if data[base:base+2] != b'\xFF\xEE':
             continue
         azimuth = struct.unpack_from("<H", data, base + 2)[0] / 100.0
         azimuth_rad = math.radians(azimuth)
-        for ch in range(channels):
-            offset = base + 4 + ch * 3
-            distance_raw = struct.unpack_from("<H", data, offset)[0]
-            intensity = data[offset + 2]
-            distance = distance_raw * DISTANCE_RESOLUTION
-            if distance == 0:
-                continue
-            vert_angle = VERTICAL_ANGLES[ch]
-            vert_rad = math.radians(vert_angle)
-            x = distance * math.cos(vert_rad) * math.sin(azimuth_rad)
-            y = distance * math.cos(vert_rad) * math.cos(azimuth_rad)
-            z = distance * math.sin(vert_rad)
-            points.append([x, y, z])
-            intensities.append(intensity)
+
+        for firing in range(2):
+            for ch in range(channels):
+                idx = firing * channels + ch
+                offset = base + 4 + idx * 3
+                distance_raw = struct.unpack_from("<H", data, offset)[0]
+                intensity = data[offset + 2]
+
+                distance = distance_raw * DISTANCE_RESOLUTION
+                if distance == 0:
+                    continue
+                vert_angle = VERTICAL_ANGLES[ch]
+                vert_rad = math.radians(vert_angle)
+
+                x = distance * math.cos(vert_rad) * math.sin(azimuth_rad)
+                y = distance * math.cos(vert_rad) * math.cos(azimuth_rad)
+                z = distance * math.sin(vert_rad)
+
+                points.append([x, y, z])
+                intensities.append(intensity)
+
     return points, intensities
 
 def receiver_thread(sock):
@@ -139,7 +147,7 @@ def pointcloud_updater():
                 vc.set_lookat([0, 0, 0])
                 vc.set_zoom(0.5)
                 gotnp = 1
-                max_points = 64000
+                max_points = 160000
 
             data_list.clear()
             intensity_list.clear()

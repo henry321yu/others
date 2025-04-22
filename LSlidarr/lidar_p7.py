@@ -22,7 +22,7 @@ packet_queue = queue.Queue(maxsize=1000)
 pcd = o3d.geometry.PointCloud()
 data_list = []
 intensity_list = []
-max_points = 160000
+max_points = 64000
 count = 0
 start_time = time.perf_counter()
 gotnp = 0
@@ -58,26 +58,34 @@ def parse_packet(data):
     channels = 16
     points = []
     intensities = []
+
     for block_idx in range(blocks):
         base = 100 * block_idx
         if data[base:base+2] != b'\xFF\xEE':
             continue
         azimuth = struct.unpack_from("<H", data, base + 2)[0] / 100.0
         azimuth_rad = math.radians(azimuth)
-        for ch in range(channels):
-            offset = base + 4 + ch * 3
-            distance_raw = struct.unpack_from("<H", data, offset)[0]
-            intensity = data[offset + 2]
-            distance = distance_raw * DISTANCE_RESOLUTION
-            if distance == 0:
-                continue
-            vert_angle = VERTICAL_ANGLES[ch]
-            vert_rad = math.radians(vert_angle)
-            x = distance * math.cos(vert_rad) * math.sin(azimuth_rad)
-            y = distance * math.cos(vert_rad) * math.cos(azimuth_rad)
-            z = distance * math.sin(vert_rad)
-            points.append([x, y, z])
-            intensities.append(intensity)
+
+        for firing in range(2):
+            for ch in range(channels):
+                idx = firing * channels + ch
+                offset = base + 4 + idx * 3
+                distance_raw = struct.unpack_from("<H", data, offset)[0]
+                intensity = data[offset + 2]
+
+                distance = distance_raw * DISTANCE_RESOLUTION
+                if distance == 0:
+                    continue
+                vert_angle = VERTICAL_ANGLES[ch]
+                vert_rad = math.radians(vert_angle)
+
+                x = distance * math.cos(vert_rad) * math.sin(azimuth_rad)
+                y = distance * math.cos(vert_rad) * math.cos(azimuth_rad)
+                z = distance * math.sin(vert_rad)
+
+                points.append([x, y, z])
+                intensities.append(intensity)
+
     return points, intensities
 
 def receiver_thread(sock):
@@ -90,26 +98,34 @@ def receiver_thread(sock):
                 pass
 
 def pointcloud_updater():
-    global count, start_time, gotnp, max_points
+    global count, start_time, gotnp, max_points, data_list, intensity_list
+    max_display_points = 80000
+
     while True:
         data = packet_queue.get()
         points, intensities = parse_packet(data)
+
         if len(points) > 0:
             data_list.extend(points)
             intensity_list.extend(intensities)
             count += len(points)
 
-        if len(data_list) >= max_points:
+        # 限制資料數量以避免空白或過多點
+        if len(data_list) >= max_display_points:
+            # 若資料超過上限，只保留最新的 max_display_points 筆
+            data_list = data_list[-max_display_points:]
+            intensity_list = intensity_list[-max_display_points:]
+
             elapsed = time.perf_counter() - start_time
             f = count / elapsed
-            fp = max_points / f
+            fp = max_display_points / f
             current_time = time.strftime("%H:%M:%S")
 
             np_points = np.array(data_list, dtype=np.float32)
             np_intensity = np.array(intensity_list, dtype=np.float32)
 
             if np_intensity.max() > 0:
-                norm_intensity = np.clip(np_intensity / 255, 0, 1)   #調整顏色閥值
+                norm_intensity = np.clip(np_intensity / 255, 0, 1)
             else:
                 norm_intensity = np.zeros_like(np_intensity)
 
@@ -139,13 +155,11 @@ def pointcloud_updater():
                 vc.set_lookat([0, 0, 0])
                 vc.set_zoom(0.5)
                 gotnp = 1
-                max_points = 64000
 
-            data_list.clear()
-            intensity_list.clear()
             count = 0
             start_time = time.perf_counter()
-            print(f"{max_points} points in {fp:.2f}s | {current_time} | {f/1000:.2f}k Hz")
+            print(f"{len(data_list)} points in {fp:.2f}s | {current_time} | {f/1000:.2f}k Hz")
+
 
 def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
