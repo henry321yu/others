@@ -1,3 +1,0 @@
-C:/Users/sgrc-325/Desktop/LS Lidar/reader/build/CMakeFiles/lidar.dir
-C:/Users/sgrc-325/Desktop/LS Lidar/reader/build/CMakeFiles/edit_cache.dir
-C:/Users/sgrc-325/Desktop/LS Lidar/reader/build/CMakeFiles/rebuild_cache.dir

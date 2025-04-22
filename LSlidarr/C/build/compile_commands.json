@@ -1,8 +1,0 @@
-[
-{
-  "directory": "C:/Users/sgrc-325/Desktop/LS Lidar/reader/build",
-  "command": "C:\\mingw64\\bin\\g++.exe  @CMakeFiles/lidar.dir/includes_CXX.rsp -g -std=gnu++14 -o CMakeFiles\\lidar.dir\\main.cpp.obj -c \"C:\\Users\\sgrc-325\\Desktop\\LS Lidar\\reader\\main.cpp\"",
-  "file": "C:/Users/sgrc-325/Desktop/LS Lidar/reader/main.cpp",
-  "output": "CMakeFiles/lidar.dir/main.cpp.obj"
-}
-]

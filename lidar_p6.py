@@ -22,9 +22,12 @@ packet_queue = queue.Queue(maxsize=1000)
 pcd = o3d.geometry.PointCloud()
 data_list = []
 intensity_list = []
+i_max_points = 160000
 max_points = 160000
 count = 0
-start_time = time.perf_counter()
+frame_count = 0
+dframe_count = 0
+start_time_ns = time.perf_counter_ns()
 gotnp = 0
 
 # 建立視窗
@@ -98,7 +101,7 @@ def receiver_thread(sock):
                 pass
 
 def pointcloud_updater():
-    global count, start_time, gotnp, max_points
+    global count, start_time_ns, gotnp, i_max_points, max_points,frame_count,dframe_count
     while True:
         data = packet_queue.get()
         points, intensities = parse_packet(data)
@@ -107,11 +110,16 @@ def pointcloud_updater():
             intensity_list.extend(intensities)
             count += len(points)
 
-        if len(data_list) >= max_points:
-            elapsed = time.perf_counter() - start_time
-            f = count / elapsed
-            fp = max_points / f
+        if len(data_list) >= i_max_points:
             current_time = time.strftime("%H:%M:%S")
+            current_time_ns = time.perf_counter_ns()
+            elapsed_ns = current_time_ns - start_time_ns
+            elapsed_s = elapsed_ns / 1e9
+            frame_count += len(data_list)
+            dframe_count +=1
+            dfrequency=dframe_count/elapsed_s
+            frequency = frame_count / elapsed_s/ 1000
+            print(f"{current_time}, {elapsed_s:.3f}s, Frames:{frame_count}, Points:{len(data_list)}, {frequency:.2f} kHz, disp {dfrequency:.2f} Hz")
 
             np_points = np.array(data_list, dtype=np.float32)
             np_intensity = np.array(intensity_list, dtype=np.float32)
@@ -147,13 +155,11 @@ def pointcloud_updater():
                 vc.set_lookat([0, 0, 0])
                 vc.set_zoom(0.5)
                 gotnp = 1
-                max_points = 160000
+                i_max_points = max_points
 
             data_list.clear()
             intensity_list.clear()
             count = 0
-            start_time = time.perf_counter()
-            print(f"{max_points} points in {fp:.2f}s | {current_time} | {f/1000:.2f}k Hz")
 
 def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
