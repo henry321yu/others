@@ -14,8 +14,8 @@ PACKET_SIZE = 1212
 DISTANCE_RESOLUTION = 0.004
 
 VERTICAL_ANGLES = [
-    -16, 0, -14, 2, -12, 4, -10, 6,
-    -8, 8, -6, 10, -4, 12, -2, 14
+    -15, 1, -13, 3, -11, 5, -9, 7,
+    -7, 9, -5, 11, -3, 13, -1, 15
 ]
 
 packet_queue = queue.Queue(maxsize=1000)

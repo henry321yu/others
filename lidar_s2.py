@@ -12,8 +12,8 @@ PACKET_SIZE = 1212
 DISTANCE_RESOLUTION = 0.004
 
 VERTICAL_ANGLES = [
-    -16, 0, -14, 2, -12, 4, -10, 6,
-    -8, 8, -6, 10, -4, 12, -2, 14
+    -15, 1, -13, 3, -11, 5, -9, 7,
+    -7, 9, -5, 11, -3, 13, -1, 15
 ]
 
 packet_queue = queue.Queue(maxsize=1000)
@@ -73,10 +73,8 @@ def pointcloud_logger():
             frequency = frame_count / elapsed_s/ 1000
             # print(f"{elapsed_s:6f} s,Frame {frame_count},Points: {len(data_points)},{frequency:.2f} kHz")
 
-            # for i, (v_angle, azimuth, distance, intensity) in enumerate(data_points[:100]): #印出前n筆資料
-            #     print(f"{elapsed_s:3f}s, {v_angle:.2f}, {azimuth:.2f}, {distance:.3f}, {intensity}, {frequency:.2f} Hz")
-
-            for v_angle, azimuth, distance, intensity in data_points: #印出全數資料
+            for i, (v_angle, azimuth, distance, intensity) in enumerate(data_points[:100]): #印出前n筆資料
+            # for v_angle, azimuth, distance, intensity in data_points: #印出全數資料
                 print(f"{elapsed_s:3f}s, {v_angle:.2f}, {azimuth:.2f}, {distance:.3f}, {intensity}, {frequency:.2f} Hz")
 
             # 清除資料準備下一幀
