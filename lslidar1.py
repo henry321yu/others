@@ -36,6 +36,7 @@ sock_recv.bind((LOCAL_IP, LOCAL_PORT))
 
 # 新增全局變數
 ax = ay = az = tem = 0.0  # 用來存放接收到的加速度和溫度數據
+printclock = 0
 
 def parse_packet(data):
     blocks = 12
@@ -84,7 +85,7 @@ def receiver_thread(sock):
                 pass
 
 def pointcloud_updater():
-    global start_time_ns, gotnp, i_max_points, frame_count, dframe_count, ax, ay, az, tem
+    global start_time_ns, gotnp, i_max_points, frame_count, dframe_count, ax, ay, az, tem,printclock
     while True:
         data = packet_queue.get()
         points, intensities = parse_packet(data)
@@ -109,7 +110,10 @@ def pointcloud_updater():
                 vert_angle = VERTICAL_ANGLES[i % len(VERTICAL_ANGLES)]  # 使用垂直角
 
                 # 印出 LiDAR 資料以及接收到的加速度和溫度數據
-                print(f"{current_time}, {elapsed_s:.3f}s, {vert_angle},{azimuth:.2f},{distance:.2f},{ax},{ay},{az},{tem},Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
+                # print(f"{current_time}, {elapsed_s:.3f}s, {vert_angle},{azimuth:.2f},{distance:.2f},{ax},{ay},{az},{tem},Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
+                if(elapsed_s > printclock):
+                    print(f"{current_time}, {elapsed_s:.3f}s, {vert_angle},{azimuth:.2f},{distance:.2f},{ax},{ay},{az},{tem},Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
+                    printclock = printclock + 1
 
             # 清空數據列表
             data_list.clear()
@@ -155,7 +159,7 @@ def main():
 
     # 🧠 這裡維持在主執行緒
     while True:
-        time.sleep(0.001)
+        time.sleep(0.0001)
 
 if __name__ == "__main__":
     main()
