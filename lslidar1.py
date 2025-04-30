@@ -112,8 +112,8 @@ def pointcloud_updater():
                 # 印出 LiDAR 資料以及接收到的加速度和溫度數據
                 # print(f"{current_time}, {elapsed_s:.3f}s, {vert_angle},{azimuth:.2f},{distance:.2f},{ax},{ay},{az},{tem},Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
                 if(elapsed_s > printclock):
+                    printclock = printclock + 0.5
                     print(f"{current_time}, {elapsed_s:.3f}s, {vert_angle},{azimuth:.2f},{distance:.2f},{ax},{ay},{az},{tem},Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
-                    printclock = printclock + 1
 
             # 清空數據列表
             data_list.clear()
@@ -154,12 +154,11 @@ def main():
 
     threading.Thread(target=receiver_thread, args=(sock,), daemon=True).start()
     threading.Thread(target=pointcloud_updater, daemon=True).start()
-    threading.Thread(target=monitor, daemon=True).start()
+    # threading.Thread(target=monitor, daemon=True).start()
     threading.Thread(target=udp_data_receiver, daemon=True).start()
 
-    # 🧠 這裡維持在主執行緒
     while True:
-        time.sleep(0.0001)
+        time.sleep(1)
 
 if __name__ == "__main__":
     main()
