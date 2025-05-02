@@ -80,7 +80,7 @@ def file_logger():
                 parts = line.split(",")
                 if len(parts) > 1:
                     program_time = float(parts[1])
-                    if program_time-tt > 5:
+                    if program_time-tt > 86400:
                         tt=program_time
                         current_file.close()
                         file_index = (file_index + 1) % 100  # 確保在 00~99 範圍循環
