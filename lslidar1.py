@@ -110,10 +110,10 @@ def pointcloud_updater():
                 vert_angle = VERTICAL_ANGLES[i % len(VERTICAL_ANGLES)]  # 使用垂直角
 
                 # 印出 LiDAR 資料以及接收到的加速度和溫度數據
-                # print(f"{current_time}, {elapsed_s:.3f}s, {vert_angle},{azimuth:.2f},{distance:.2f},{ax},{ay},{az},{tem},Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
+                # print(f"{current_time}, {elapsed_s:.3f}s, {vert_angle}, {azimuth:.2f}, {distance:.2f}, {ax}, {ay}, {az}, {tem}°C, Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
                 if(elapsed_s > printclock):
                     printclock = printclock + 0.5
-                    print(f"{current_time}, {elapsed_s:.3f}s, {vert_angle},{azimuth:.2f},{distance:.2f},{ax},{ay},{az},{tem},Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
+                    print(f"{current_time}, {elapsed_s:.3f}s, {vert_angle}, {azimuth:.2f}, {distance:.2f}, {ax}, {ay}, {az}, {tem}°C, Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
 
             # 清空數據列表
             data_list.clear()
