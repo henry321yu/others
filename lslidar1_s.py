@@ -4,6 +4,7 @@ import math
 import time
 import threading
 import queue
+from datetime import datetime
 
 # LiDAR 設定
 UDP_IP = "0.0.0.0"
@@ -39,8 +40,8 @@ ax = ay = az = tem = 0.0  # 用來存放接收到的加速度和溫度數據
 printclock = 0
 
 #save data
-file_path = r"C:\Users\sgrc-325\Desktop\git\lidar\lslidarr\lslidar_output.txt"
-# file_path = "lslidar_output.txt"
+# file_path = r"C:\Users\sgrc-325\Desktop\git\lidar\lslidarr\lslidar_output.txt"
+file_path = "lslidar_output.txt"
 log_queue = queue.Queue(maxsize=i_max_points)
 log_queue_full=0
 
@@ -114,7 +115,7 @@ def pointcloud_updater():
             intensity_list.extend(intensities)
 
         if len(data_list) >= i_max_points:
-            current_time = time.strftime("%H:%M:%S")
+            current_time = datetime.now().strftime("%H:%M:%S.%f")[:-4]  # 精確到百分之一秒（兩位小數）
             current_time_ns = time.perf_counter_ns()
             elapsed_ns = current_time_ns - start_time_ns
             elapsed_s = elapsed_ns / 1e9

@@ -5,6 +5,7 @@ import time
 import threading
 import queue
 import os
+from datetime import datetime
 
 # LiDAR 設定
 UDP_IP = "0.0.0.0"
@@ -150,7 +151,7 @@ def pointcloud_updater():
             intensity_list.extend(intensities)
 
         if len(data_list) >= i_max_points:
-            current_time = time.strftime("%H:%M:%S")
+            current_time = datetime.now().strftime("%H:%M:%S.%f")[:-4]  # 精確到百分之一秒（兩位小數）
             current_time_ns = time.perf_counter_ns()
             elapsed_ns = current_time_ns - start_time_ns
             elapsed_s = elapsed_ns / 1e9
@@ -165,10 +166,10 @@ def pointcloud_updater():
                 vert_angle = VERTICAL_ANGLES[i % len(VERTICAL_ANGLES)]  # 使用垂直角
 
                 # 印出 LiDAR 資料以及接收到的加速度和溫度數據
-                # print(f"{current_time}, {elapsed_s:.3f}s, {vert_angle}, {azimuth:.2f}, {distance:.2f}, {ax}, {ay}, {az}, {tem}, Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
+                # print(f"{current_time}, {elapsed_s:.3f}s, {vert_angle}, {azimuth:.2f}, {distance:.2f}, {ax}, {ay}, {az}, {tem}°C, Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
                 if(elapsed_s > printclock):
                     printclock = printclock + 0.5
-                    print(f"{current_time}, {elapsed_s:.3f}s, {vert_angle}, {azimuth:.2f}, {distance:.2f}, {ax}, {ay}, {az}, {tem}, Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
+                    print(f"{current_time}, {elapsed_s:.3f}s, {vert_angle}, {azimuth:.2f}, {distance:.2f}, {ax}, {ay}, {az}, {tem}°C, Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
                     log_line = f"{current_time},{elapsed_s:.3f},{vert_angle},{azimuth:.2f},{distance:.2f},{ax},{ay},{az},{tem},{len(data_list)},{frequency:.2f},{dfrequency:.2f}"
                     log_queue.put_nowait(log_line)
 
