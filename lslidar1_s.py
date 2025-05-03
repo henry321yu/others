@@ -39,8 +39,8 @@ ax = ay = az = tem = 0.0  # 用來存放接收到的加速度和溫度數據
 printclock = 0
 
 #save data
-# file_path = r"C:\Users\sgrc-325\Desktop\git\lidar\lslidarr\lslidar_output.txt"
-file_path = "lslidar_output.txt"
+file_path = r"C:\Users\sgrc-325\Desktop\git\lidar\lslidarr\lslidar_output.txt"
+# file_path = "lslidar_output.txt"
 log_queue = queue.Queue(maxsize=i_max_points)
 log_queue_full=0
 
@@ -129,10 +129,10 @@ def pointcloud_updater():
                 vert_angle = VERTICAL_ANGLES[i % len(VERTICAL_ANGLES)]  # 使用垂直角
 
                 # 印出 LiDAR 資料以及接收到的加速度和溫度數據
-                # print(f"{current_time}, {elapsed_s:.3f}s, {vert_angle}, {azimuth:.2f}, {distance:.2f}, {ax}, {ay}, {az}, {tem}, Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
+                # print(f"{current_time}, {elapsed_s:.3f}s, {vert_angle}, {azimuth:.2f}, {distance:.2f}, {ax}, {ay}, {az}, {tem}°C, Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
                 if(elapsed_s > printclock):
                     printclock = printclock + 0.5
-                    print(f"{current_time}, {elapsed_s:.3f}s, {vert_angle}, {azimuth:.2f}, {distance:.2f}, {ax}, {ay}, {az}, {tem}, Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
+                    print(f"{current_time}, {elapsed_s:.3f}s, {vert_angle}, {azimuth:.2f}, {distance:.2f}, {ax}, {ay}, {az}, {tem}°C, Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
                     log_line = f"{current_time},{elapsed_s:.3f},{vert_angle},{azimuth:.2f},{distance:.2f},{ax},{ay},{az},{tem},{len(data_list)},{frequency:.2f},{dfrequency:.2f}"
                     log_queue.put_nowait(log_line)
 
