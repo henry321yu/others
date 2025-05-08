@@ -66,7 +66,8 @@ x = T_all['datetime']
 # 可用欄位
 plot_vars = [col for col in T_all.columns if col not in ['time', 'datetime', 'program_time']]
 
-# 範例：單圖繪圖
+# 選擇要繪圖的欄位
+# {'vert_angle','azimuth','distance','ax','ay','az','temperture','points','frequency_khz_','program_frequency',}
 idx = 6  # 根據實際欄位選擇
 smoothk = 50
 y = pd.to_numeric(T_all[plot_vars[idx]], errors='coerce')
