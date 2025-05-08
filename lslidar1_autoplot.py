@@ -8,8 +8,9 @@ import matplotlib.dates as mdates
 import time
 
 # 資料夾路徑
-folder = r'C:\Users\弘銘\Desktop\work from home\git\lidar\lslidarr\\'
+# folder = r'C:\Users\弘銘\Desktop\work from home\git\lidar\lslidarr\\'
 # folder = r'C:\Users\sgrc-325\Desktop\git\lidar\lslidarr\\'
+folder = ''
 
 # 欲繪圖欄位 index
 plot_idx = 6
