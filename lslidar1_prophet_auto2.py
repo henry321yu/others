@@ -75,7 +75,7 @@ def process_and_plot():
     idx = 6  # 可以更換
     target_var = plot_vars[idx]
     smoothk = 50
-    model_hr = 1 # 模型小時數
+    model_hr = 2 # 模型小時數
     future_hr = 2 # 預測的小時數
 
     latest_time = T_all['datetime'].iloc[-1]
@@ -116,7 +116,12 @@ def process_and_plot():
         future_pred_prophet = forecast['yhat'][-future_hr * 3600:]
 
     plt.clf()
-    plt.rcParams['font.family'] = 'Microsoft JhengHei'
+    plt.rcParams['font.family'] = 'Microsoft JhengHei' #使中文編碼正確
+
+    x_end=T_all['datetime'].iloc[-1]
+    y_end=data.iloc[-1]
+    plt.plot(x_end, y_end, 'mo')
+    plt.text(x_end, y_end, f'{y_end:.2f}', fontsize=9, color='k')
 
     plt.plot(T_all['datetime'], data, '.', markersize=1.2, label=f'全數{latest_s:.2f}秒資料')
     plt.plot(x_recent_time, y_recent, 'y.', markersize=1.2, label=f'近{model_hr}小時資料')
@@ -129,12 +134,10 @@ def process_and_plot():
         plt.plot(future_times, future_pred_linear, 'r--', linewidth=1.2, label='線性預測')
         plt.plot(last_time, last_value_linear, 'ro')
         plt.text(last_time, last_value_linear, f'{last_value_linear:.2f}', fontsize=9, color='red')
-        print(f"[Linear] 預測 {last_time.strftime('%H:%M:%S')}, 值為：{last_value_linear:.4f}")
 
         plt.plot(future_times, future_pred_poly, 'g--', linewidth=1.2, label='多項式回歸 (deg=2)')
         plt.plot(last_time, last_value_poly, 'go')
         plt.text(last_time, last_value_poly, f'{last_value_poly:.2f}', fontsize=9, color='green')
-        print(f"[Poly] 預測 {last_time.strftime('%H:%M:%S')}, 值為：{last_value_poly:.4f}")
 
     if len(future_times_prophet) > 0:
         last_time_prophet = future_times_prophet.iloc[-1]
@@ -142,19 +145,20 @@ def process_and_plot():
         plt.plot(future_times_prophet, future_pred_prophet, 'b--', linewidth=1.2, label='Prophet預測')
         plt.plot(last_time_prophet, last_value_prophet, 'bo')
         plt.text(last_time_prophet, last_value_prophet, f'{last_value_prophet:.2f}', fontsize=9, color='blue')
-        print(f"[Prophet] 預測 {last_time_prophet.strftime('%H:%M:%S')}, 值為：{last_value_prophet:.4f}")
 
 
-    t_str = future_times[-1].strftime('%H:%M:%S.%f')[:-4]
-    print(f'資料為 {oldest_time.strftime("%H:%M:%S")} 到 {latest_time.strftime("%H:%M:%S")}')
-    print(f'依據最新的 {model_hr} 小時的 {target_var} 預測 {future_hr} 小時後,在 {t_str} 時的預測模型')
+    f_t_str = future_times[-1].strftime('%H:%M:%S.%f')[:-4]
+    print(f'資料為 {oldest_time.strftime("%Y-%m-%d %H:%M:%S")} 到 {latest_time.strftime("%Y-%m-%d %H:%M:%S")} 的 {target_var}\n依據最新{model_hr} 小時的資料,預測 {future_hr} 小時後,在 {f_t_str} 時的預測模型')
+    print(f'目前值為 {y_end:.3f}')
+    print(f"[Linear] 預測 {last_time.strftime('%H:%M:%S')}, 值為：{last_value_linear:.3f}")
+    print(f"[Poly] 預測 {last_time.strftime('%H:%M:%S')}, 值為：{last_value_poly:.3f}")
+    print(f"[Prophet] 預測 {last_time_prophet.strftime('%H:%M:%S')}, 值為：{last_value_prophet:.3f}")
 
-    time_fmt = mdates.DateFormatter('%H:%M:%S')
-    plt.gca().xaxis.set_major_formatter(time_fmt)
-
-    plt.title(f'資料為 {oldest_time.strftime("%H:%M:%S")} 到 {latest_time.strftime("%H:%M:%S")}\n依據最新的 {model_hr} 小時的 {target_var} 預測 {future_hr} 小時後,在 {t_str} 時的預測模型')
+    plt.title(f'資料為 {oldest_time.strftime("%Y-%m-%d %H:%M:%S")} 到 {latest_time.strftime("%Y-%m-%d %H:%M:%S")} 的 {target_var}\n依據最新{model_hr} 小時的資料,預測 {future_hr} 小時後,在 {f_t_str} 時的預測模型')
     plt.xlabel('Time')
-    plt.ylabel(target_var)
+    plt.ylabel(plot_vars[idx])
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
+    plt.xticks(rotation=45)
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
