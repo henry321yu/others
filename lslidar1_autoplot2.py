@@ -14,10 +14,11 @@ import time
 folder = ''
 
 # 欲繪圖欄位 index
-plot_idx = 6
+idx = 6
 smoothk = 50
 
 # 開啟互動模式
+plt.rcParams['font.family'] = 'Microsoft JhengHei' #使中文編碼正確
 plt.ion()
 fig, ax = plt.subplots()
 
@@ -72,19 +73,28 @@ while True:
 
     # 欄位列表與要畫的欄位
     plot_vars = [v for v in T_all.columns if v not in ['time', 'program_time']]
-    if plot_idx >= len(plot_vars):
+    if idx >= len(plot_vars):
         print("⚠️ 欲繪圖欄位索引超出範圍。")
         break
 
-    y = pd.to_numeric(T_all[plot_vars[plot_idx]], errors='coerce')
+    y = pd.to_numeric(T_all[plot_vars[idx]], errors='coerce')
     y_smooth = y.rolling(smoothk, min_periods=1).mean()
     x = T_all['datetime']
+    x_end=x.iloc[-1]
+    x_new=x.iloc[0]
+    y_end=y_smooth.iloc[-1]
+
+    print(f'資料為 {x_end.strftime("%Y-%m-%d %H:%M:%S")} 到 {x_new.strftime("%Y-%m-%d %H:%M:%S")} 的 {plot_vars[idx]}')
+    print(f'目前值為 {y_end:.3f}')
 
     # 繪圖
     ax.clear()
+    ax.plot(x_end, y_end, 'mo')
+    ax.text(x_end, y_end, f'{y_end:.2f}', fontsize=9, color='k')
     ax.plot(x, y_smooth, marker='.', linestyle='None', markersize=0.8)
-    ax.set_title(plot_vars[plot_idx])
-    ax.set_ylabel(plot_vars[plot_idx])
+    ax.set_title(f'資料為 {x_end.strftime("%Y-%m-%d %H:%M:%S")} 到 {x_new.strftime("%Y-%m-%d %H:%M:%S")} 的 {plot_vars[idx]}')
+    ax.set_xlabel('Time')
+    ax.set_ylabel(plot_vars[idx])
     ax.grid(True)
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
     fig.autofmt_xdate()
