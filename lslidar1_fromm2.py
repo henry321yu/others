@@ -72,13 +72,22 @@ idx = 6  # 根據實際欄位選擇
 smoothk = 50
 y = pd.to_numeric(T_all[plot_vars[idx]], errors='coerce')
 y_smooth = y.rolling(smoothk, min_periods=1).mean()
+x_end=T_all['datetime'].iloc[-1]
+x_new=T_all['datetime'].iloc[0]
+y_end=y_smooth.iloc[-1]
 
+print(f'資料為 {x_end.strftime("%Y-%m-%d %H:%M:%S")} 到 {x_new.strftime("%Y-%m-%d %H:%M:%S")} 的 {plot_vars[idx]}')
+print(f'目前值為 {y_end:.3f}')
+
+plt.rcParams['font.family'] = 'Microsoft JhengHei' #使中文編碼正確
+plt.plot(x_end, y_end, 'mo')
+plt.text(x_end, y_end, f'{y_end:.2f}', fontsize=9, color='k')
 plt.plot(x, y_smooth, marker='.', linestyle='None', markersize=0.8)
-plt.title(plot_vars[idx])
-plt.xlabel("時間")
+plt.title(f'資料為 {x_end.strftime("%Y-%m-%d %H:%M:%S")} 到 {x_new.strftime("%Y-%m-%d %H:%M:%S")} 的 {plot_vars[idx]}')
+plt.xlabel('Time')
 plt.ylabel(plot_vars[idx])
 plt.grid(True)
-plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m-%d %H:%M:%S'))
+plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
 plt.xticks(rotation=45)
 plt.tight_layout()
 plt.show()
