@@ -14,7 +14,7 @@ import time
 folder = ''
 
 # 欲繪圖欄位 index
-idx = 3
+idx = 7
 smoothk = 50
 
 # 開啟互動模式
