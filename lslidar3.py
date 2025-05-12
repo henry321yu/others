@@ -159,7 +159,7 @@ def get_2369():
 
             # 溫度（以 0.01°C 計算後再乘 3，可能是補償係數）
             temp_raw = struct.unpack_from('>h', data, 80)[0]
-            board2_temp = (temp_raw / 100.0) * 3.0            
+            board2_temp = (temp_raw / 100.0) * 6.03226 - 48.84387
         except Exception as e:
             pass
 
