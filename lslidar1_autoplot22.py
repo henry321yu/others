@@ -84,7 +84,7 @@ while True:
     x_new=x.iloc[0]
     y_end=y_smooth.iloc[-1]
 
-    print(f'資料為 {x_end.strftime("%Y-%m-%d %H:%M:%S")} 到 {x_new.strftime("%Y-%m-%d %H:%M:%S")} 的 {plot_vars[idx]}')
+    print(f'資料為 {x_new.strftime("%Y-%m-%d %H:%M:%S")} 到 {x_end.strftime("%Y-%m-%d %H:%M:%S")} 的 {plot_vars[idx]}')
     print(f'目前值為 {y_end:.3f}')
 
     # 繪圖
@@ -92,7 +92,7 @@ while True:
     ax.plot(x_end, y_end, 'mo')
     ax.text(x_end, y_end, f'{y_end:.2f}', fontsize=9, color='k')
     ax.plot(x, y_smooth, marker='.', linestyle='None', markersize=0.8)
-    ax.set_title(f'資料為 {x_end.strftime("%Y-%m-%d %H:%M:%S")} 到 {x_new.strftime("%Y-%m-%d %H:%M:%S")} 的 {plot_vars[idx]}')
+    ax.set_title(f'資料為 {x_new.strftime("%Y-%m-%d %H:%M:%S")} 到 {x_end.strftime("%Y-%m-%d %H:%M:%S")} 的 {plot_vars[idx]}')
     ax.set_xlabel('Time')
     ax.set_ylabel(plot_vars[idx])
     ax.grid(True)
