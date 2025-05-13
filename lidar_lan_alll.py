@@ -56,15 +56,24 @@ sock_pixel = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock_lidar1 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock_lidar2 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
+adxl_sent = 0
+img_sent = 0
+pixel_sent = 0
+lidar1_sent = 0
+lidar2_sent = 0
+
 def send_adxl355():
+    global adxl_sent
     while True:
         ax, ay, az, temp = read_adxl355()
         message = f"ADXL355,{ax:.6f},{ay:.6f},{az:.6f},{temp:.2f}"
         for ip, _ in REMOTE_PC_LIST:
             sock_adxl.sendto(message.encode(), (ip, ADXL_PORT))
+            adxl_sent += 1
         time.sleep(0.01)
 
 def send_camera():
+    global img_sent, pixel_sent
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         print("❌ 攝影機無法開啟")
@@ -84,17 +93,20 @@ def send_camera():
         pixel_msg = f"{ts},{pixel_val}"
         for ip, _ in REMOTE_PC_LIST:
             sock_pixel.sendto(pixel_msg.encode(), (ip, PIXEL_PORT))
+            pixel_sent += 1
 
         if frame_count % 2 == 0:
             success, jpeg = cv2.imencode('.jpg', resized, [int(cv2.IMWRITE_JPEG_QUALITY), 60])
             if success and len(jpeg) < 60000:
                 for ip, _ in REMOTE_PC_LIST:
                     sock_img.sendto(jpeg.tobytes(), (ip, IMAGE_PORT))
+                    img_sent += 1
         frame_count += 1
         time.sleep(interval)
 
 # ========= LiDAR 資料接收轉發 =========
 def forward_lidar(local_port, remote_port):
+    global lidar1_sent, lidar2_sent
     recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     recv_sock.bind(('', local_port))
     while True:
@@ -102,8 +114,24 @@ def forward_lidar(local_port, remote_port):
         for ip, _ in REMOTE_PC_LIST:
             sock = sock_lidar1 if remote_port == LIDAR1_PORT else sock_lidar2
             sock.sendto(data, (ip, remote_port))
+            if remote_port == LIDAR1_PORT:
+                lidar1_sent += 1
+            else:
+                lidar2_sent += 1
 
 # ========= 主程式 =========
+def print_status():
+    global adxl_sent, img_sent, pixel_sent, lidar1_sent, lidar2_sent
+    while True:
+        print(f"📊 系統狀態：")
+        print(f"  ADXL355 傳送數量: {adxl_sent}")
+        print(f"  影像傳送數量: {img_sent}")
+        print(f"  像素值傳送數量: {pixel_sent}")
+        print(f"  LiDAR1 傳送數量: {lidar1_sent}")
+        print(f"  LiDAR2 傳送數量: {lidar2_sent}")
+        print(f"  --------------------")
+        time.sleep(10)
+
 if __name__ == "__main__":
     setup_adxl355()
 
@@ -111,6 +139,7 @@ if __name__ == "__main__":
     threading.Thread(target=send_camera, daemon=True).start()
     threading.Thread(target=forward_lidar, args=(2368, 2368), daemon=True).start()
     threading.Thread(target=forward_lidar, args=(2369, 2369), daemon=True).start()
+    threading.Thread(target=print_status, daemon=True).start()
 
     print("📡 系統啟動中... 按 Ctrl+C 結束。")
     try:
