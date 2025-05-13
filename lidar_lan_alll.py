@@ -110,7 +110,7 @@ def forward_lidar(local_port, remote_port):
     recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     recv_sock.bind(('', local_port))
     while True:
-        data, _ = recv_sock.recvfrom(12000)
+        data, _ = recv_sock.recvfrom(1500)
         for ip, _ in REMOTE_PC_LIST:
             sock = sock_lidar1 if remote_port == LIDAR1_PORT else sock_lidar2
             sock.sendto(data, (ip, remote_port))
@@ -137,8 +137,8 @@ if __name__ == "__main__":
 
     threading.Thread(target=send_adxl355, daemon=True).start()
     threading.Thread(target=send_camera, daemon=True).start()
-    threading.Thread(target=forward_lidar, args=(2368, 2368), daemon=True).start()
-    threading.Thread(target=forward_lidar, args=(2369, 2369), daemon=True).start()
+    threading.Thread(target=forward_lidar, args=(LIDAR1_PORT, LIDAR1_PORT), daemon=True).start()
+    threading.Thread(target=forward_lidar, args=(LIDAR2_PORT, LIDAR2_PORT), daemon=True).start()
     threading.Thread(target=print_status, daemon=True).start()
 
     print("📡 系統啟動中... 按 Ctrl+C 結束。")
