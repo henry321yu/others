@@ -130,4 +130,25 @@ def lidar_receiver(sock, port_index):
 threading.Thread(target=lidar_receiver, args=(sock_lidar, 0), daemon=True).start()
 threading.Thread(target=lidar_receiver, args=(sock_lidar2, 1), daemon=True).start()
 
-# --------- 主執
+# --------- 主執行緒：傳送 ADXL355 ---------
+last_display_time = time.time()
+
+while True:
+    ax, ay, az, temp = read_355()
+    message = f"ADXL355,{ax:.6f},{ay:.6f},{az:.6f},{temp:.2f}"
+    data = message.encode('utf-8')
+
+    for ip in REMOTE_PC_LIST:
+        if not online_status[ip]: continue
+        try:
+            sock_acc.sendto(data, (ip, ACCPORT))
+            total_bytes_sent_acc += len(data)
+            sent_bytes_acc[ip] += len(data)
+        except:
+            pass
+
+    if time.time() - last_display_time >= 1:
+        display_status()
+        last_display_time = time.time()
+
+    time.sleep(0.01)  # 每 10ms 傳送 ADXL355
