@@ -121,8 +121,8 @@ def parse_packet(data):
                 distance_raw = struct.unpack_from("<H", data, offset)[0]
                 intensity = data[offset + 2]
                 distance = distance_raw * DISTANCE_RESOLUTION
-                if distance == 0:
-                    continue
+                # if distance == 0:
+                #     continue
                 vert_angle = VERTICAL_ANGLES[ch]
 
                 results.append((vert_angle, azimuth, distance, intensity))
