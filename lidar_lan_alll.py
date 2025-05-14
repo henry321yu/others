@@ -91,17 +91,26 @@ def send_adxl355():
 
 def send_camera():
     global img_sent, pixel_sent
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("攝影機無法開啟")
-        return
 
+    cap = None
     frame_count = 0
     interval = 0.5
+
     while True:
+        # 如果攝影機沒開啟，就嘗試開啟
+        if cap is None or not cap.isOpened():
+            print("攝影機未偵測到，等待重新連接中...")
+            cap = cv2.VideoCapture(0)
+            time.sleep(2)
+            continue
+
         ret, frame = cap.read()
         if not ret:
+            print("攝影機讀取失敗，重新初始化中...")
+            cap.release()
+            cap = None
             continue
+
         ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
         cv2.putText(frame, ts, (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         resized = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
@@ -120,8 +129,10 @@ def send_camera():
                     if online_status[ip]:
                         sock_img.sendto(jpeg.tobytes(), (ip, IMAGE_PORT))
                         img_sent += 1
+
         frame_count += 1
         time.sleep(interval)
+
 
 def lidar1():
     global lidar1_sent
