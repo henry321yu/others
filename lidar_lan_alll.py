@@ -49,6 +49,9 @@ PIXEL_PORT = 2386
 LIDAR1_PORT = 2368
 LIDAR2_PORT = 2369
 
+# ========= 上線狀態與統計 =========
+online_status = {ip: True for ip, _ in REMOTE_PC_LIST}
+
 # ========= 資料傳送 =========
 sock_adxl = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock_img = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -64,14 +67,26 @@ pixel_sent = 0
 lidar1_sent = 0
 lidar2_sent = 0
 
+def ping(ip):
+    param = "-n" if platform.system().lower() == "windows" else "-c"
+    result = os.system(f"ping {param} 1 {ip} > /dev/null 2>&1")
+    return result == 0
+
+def ping_checker():
+    while True:
+        for ip, _ in REMOTE_PC_LIST:
+            online_status[ip] = ping(ip)
+        time.sleep(5)
+
 def send_adxl355():
     global adxl_sent
     while True:
         ax, ay, az, temp = read_adxl355()
         message = f"ADXL355,{ax:.6f},{ay:.6f},{az:.6f},{temp:.2f}"
         for ip, _ in REMOTE_PC_LIST:
-            sock_adxl.sendto(message.encode(), (ip, ADXL_PORT))
-            adxl_sent += 1
+            if online_status[ip]:
+                sock_adxl.sendto(message.encode(), (ip, ADXL_PORT))
+                adxl_sent += 1
         time.sleep(0.01)
 
 def send_camera():
@@ -94,25 +109,26 @@ def send_camera():
         pixel_val = int(gray[13, 50]) if gray.shape[0] > 13 and gray.shape[1] > 50 else 0
         pixel_msg = f"{ts},{pixel_val}"
         for ip, _ in REMOTE_PC_LIST:
-            sock_pixel.sendto(pixel_msg.encode(), (ip, PIXEL_PORT))
-            pixel_sent += 1
+            if online_status[ip]:
+                sock_pixel.sendto(pixel_msg.encode(), (ip, PIXEL_PORT))
+                pixel_sent += 1
 
         if frame_count % 2 == 0:
             success, jpeg = cv2.imencode('.jpg', resized, [int(cv2.IMWRITE_JPEG_QUALITY), 60])
             if success and len(jpeg) < 60000:
                 for ip, _ in REMOTE_PC_LIST:
-                    sock_img.sendto(jpeg.tobytes(), (ip, IMAGE_PORT))
-                    img_sent += 1
+                    if online_status[ip]:
+                        sock_img.sendto(jpeg.tobytes(), (ip, IMAGE_PORT))
+                        img_sent += 1
         frame_count += 1
         time.sleep(interval)
 
-# ========= LiDAR 資料接收轉發 =========
 def lidar1():
     global lidar1_sent
     while True:
         data, _ = sock_lidar1.recvfrom(1500)
         for ip, _ in REMOTE_PC_LIST:
-            if is_reachable(ip, LIDAR1_PORT):
+            if online_status[ip]:
                 sock_lidar1.sendto(data, (ip, LIDAR1_PORT))
                 lidar1_sent += 1
 
@@ -121,23 +137,10 @@ def lidar2():
     while True:
         data, _ = sock_lidar2.recvfrom(1500)
         for ip, _ in REMOTE_PC_LIST:
-            if is_reachable(ip, LIDAR2_PORT):
+            if online_status[ip]:
                 sock_lidar2.sendto(data, (ip, LIDAR2_PORT))
                 lidar2_sent += 1
 
-# ========= 驗證主機可否收 =========
-def is_reachable(ip, port, timeout=0.05):
-    try:
-        test_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        test_sock.settimeout(timeout)
-        test_sock.sendto(b'', (ip, port))
-        return True
-    except Exception:
-        return False
-    finally:
-        test_sock.close()
-
-# ========= 主程式 =========
 def print_status():
     global adxl_sent, img_sent, pixel_sent, lidar1_sent, lidar2_sent
     while True:
@@ -149,11 +152,16 @@ def print_status():
         print(f"  LiDAR1 傳送數量: {lidar1_sent}")
         print(f"  LiDAR2 傳送數量: {lidar2_sent}")
         print(f"  --------------------")
+        for ip, _ in REMOTE_PC_LIST:
+            status = "Online" if online_status[ip] else "Offline"
+            print(f"  {ip} : {status}")
         time.sleep(10)
 
+# ========= 主程式啟動 =========
 if __name__ == "__main__":
     setup_adxl355()
 
+    threading.Thread(target=ping_checker, daemon=True).start()
     threading.Thread(target=send_adxl355, daemon=True).start()
     threading.Thread(target=send_camera, daemon=True).start()
     threading.Thread(target=lidar1, daemon=True).start()
@@ -164,7 +172,7 @@ if __name__ == "__main__":
     try:
         while True:
             time.sleep(1)
-    except KeyboardInterrupt:        
+    except KeyboardInterrupt:
         sock_adxl.close()
         sock_img.close()
         sock_pixel.close()
