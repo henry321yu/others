@@ -78,7 +78,7 @@ def send_camera():
     global img_sent, pixel_sent
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
-        print("❌ 攝影機無法開啟")
+        print("攝影機無法開啟")
         return
 
     frame_count = 0
@@ -112,23 +112,37 @@ def lidar1():
     while True:
         data, _ = sock_lidar1.recvfrom(1500)
         for ip, _ in REMOTE_PC_LIST:
-            sock_lidar1.sendto(data, (ip, LIDAR1_PORT))
-            lidar1_sent += 1
+            if is_reachable(ip, LIDAR1_PORT):
+                sock_lidar1.sendto(data, (ip, LIDAR1_PORT))
+                lidar1_sent += 1
 
 def lidar2():
     global lidar2_sent
     while True:
         data, _ = sock_lidar2.recvfrom(1500)
         for ip, _ in REMOTE_PC_LIST:
-            sock_lidar2.sendto(data, (ip, LIDAR2_PORT))
-            lidar2_sent += 1
+            if is_reachable(ip, LIDAR2_PORT):
+                sock_lidar2.sendto(data, (ip, LIDAR2_PORT))
+                lidar2_sent += 1
+
+# ========= 驗證主機可否收 =========
+def is_reachable(ip, port, timeout=0.05):
+    try:
+        test_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        test_sock.settimeout(timeout)
+        test_sock.sendto(b'', (ip, port))
+        return True
+    except Exception:
+        return False
+    finally:
+        test_sock.close()
 
 # ========= 主程式 =========
 def print_status():
     global adxl_sent, img_sent, pixel_sent, lidar1_sent, lidar2_sent
     while True:
         os.system('cls' if platform.system().lower() == 'windows' else 'clear')
-        print(f"📊 系統狀態：")
+        print(f"  系統狀態：")
         print(f"  ADXL355 傳送數量: {adxl_sent}")
         print(f"  影像傳送數量: {img_sent}")
         print(f"  像素值傳送數量: {pixel_sent}")
@@ -146,14 +160,14 @@ if __name__ == "__main__":
     threading.Thread(target=lidar2, daemon=True).start()
     threading.Thread(target=print_status, daemon=True).start()
 
-    print("📡 系統啟動中... 按 Ctrl+C 結束。")
+    print("系統啟動中... 按 Ctrl+C 結束。")
     try:
         while True:
             time.sleep(1)
-    except KeyboardInterrupt:
+    except KeyboardInterrupt:        
         sock_adxl.close()
         sock_img.close()
         sock_pixel.close()
         sock_lidar1.close()
         sock_lidar2.close()
-        print("🛑 已手動中斷")
+        print("已手動中斷")
