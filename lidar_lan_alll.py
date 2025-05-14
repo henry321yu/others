@@ -55,6 +55,8 @@ sock_img = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock_pixel = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock_lidar1 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock_lidar2 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock_lidar1.bind(("", LIDAR1_PORT))
+sock_lidar2.bind(("", LIDAR2_PORT))
 
 adxl_sent = 0
 img_sent = 0
@@ -105,24 +107,27 @@ def send_camera():
         time.sleep(interval)
 
 # ========= LiDAR 資料接收轉發 =========
-def forward_lidar(local_port, remote_port):
-    global lidar1_sent, lidar2_sent
-    recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    recv_sock.bind(('', local_port))
+def lidar1():
+    global lidar1_sent
     while True:
-        data, _ = recv_sock.recvfrom(1500)
+        data, _ = sock_lidar1.recvfrom(1500)
         for ip, _ in REMOTE_PC_LIST:
-            sock = sock_lidar1 if remote_port == LIDAR1_PORT else sock_lidar2
-            sock.sendto(data, (ip, remote_port))
-            if remote_port == LIDAR1_PORT:
-                lidar1_sent += 1
-            else:
-                lidar2_sent += 1
+            sock_lidar1.sendto(data, (ip, LIDAR1_PORT))
+            lidar1_sent += 1
+
+def lidar2():
+    global lidar2_sent
+    while True:
+        data, _ = sock_lidar2.recvfrom(1500)
+        for ip, _ in REMOTE_PC_LIST:
+            sock_lidar2.sendto(data, (ip, LIDAR2_PORT))
+            lidar2_sent += 1
 
 # ========= 主程式 =========
 def print_status():
     global adxl_sent, img_sent, pixel_sent, lidar1_sent, lidar2_sent
     while True:
+        os.system('cls' if platform.system().lower() == 'windows' else 'clear')
         print(f"📊 系統狀態：")
         print(f"  ADXL355 傳送數量: {adxl_sent}")
         print(f"  影像傳送數量: {img_sent}")
@@ -137,8 +142,8 @@ if __name__ == "__main__":
 
     threading.Thread(target=send_adxl355, daemon=True).start()
     threading.Thread(target=send_camera, daemon=True).start()
-    threading.Thread(target=forward_lidar, args=(LIDAR1_PORT, LIDAR1_PORT), daemon=True).start()
-    threading.Thread(target=forward_lidar, args=(LIDAR2_PORT, LIDAR2_PORT), daemon=True).start()
+    threading.Thread(target=lidar1, daemon=True).start()
+    threading.Thread(target=lidar2, daemon=True).start()
     threading.Thread(target=print_status, daemon=True).start()
 
     print("📡 系統啟動中... 按 Ctrl+C 結束。")
@@ -146,4 +151,9 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
+        sock_adxl.close()
+        sock_img.close()
+        sock_pixel.close()
+        sock_lidar1.close()
+        sock_lidar2.close()
         print("🛑 已手動中斷")
