@@ -12,8 +12,10 @@ import time
 folder = ''  # 設定你的資料夾路徑
 
 # 欲繪圖欄位 index 列表
-idx_list = [3, 7, 9]
-smoothk = 50
+# {'vert_angle','azimuth','distance','board2_temp','ax','ay','az','temperture','points','frequency_khz_','program_frequency',}
+# idx_list = [3, 7, 9, 10]
+idx_list = [3, 7]
+smoothk = 1
 
 plt.rcParams['font.family'] = 'Microsoft JhengHei'  # 中文編碼正確
 plt.ion()
@@ -95,4 +97,4 @@ while True:
     plt.draw()
 
     print(f"✅ 圖表更新完成：{datetime.now().strftime('%H:%M:%S')}")
-    plt.pause(10)
+    plt.pause(5)
