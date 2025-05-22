@@ -15,6 +15,7 @@ PORT = 5001
 SCAN_INTERVAL = 1
 file_status = {}
 sending = 0
+disnamelen = 40
 
 def get_zerotier_ip():
     interfaces = psutil.net_if_addrs()
@@ -100,11 +101,11 @@ def send_file(file_path):
                     sent += len(chunk)
                     elapsed = time.time() - start_time
                     speed = sent / (1024 * 1024) / elapsed if elapsed > 0 else 0
-                    print_name = (filename[:37] + '...') if len(filename) > 30 else filename
+                    print_name = (filename[:disnamelen - 3] + '...') if len(filename) > disnamelen else filename
                     print(f"\r[SEND START] ↑ 傳送中 {print_name}: {filesize / (1024 * 1024):.2f} MB/{sent / (1024 * 1024):.2f} MB({sent / filesize*100:.2f}% , {speed:.2f} MB/S)", end='', flush=True)
 
         # 清除 SEND START 和 傳送進度輸出行
-        print('\r' + ' ' * 40 + '\r', end='')
+        print('\r' + ' ' * disnamelen + '\r', end='')
         print(f"[SEND DONE][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {filename} ({filesize / (1024 * 1024):.2f} MB)")
         sending = 0
     except Exception as e:
@@ -175,11 +176,11 @@ def receiver():
                             received += len(data)
                             elapsed = time.time() - start_time
                             speed = received / (1024 * 1024) / elapsed if elapsed > 0 else 0
-                            print_name = (filename[:37] + '...') if len(filename) > 40 else filename
+                            print_name = (filename[:disnamelen-3] + '...') if len(filename) > disnamelen else filename
                             print(f"\r[RECEIVE START] ↓ 接收中 {print_name}: {filesize / (1024 * 1024):.2f} MB/{received / (1024 * 1024):.2f} MB({received / filesize*100:.2f}% , {speed:.2f} MB/S)", end='', flush=True)
 
                     os.rename(tmp_file_path, final_file_path)
-                    print('\r' + ' ' * 40 + '\r', end='')   # 清除行
+                    print('\r' + ' ' * disnamelen + '\r', end='')   # 清除行
                     print(f"[RECEIVE DONE][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {filename}")
                 except Exception as e:
                     print(f"[RECEIVE ERROR][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] - {e}")
