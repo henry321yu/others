@@ -16,7 +16,8 @@ unsigned long i = 0;
 String mon, dayy;
 double timee, f, t0;
 //int maxsize = 4718592;//4718592=4.5mb(~1day/1hz)=4.5*2^20 52428800=50mb=50*2^20(不超過excel)
-int maxsize = 460800;//460800=450kb(~1day/0.1hz)=450*2^10 52428800=50mb=50*2^20(不超過excel)
+//int maxsize = 460800;//460800=450kb(~1day/0.1hz)=450*2^10 52428800=50mb=50*2^20(不超過excel)
+int maxsize = 76800;//76800=75kb(~4hr/0.1hz)=450*2^10 52428800=50mb=50*2^20
 //int maxsize = 19200;//19200=18.75kb(~1hr/0.1hz)
 //int maxsize = 1600;//1600=(~5min/0.1hz)
 //int maxsize = 320;//320=(~1min/0.1hz)
