@@ -96,9 +96,21 @@ def get_peer_ip():
                 print(f"[CONNECTION ERROR] 無法連線到儲存的 IP：{ip}，請重新輸入。")
 
     while True:
-        ip = input("請輸入接收方的IP(空白或等待10秒則為純接收模式)，連線成功後會存至config.ini：").strip()
+        ip_input = [None]
+
+        def timed_input():
+            ip_input[0] = input("請輸入接收方的IP(空白或等待10秒進入純接收模式)：").strip()
+
+        t = threading.Thread(target=timed_input)
+        t.daemon = True
+        t.start()
+        t.join(timeout=10)
+
+        ip = ip_input[0] or ""
+
         if not ip:
-            print("[INFO] 純接收模式啟用（未指定對方 IP）")
+            print("")
+            print("[INFO] 純接收模式啟用")
             recive_mod = 1
             return None  # 代表接收模式
         if is_ip_reachable(ip):
@@ -127,7 +139,6 @@ def send_file(file_path):
             if response == "SKIP":
                 print(f"[SKIP EXISTING] {filename}")
                 return True
-            sending = 1
 
             with open(file_path, 'rb') as f:
                 sent = 0
@@ -147,7 +158,6 @@ def send_file(file_path):
                 # 清除 SEND START 和 傳送進度輸出行
                 print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')
         print(f"[SEND DONE][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {filename} ({filesize / megabyte:.2f} MB)")
-        sending = 0
         return True
     except Exception as e:        
         print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')
@@ -159,6 +169,7 @@ def scan_and_sync_datasize():
     while True:    
         while receiving == 1:
             time.sleep(1)
+        sending = 1 
         print("[INFO] ------- new scan and sync -------")
         for fname in os.listdir(FOLDER):
             full_path = os.path.join(FOLDER, fname)
@@ -168,7 +179,8 @@ def scan_and_sync_datasize():
                 if success:
                     continue
                 else:
-                    print(f"[RETRY] 檔案 {fname} 傳送失敗，將在下次掃描時再次嘗試")
+                    print(f"[RETRY] 檔案 {fname} 傳送失敗，將在下次掃描時再次嘗試")        
+        sending = 0
         time.sleep(SCAN_INTERVAL)
 
 def receiver():
