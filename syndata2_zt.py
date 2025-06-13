@@ -99,7 +99,7 @@ def get_peer_ip():
         ip_input = [None]
 
         def timed_input():
-            ip_input[0] = input("請輸入接收方的IP(空白或等待10秒進入純接收模式)：").strip()
+            ip_input[0] = input("請輸入接收方的IP(輸入空白或等待10秒進入純接收模式)：").strip()
 
         t = threading.Thread(target=timed_input)
         t.daemon = True
@@ -110,11 +110,11 @@ def get_peer_ip():
 
         if not ip:
             print("")
-            print("[INFO] 純接收模式啟用")
+            print("[RECEIVE MODE] 接收模式 ...")
             recive_mod = 1
             return None  # 代表接收模式
         if is_ip_reachable(ip):
-            print(f"[SUCCESSED] IP {ip} 連線成功")
+            print(f"[SYNC MODE] IP {ip} 連線成功，開始同步 ...")
             config["SETTINGS"] = {"receiver_ip": ip}
             with open(CONFIG_FILE, "w") as f:
                 config.write(f)
@@ -169,11 +169,11 @@ def scan_and_sync_datasize():
     while True:    
         while receiving == 1:
             time.sleep(1)
-        sending = 1 
         print("[INFO] ------- new scan and sync -------")
         for fname in os.listdir(FOLDER):
             full_path = os.path.join(FOLDER, fname)
             if os.path.isfile(full_path) and not fname.endswith(".tmp"):
+                sending = 1 
                 fsize = os.path.getsize(full_path)
                 success = send_file(full_path)
                 if success:
