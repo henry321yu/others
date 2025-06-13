@@ -38,7 +38,9 @@ PORT = 5001
 SCAN_INTERVAL = 3
 file_status = {}
 sending = 0
+receiving = 0
 disnamelen = 30
+extranamelen = 87
 recive_mod = 0
 
 def get_zerotier_ip():
@@ -85,33 +87,32 @@ def get_peer_ip():
 
     if os.path.exists(CONFIG_FILE):
         config.read(CONFIG_FILE)
-        if "SETTINGS" in config and "peer_ip" in config["SETTINGS"]:
-            ip = config["SETTINGS"]["peer_ip"].strip()
+        if "SETTINGS" in config and "receiver_ip" in config["SETTINGS"]:
+            ip = config["SETTINGS"]["receiver_ip"].strip()
             if is_ip_reachable(ip):
-                print(f"[設定] 使用儲存的 IP：{ip} 連線成功")
+                print(f"[SETTINGS] 使用儲存的 IP：{ip} 連線成功")
                 return ip
             else:
-                print(f"[警告] 無法連線到儲存的 IP：{ip}，請重新輸入。")
+                print(f"[CONNECTION ERROR] 無法連線到儲存的 IP：{ip}，請重新輸入。")
 
     while True:
-        ip = input("請輸入對方虛擬LAN IP，連線後會存至config.ini：").strip()
+        ip = input("請輸入接收方的IP(空白或等待10秒則為純接收模式)，連線成功後會存至config.ini：").strip()
         if not ip:
-            print("[模式] 接收模式啟用（未指定對方 IP）")
+            print("[INFO] 純接收模式啟用（未指定對方 IP）")
             recive_mod = 1
             return None  # 代表接收模式
         if is_ip_reachable(ip):
-            print(f"[成功] IP {ip} 連線成功")
-            config["SETTINGS"] = {"peer_ip": ip}
+            print(f"[SUCCESSED] IP {ip} 連線成功")
+            config["SETTINGS"] = {"receiver_ip": ip}
             with open(CONFIG_FILE, "w") as f:
                 config.write(f)
             return ip
         else:
-            print(f"[失敗] 無法連線到 {ip}，請確認網路狀態後重試。")
+            print(f"[CONNECTION ERROR] 無法連線到 {ip}，請確認網路狀態後重試。")
 
 PEER_IP = get_peer_ip()
 
 def send_file(file_path):
-    global sending
     filename = os.path.basename(file_path)
     filesize = os.path.getsize(file_path)
     try:
@@ -124,7 +125,7 @@ def send_file(file_path):
             # 等待對方是否要跳過此檔案
             response = s.recv(4).decode()
             if response == "SKIP":
-                print(f"[SKIP] {filename} 已存在於接收端")
+                print(f"[SKIP EXISTING] {filename}")
                 return True
             sending = 1
 
@@ -135,25 +136,30 @@ def send_file(file_path):
                 while chunk := f.read(4096):
                     s.sendall(chunk)
                     sent += len(chunk)
-                    elapsed = time.time() - start_time
-                    speed = sent / (1024 * 1024) / elapsed if elapsed > 0 else 0
+                    elapsed = time.time() - start_time                    
+                    megabyte = 1024 * 1000
+                    speed = sent / megabyte / elapsed if elapsed > 0 else 0
                     print_name = (filename[:disnamelen - 3] + '...') if len(filename) > disnamelen else filename            
-                    eta = (filesize - sent)/ (1024 * 1024) / speed if speed > 0 else 0
+                    eta = (filesize - sent)/ megabyte / speed if speed > 0 else 0
                     eta_str = time.strftime('%M:%S', time.gmtime(eta))
-                    print(f"\r[SEND START] ↑ 傳送中 {print_name}:{filesize / (1024 * 1024):.2f} MB/{sent / (1024 * 1024):.2f} MB({sent / filesize*100:.2f}% , {speed:.2f} MB/S, 剩餘時間: {eta_str})", end='', flush=True)
+                    print(f"\r[SEND START] ↑ 傳送中 {print_name}:{filesize / megabyte:.2f} MB/{sent / megabyte:.2f} MB({sent / filesize*100:.2f}% , {speed:.2f} MB/S, ETA: {eta_str})", end='', flush=True)
 
-        # 清除 SEND START 和 傳送進度輸出行
-        print('\r' + ' ' * (disnamelen + 85) + '\r', end='')
-        print(f"[SEND DONE][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {filename} ({filesize / (1024 * 1024):.2f} MB)")
+                # 清除 SEND START 和 傳送進度輸出行
+                print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')
+        print(f"[SEND DONE][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {filename} ({filesize / megabyte:.2f} MB)")
         sending = 0
         return True
-    except Exception as e:
+    except Exception as e:        
+        print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')
         print(f"[SEND ERROR][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {filename} - {e}")
         return False 
 
 def scan_and_sync_datasize():
-    while True:
-        print("[INFO] ===== 新一輪掃描開始 =====")
+    global sending , receiving
+    while True:    
+        while receiving == 1:
+            time.sleep(1)
+        print("[INFO] ------- new scan and sync -------")
         for fname in os.listdir(FOLDER):
             full_path = os.path.join(FOLDER, fname)
             if os.path.isfile(full_path) and not fname.endswith(".tmp"):
@@ -161,13 +167,12 @@ def scan_and_sync_datasize():
                 success = send_file(full_path)
                 if success:
                     continue
-                    # print(f"[INFO] 檔案 {fname} 傳送成功（大小: {fsize} bytes）")
                 else:
                     print(f"[RETRY] 檔案 {fname} 傳送失敗，將在下次掃描時再次嘗試")
         time.sleep(SCAN_INTERVAL)
 
 def receiver():
-    global sending
+    global sending , receiving
     os.makedirs(FOLDER, exist_ok=True)    
     # 啟動時清理 .tmp 檔
     for file in os.listdir(FOLDER):
@@ -198,10 +203,11 @@ def receiver():
                     # 檢查是否存在相同檔案（大小一致）
                     if os.path.exists(final_file_path) and os.path.getsize(final_file_path) == filesize:
                         conn.send(b"SKIP")
-                        # print(f"[SKIP RECEIVED] {filename} 已存在，略過接收")
                         continue
                     else:
                         conn.send(b"OKAY")
+
+                    receiving = 1
 
                     tmp_file_path = final_file_path + ".tmp"
                     with open(tmp_file_path, 'wb') as f:
@@ -214,18 +220,21 @@ def receiver():
                             f.write(data)
                             received += len(data)
                             elapsed = time.time() - start_time
-                            speed = received / (1024 * 1024) / elapsed if elapsed > 0 else 0
+                            megabyte = 1024 * 1000
+                            speed = received / megabyte / elapsed if elapsed > 0 else 0
                             print_name = (filename[:disnamelen-3] + '...') if len(filename) > disnamelen else filename
-                            eta = (filesize - received)/ (1024 * 1024) / speed if speed > 0 else 0
+                            eta = (filesize - received)/ megabyte / speed if speed > 0 else 0
                             eta_str = time.strftime('%M:%S', time.gmtime(eta))
-                            print(f"\r[RECEIVE START] ↓ 接收中 {print_name}:{filesize / (1024 * 1024):.2f} MB/{received / (1024 * 1024):.2f} MB({received / filesize*100:.2f}% , {speed:.2f} MB/S, ETA: {eta_str})", end='', flush=True)
+                            print(f"\r[RECEIVE START] ↓ 接收中 {print_name}:{filesize / megabyte:.2f} MB/{received / megabyte:.2f} MB({received / filesize*100:.2f}% , {speed:.2f} MB/S, ETA: {eta_str})", end='', flush=True)
 
                     if os.path.exists(final_file_path):
                         os.remove(final_file_path)  # 刪除已存在的同名檔案
                     os.rename(tmp_file_path, final_file_path)
-                    print('\r' + ' ' * (disnamelen + 85) + '\r', end='')   # 清除行
-                    print(f"[RECEIVE DONE][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {filename}")
+                    print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')   # 清除行
+                    print(f"[RECEIVE DONE][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {filename} ({filesize / megabyte:.2f} MB)")
+                    receiving = 0
                 except Exception as e:
+                    print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')   # 清除行
                     print(f"[RECEIVE ERROR][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] - {e}")
                     if tmp_file_path and os.path.exists(tmp_file_path):
                         try:
