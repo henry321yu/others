@@ -63,7 +63,7 @@ def main(input_folder, output_csv):
     print(f"完成，輸出檔案: {output_csv}")
 
 if __name__ == "__main__":
-    input_folder = r"D:\gps file\auto convert\output"  # 修改為你的 rinex 輸出資料夾
-    output_csv = r"D:\gps file\auto_rinex_time_ranges.csv"
+    input_folder = r"C:\Users\sgrc - 325\Desktop\auto_gps\gps data\output"  # 修改為你的 rinex 輸出資料夾
+    output_csv = r"C:\Users\sgrc - 325\Desktop\auto_gps\auto_rinex_time_ranges.csv"
     main(input_folder, output_csv)
-    input("輸出完成，請按任意鍵結束...")
+    input("按任意鍵結束...")
