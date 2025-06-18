@@ -27,7 +27,7 @@ File logFile;
 WDT_T4<WDT3> wdt;
 
 void setup() {
-  Serial.begin(115200); 
+  Serial.begin(115200);
   delay(100);
   Serial.println(F("Serial.begin"));
   delay(100);
@@ -39,6 +39,7 @@ void setup() {
   setSyncProvider(getTeensy3Time);
   if (timeStatus() != timeSet) {
     Serial.println(F("RTC time not set! Rebooting..."));
+    digitalWrite(beeper, HIGH);
     delay(1000);
     *((volatile uint32_t *)0xE000ED0C) = (0x5FA << 16) | (1 << 2);
   }
@@ -59,6 +60,7 @@ void setup() {
     sd_retry++;
     if (sd_retry >= 3) {
       Serial.println(F("SD init failed too many times, rebooting..."));
+      digitalWrite(beeper, HIGH);
       delay(1000);
       *((volatile uint32_t *)0xE000ED0C) = (0x5FA << 16) | (1 << 2);
     }
@@ -70,6 +72,7 @@ void setup() {
   logFile = SD.open(logFileName.c_str(), FILE_WRITE);
   if (!logFile) {
     Serial.println(F("File open failed! Rebooting..."));
+    digitalWrite(beeper, HIGH);
     delay(1000);
     *((volatile uint32_t *)0xE000ED0C) = (0x5FA << 16) | (1 << 2);
   }
@@ -85,6 +88,7 @@ void setup() {
   byte mpuStatus = Wire.endTransmission();
   if (mpuStatus != 0) {
     Serial.println(F("MPU6050 not responding! Rebooting..."));
+    digitalWrite(beeper, HIGH);
     delay(1000);
     *((volatile uint32_t *)0xE000ED0C) = (0x5FA << 16) | (1 << 2);
   }
