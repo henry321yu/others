@@ -27,6 +27,13 @@ File logFile;
 WDT_T4<WDT3> wdt;
 
 void setup() {
+  // ------------------ Watchdog ------------------
+  WDT_timings_t config;
+  config.timeout = 30000;
+  wdt.begin(config);
+  pinMode(beeper, OUTPUT);
+  digitalWrite(beeper, HIGH);
+  
   Serial.begin(115200);
   delay(100);
   Serial.println(F("Serial.begin"));
@@ -39,29 +46,39 @@ void setup() {
   setSyncProvider(getTeensy3Time);
   if (timeStatus() != timeSet) {
     Serial.println(F("RTC time not set! Rebooting..."));
+    digitalWrite(beeper, LOW);
+    delay(500);
+    digitalWrite(beeper, HIGH);
+    delay(500);
+    digitalWrite(beeper, LOW);
+    delay(500);
     digitalWrite(beeper, HIGH);
     delay(1000);
     *((volatile uint32_t *)0xE000ED0C) = (0x5FA << 16) | (1 << 2);
   }
 
   Wire.begin();
-  pinMode(beeper, OUTPUT);
-  digitalWrite(beeper, LOW);
 
   // ------------------ SD卡初始化 ------------------
   Serial.println(F("SD.begin"));
   int sd_retry = 0;
   while (!SD.begin(SD_CS)) {
     Serial.println(F("SD card failed, or not present"));
-    digitalWrite(beeper, HIGH);
-    delay(300);
     digitalWrite(beeper, LOW);
+    delay(300);
+    digitalWrite(beeper, HIGH);
     delay(700);
     sd_retry++;
     if (sd_retry >= 3) {
       Serial.println(F("SD init failed too many times, rebooting..."));
-      digitalWrite(beeper, HIGH);
-      delay(1000);
+    digitalWrite(beeper, LOW);
+    delay(500);
+    digitalWrite(beeper, HIGH);
+    delay(500);
+    digitalWrite(beeper, LOW);
+    delay(500);
+    digitalWrite(beeper, HIGH);
+    delay(1000);
       *((volatile uint32_t *)0xE000ED0C) = (0x5FA << 16) | (1 << 2);
     }
   }
@@ -72,6 +89,12 @@ void setup() {
   logFile = SD.open(logFileName.c_str(), FILE_WRITE);
   if (!logFile) {
     Serial.println(F("File open failed! Rebooting..."));
+    digitalWrite(beeper, LOW);
+    delay(500);
+    digitalWrite(beeper, HIGH);
+    delay(500);
+    digitalWrite(beeper, LOW);
+    delay(500);
     digitalWrite(beeper, HIGH);
     delay(1000);
     *((volatile uint32_t *)0xE000ED0C) = (0x5FA << 16) | (1 << 2);
@@ -82,12 +105,19 @@ void setup() {
   delay(100);
   writeRegister(MPU_addr, 0x6B, 0x00); // wake up
   delay(30);
+  delay(100);
 
   // 嘗試讀取 MPU6050，確認是否回應
   Wire.beginTransmission(MPU_addr);
   byte mpuStatus = Wire.endTransmission();
   if (mpuStatus != 0) {
     Serial.println(F("MPU6050 not responding! Rebooting..."));
+    digitalWrite(beeper, LOW);
+    delay(500);
+    digitalWrite(beeper, HIGH);
+    delay(500);
+    digitalWrite(beeper, LOW);
+    delay(500);
     digitalWrite(beeper, HIGH);
     delay(1000);
     *((volatile uint32_t *)0xE000ED0C) = (0x5FA << 16) | (1 << 2);
@@ -95,10 +125,6 @@ void setup() {
 
   // ------------------ 設定其他參數 ------------------
   setf = 1 / setf * 1000;
-
-  WDT_timings_t config;
-  config.timeout = 30000;
-  wdt.begin(config);
 
   Serial.println(F("Initialization done"));
   // 音效提示完成

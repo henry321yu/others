@@ -40,7 +40,7 @@ file_status = {}
 sending = 0
 receiving = 0
 disnamelen = 20
-extranamelen = 95
+extranamelen = 98
 recive_mod = 0
 
 def get_zerotier_ip():
