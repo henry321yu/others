@@ -161,12 +161,12 @@ def send_file(file_path):
                 # 清除 SEND START 和 傳送進度輸出行
                 print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')
         sending = 0
-        print(f"[SEND DONE][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {filename} ({filesize / megabyte:.2f} MB)")
+        print(f"[SEND DONE][{datetime.now().strftime('%H:%M:%S')}] {filename} ({filesize / megabyte:.2f} MB)")
         return True
     except Exception as e:       
         sending = 0 
         print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')
-        print(f"[SEND ERROR][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {filename} - {e}")
+        print(f"[SEND ERROR][{datetime.now().strftime('%H:%M:%S')}] {filename} - {e}")
         return False 
 
 def scan_and_sync_datasize_once():
@@ -198,7 +198,7 @@ def receiver():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(('', PORT))
         s.listen(5)
-        print(f"[RECEIVER][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Listening on port {PORT}...")
+        print(f"[RECEIVER][{datetime.now().strftime('%H:%M:%S')}] Listening on port {PORT}...")
 
         while True:
             conn, addr = s.accept()
@@ -242,12 +242,12 @@ def receiver():
                         os.remove(final_file_path)  # 刪除已存在的同名檔案
                     os.rename(tmp_file_path, final_file_path)
                     print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')   # 清除行
-                    print(f"[RECEIVE DONE][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}][From:{addr[0]}]{filename} ({filesize / megabyte:.2f} MB)")
+                    print(f"[RECEIVE DONE][{datetime.now().strftime('%H:%M:%S')}][From:{addr[0]}]{filename} ({filesize / megabyte:.2f} MB)")
                     receiving = 0
                 except Exception as e:
                     receiving = 0
                     print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')   # 清除行
-                    print(f"[RECEIVE ERROR][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] - {e}")
+                    print(f"[RECEIVE ERROR][{datetime.now().strftime('%H:%M:%S')}] - {e}")
                     if tmp_file_path and os.path.exists(tmp_file_path):
                         try:
                             os.remove(tmp_file_path)
@@ -257,7 +257,7 @@ def receiver():
 
 def main_loop():
     global sending, receiving
-    print(f"[MAIN LOOP][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 開始自動同步模式")
+    print(f"[INFO][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 開始自動同步模式")
 
     # 啟動接收器 socket server（持續執行，非阻塞）
     threading.Thread(target=receiver, daemon=True).start()
@@ -276,7 +276,7 @@ def main_loop():
 
 if __name__ == "__main__":
     try:
-        print(f"[START][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Synchronizing folder: {FOLDER}")
+        print(f"[INFO]目標資料夾: {FOLDER}")
         os.makedirs(FOLDER, exist_ok=True)
         main_loop()
     except KeyboardInterrupt:
