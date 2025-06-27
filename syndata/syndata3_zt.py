@@ -127,8 +127,8 @@ def get_peer_ip():
                 config.write(f)
             return ip
         else:
-            print(f"[CONNECTION ERROR] 無法連線到 {ip}，請確認IP，輸入空白或30秒後自動進入接收模式。")
             timeoutT = 30
+            print(f"[CONNECTION ERROR] 無法連線到 {ip}，請確認IP，輸入空白或等待{timeoutT}秒後自動進入接收模式。")
 
 PEER_IP = get_peer_ip()
 
