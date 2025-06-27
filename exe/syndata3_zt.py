@@ -40,7 +40,7 @@ file_status = {}
 sending = 0
 receiving = 0
 disnamelen = 20
-extranamelen = 97
+extranamelen = 99
 recive_mod = 0
 
 def get_zerotier_ip():
@@ -95,16 +95,18 @@ def get_peer_ip():
             else:
                 print(f"[CONNECTION ERROR] 無法連線到儲存的 IP：{ip}，請重新輸入。")
 
+    timeoutT = 5
+    print(f"[CONNECTING] 請輸入接收方的IP(輸入空白或等待{timeoutT}秒進入接收模式)")
     while True:
         ip_input = [None]
 
         def timed_input():
-            ip_input[0] = input("請輸入接收方的IP(輸入空白或等待10秒進入純接收模式)：").strip()
+            ip_input[0] = input("IP：").strip()
 
         t = threading.Thread(target=timed_input)
         t.daemon = True
         t.start()
-        t.join(timeout=10)
+        t.join(timeoutT)
 
         ip = ip_input[0] or ""
 
@@ -115,12 +117,18 @@ def get_peer_ip():
             return None  # 代表接收模式
         if is_ip_reachable(ip):
             print(f"[SYNC MODE] IP {ip} 連線成功，開始同步 ...")
-            config["SETTINGS"] = {"receiver_ip": ip}
+            
+            if not config.has_section("SETTINGS"):
+                config.add_section("SETTINGS")
+                
+            config.set("SETTINGS", "receiver_ip", ip)
+            
             with open(CONFIG_FILE, "w") as f:
                 config.write(f)
             return ip
         else:
-            print(f"[CONNECTION ERROR] 無法連線到 {ip}，請確認網路狀態後重試。")
+            timeoutT = 30
+            print(f"[CONNECTION ERROR] 無法連線到 {ip}，請確認IP，輸入空白或等待{timeoutT}秒後自動進入接收模式。")
 
 PEER_IP = get_peer_ip()
 
@@ -161,29 +169,27 @@ def send_file(file_path):
                 # 清除 SEND START 和 傳送進度輸出行
                 print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')
         sending = 0
-        print(f"[SEND DONE][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {filename} ({filesize / megabyte:.2f} MB)")
+        print(f"[SEND DONE][{datetime.now().strftime('%H:%M:%S')}] {filename} ({filesize / megabyte:.2f} MB)")
         return True
     except Exception as e:       
         sending = 0 
         print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')
-        print(f"[SEND ERROR][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {filename} - {e}")
+        print(f"[SEND ERROR][{datetime.now().strftime('%H:%M:%S')}] {filename} - {e}")
         return False 
 
-def scan_and_sync_datasize():
-    while True:    
-        while receiving == 1:
-            time.sleep(1)        
-        print("[INFO] ------- new scan and sync -------")
-        for fname in os.listdir(FOLDER):
-            full_path = os.path.join(FOLDER, fname)
-            if os.path.isfile(full_path) and not fname.endswith(".tmp"):
-                fsize = os.path.getsize(full_path)
-                success = send_file(full_path)
-                if success:
-                    continue
-                else:
-                    print(f"[RETRY] 檔案 {fname} 傳送失敗，將在下次掃描時再次嘗試")        
-        time.sleep(SCAN_INTERVAL)
+def scan_and_sync_datasize_once():
+    global sending
+    print("[INFO] ------- new scan and sync -------")
+    for fname in os.listdir(FOLDER):
+        full_path = os.path.join(FOLDER, fname)
+        if os.path.isfile(full_path) and not fname.endswith(".tmp"):
+            fsize = os.path.getsize(full_path)
+            success = send_file(full_path)
+            if success:
+                continue
+            else:
+                print(f"[RETRY] 檔案 {fname} 傳送失敗，將在下次掃描時再次嘗試")
+
 
 def receiver():
     global sending , receiving
@@ -200,7 +206,7 @@ def receiver():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(('', PORT))
         s.listen(5)
-        print(f"[RECEIVER][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Listening on port {PORT}...")
+        print(f"[RECEIVER][{datetime.now().strftime('%H:%M:%S')}] Listening on port {PORT}...")
 
         while True:
             conn, addr = s.accept()
@@ -244,11 +250,12 @@ def receiver():
                         os.remove(final_file_path)  # 刪除已存在的同名檔案
                     os.rename(tmp_file_path, final_file_path)
                     print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')   # 清除行
-                    print(f"[RECEIVE DONE][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}][From:{addr[0]}]{filename} ({filesize / megabyte:.2f} MB)")
+                    print(f"[RECEIVE DONE][{datetime.now().strftime('%H:%M:%S')}][From:{addr[0]}]{filename} ({filesize / megabyte:.2f} MB)")
                     receiving = 0
                 except Exception as e:
+                    receiving = 0
                     print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')   # 清除行
-                    print(f"[RECEIVE ERROR][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] - {e}")
+                    print(f"[RECEIVE ERROR][{datetime.now().strftime('%H:%M:%S')}] - {e}")
                     if tmp_file_path and os.path.exists(tmp_file_path):
                         try:
                             os.remove(tmp_file_path)
@@ -256,9 +263,31 @@ def receiver():
                         except Exception as cleanup_error:
                             print(f"[CLEANUP ERROR] 刪除失敗: {cleanup_error}")
 
+def main_loop():
+    global sending, receiving
+    print(f"[INFO][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 開始自動同步模式")
+
+    # 啟動接收器 socket server（持續執行，非阻塞）
+    threading.Thread(target=receiver, daemon=True).start()
+
+    while True:
+        if recive_mod == 1:
+            # 純接收模式，不進入同步
+            time.sleep(1)
+            continue
+
+        # 若目前非傳送/接收中 → 執行同步掃描
+        if sending == 0 and receiving == 0:
+            scan_and_sync_datasize_once()
+        time.sleep(SCAN_INTERVAL)
+
+
 if __name__ == "__main__":
-    print(f"[START][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Synchronizing folder: {FOLDER}")
-    os.makedirs(FOLDER, exist_ok=True)
-    if recive_mod == 0:
-        threading.Thread(target=scan_and_sync_datasize, daemon=True).start() #依據檔案大小更新
-    receiver()
+    try:
+        print(f"[INFO]目標資料夾: {FOLDER}")
+        os.makedirs(FOLDER, exist_ok=True)
+        main_loop()
+    except KeyboardInterrupt:
+        print("\n[EXIT] 使用者中斷，程式結束")
+    except Exception as e:
+        print(f"[FATAL ERROR] 未預期錯誤導致程式終止：{e}")
