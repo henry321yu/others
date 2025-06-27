@@ -95,16 +95,18 @@ def get_peer_ip():
             else:
                 print(f"[CONNECTION ERROR] 無法連線到儲存的 IP：{ip}，請重新輸入。")
 
+    timeoutT = 5
+    print(f"[CONNECTING] 請輸入接收方的IP(輸入空白或等待{timeoutT}秒進入接收模式)")
     while True:
         ip_input = [None]
 
         def timed_input():
-            ip_input[0] = input("請輸入接收方的IP(輸入空白或等待10秒進入純接收模式)：").strip()
+            ip_input[0] = input("IP：").strip()
 
         t = threading.Thread(target=timed_input)
         t.daemon = True
         t.start()
-        t.join(timeout=10)
+        t.join(timeoutT)
 
         ip = ip_input[0] or ""
 
@@ -125,7 +127,8 @@ def get_peer_ip():
                 config.write(f)
             return ip
         else:
-            print(f"[CONNECTION ERROR] 無法連線到 {ip}，請確認網路狀態後重試。")
+            print(f"[CONNECTION ERROR] 無法連線到 {ip}，請確認IP，輸入空白或30秒後自動進入接收模式。")
+            timeoutT = 30
 
 PEER_IP = get_peer_ip()
 
