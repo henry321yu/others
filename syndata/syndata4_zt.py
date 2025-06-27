@@ -197,7 +197,6 @@ def receiver_once():
             except Exception as e:
                 print(f"[CLEANUP ERROR] {tmp_path}: {e}")
 
-    print(f"[RECEIVER] Listening on port {PORT}...")
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(SCAN_INTERVAL)  # 避免卡住
         s.bind(('', PORT))
@@ -266,17 +265,15 @@ def main_loop():
 
     while True:
         # === 接收階段 ===
-        print(f"[INFO] 進入接收階段")
         start_time = time.time()
         while time.time() - start_time < SCAN_INTERVAL:
+            print(f"[INFO] 進入接收階段")
             receiver_once()
 
         # === 傳送階段 ===
         if recive_mod == 0:
             print(f"[INFO] 進入同步階段")
             scan_and_sync_datasize_once()
-
-        time.sleep(1)
 
 
 

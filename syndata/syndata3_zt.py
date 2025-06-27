@@ -40,7 +40,7 @@ file_status = {}
 sending = 0
 receiving = 0
 disnamelen = 20
-extranamelen = 95
+extranamelen = 99
 recive_mod = 0
 
 def get_zerotier_ip():
@@ -115,7 +115,12 @@ def get_peer_ip():
             return None  # 代表接收模式
         if is_ip_reachable(ip):
             print(f"[SYNC MODE] IP {ip} 連線成功，開始同步 ...")
-            config["SETTINGS"] = {"receiver_ip": ip}
+            
+            if not config.has_section("SETTINGS"):
+                config.add_section("SETTINGS")
+                
+            config.set("SETTINGS", "receiver_ip", ip)
+            
             with open(CONFIG_FILE, "w") as f:
                 config.write(f)
             return ip
