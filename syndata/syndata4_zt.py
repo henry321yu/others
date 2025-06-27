@@ -10,6 +10,32 @@ import psutil
 
 BASE_DIR = os.getcwd()
 CONFIG_FILE = os.path.join(BASE_DIR, "config.ini")
+def get_port():
+    config = configparser.ConfigParser()
+    
+    # 如果設定檔存在就讀取
+    if os.path.exists(CONFIG_FILE):
+        config.read(CONFIG_FILE, encoding="utf-8")
+
+    # 若無 SETTINGS 區塊則新增
+    if not config.has_section("SETTINGS"):
+        config.add_section("SETTINGS")
+
+    # 嘗試取得 port 並轉為 int
+    if config.has_option("SETTINGS", "port"):
+        try:
+            port = int(config.get("SETTINGS", "port"))
+            return port
+        except ValueError:
+            print("port 格式錯誤，使用預設值")
+
+    # 預設值
+    port = 5001
+    config.set("SETTINGS", "port", str(port))
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        config.write(f)
+    return port
+
 def get_sync_folder():
     config = configparser.ConfigParser()
     if os.path.exists(CONFIG_FILE):
@@ -34,7 +60,7 @@ def get_sync_folder():
     
     return full_path
 FOLDER = get_sync_folder()
-PORT = 5001
+PORT = get_port()
 SCAN_INTERVAL = 5
 file_status = {}
 sending = 0
