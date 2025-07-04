@@ -10,9 +10,11 @@
 #define SAMPLE_INTERVAL_MS (1000 / SAMPLE_HZ)
 #define THRESHOLD_G 0.03
 #define SD_CS BUILTIN_SDCARD
-#define MAX_STORAGE_BYTES (uint64_t)(12.0 * 1024 * 1024 * 1024)  // 12GB
-#define PRE_TRIGGER_SECONDS 15
+#define MAX_STORAGE_BYTES (uint64_t)(25.0 * 1024 * 1024 * 1024)  // 12GB
+#define PRE_TRIGGER_SECONDS 30
 #define BUFFER_SIZE (SAMPLE_HZ * PRE_TRIGGER_SECONDS)
+#define SETT 1
+//#define SETT 0.083 //for testing
 
 File f;
 File pf;
@@ -77,17 +79,17 @@ void loop() {
     readMPU();
     float magnitude = sqrt((ax - int_ax) * (ax - int_ax) + (ay - int_ay) * (ay - int_ay) + (az - int_az) * (az - int_az));
     String data = timeStamp() + "," + String(ax, 5) + "," + String(ay, 5) + "," + String(az, 5) + "," + String(magnitude, 5);
-    //    Serial.printf("%.5f,%.5f,%.5f,%.5f\n", ax, ay, az, magnitude * 100);
+//    Serial.printf("%.5f,%.5f,%.5f,%.5f\n", ax, ay, az, magnitude * 100);
 
     // 儲存到 circular buffer
     preTriggerBuffer[bufferIndex] = data;
     bufferIndex = (bufferIndex + 1) % BUFFER_SIZE;
 
     // 寫入 temp 檔案
-    if (!f) {
+    if (!f && !triggered) {
       f = SD.open(currentTempFile.c_str(), FILE_WRITE);
     }
-    if (f) {
+    if (f && !triggered) {
       f.println(data);
       f.close();
     }
@@ -95,12 +97,13 @@ void loop() {
 
     // 若超過閾值則啟動觸發記錄
     if (magnitude > THRESHOLD_G) {
+      f.close();
       if (!triggered) {
         triggered = true;
         preTriggerSaved = false;  // 尚未儲存 pre-trigger 資料
-        triggerEndTime = millis() + 1UL * 60 * 1000 * 0.25;  // ➜ 後 1 分鐘
+        triggerEndTime = millis() + 3UL * 60 * 1000 * SETT;  // ➜ 後 3 分鐘
         currentPermFile = "perm_" + nextLogFileName_perm();
-        Serial.println("⚠ Trigger detected! Saving 1 min before + 1 min after...");
+        Serial.println("⚠ Trigger detected! Saving 30s before + 3 min after...");
         Serial.println("🔒 Saving to: " + currentPermFile);
         digitalWrite(beeper, HIGH);
       }
@@ -110,7 +113,7 @@ void loop() {
     if (triggered) {
      if (magnitude > THRESHOLD_G) {
       Serial.println("⚠ More trigger detected! add 1 more min...");
-      triggerEndTime = millis() + 1UL * 60 * 1000 * 0.25;  // ➜ 再加 1 分鐘
+      triggerEndTime = millis() + 1UL * 60 * 1000 * SETT;  // ➜ 再加 1 分鐘
      }
       if (!pf)
         pf = SD.open(currentPermFile.c_str(), FILE_WRITE);
@@ -122,9 +125,10 @@ void loop() {
             if (preTriggerBuffer[index].length() > 0)
               pf.println(preTriggerBuffer[index]);
           }
+          pf.close();
           preTriggerSaved = true;
-          Serial.println("✅ preTriggerSaved.");
-          Serial.println("Saving next 1 min data...");
+          Serial.println("✅ PreDataSaved.");
+          Serial.println("Saving next 3 min data...");
         }
       }
 
@@ -134,20 +138,20 @@ void loop() {
           pf = SD.open(currentPermFile.c_str(), FILE_WRITE);
         if (pf) {
           pf.println(data);
+          pf.close();
         }
       }
 
       // 觸發結束
       if (millis() >= triggerEndTime) {
-        pf.close();
         triggered = false;
         digitalWrite(beeper, LOW);
         Serial.println("✅ Trigger recording completed.");
       }
     }
 
-    // 每 1 分鐘更換 temp 檔案
-    if (millis() - last_file_switch_time >= 1UL * 60 * 1000 * 0.25 && !triggered) {
+    // 每 5 分鐘更換 temp 檔案
+    if (millis() - last_file_switch_time >= 5UL * 60 * 1000 * SETT && !triggered) {
       switchTempLogFile();
     }
   }
@@ -196,7 +200,11 @@ time_t getTeensy3Time() {
   return Teensy3Clock.get();
 }
 
-String nextLogFileName() {
+String nextLogFileName() {  
+  // 關閉目前檔案
+  if (f) {
+    f.close();
+  }
   String base = twoDigit(month()) + twoDigit(day());
   for (int i = 0; i < 9999; i++) {
     String name = base + "_" + String(i) + ".txt";
@@ -205,6 +213,10 @@ String nextLogFileName() {
   return "error.txt";
 }
 String nextLogFileName_perm() {
+  // 關閉目前檔案
+  if (pf) {
+    pf.close();
+  }
   String base = twoDigit(month()) + twoDigit(day());
   for (int i = 0; i < 9999; i++) {
     String name = base + "_" + String(i) + ".txt";
@@ -214,11 +226,6 @@ String nextLogFileName_perm() {
 }
 
 void switchTempLogFile() {
-  // 關閉目前檔案
-  if (f) {
-    f.close();
-  }
-
   // 檢查儲存空間
   checkStorageLimit();
 
