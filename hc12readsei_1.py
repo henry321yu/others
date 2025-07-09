@@ -25,7 +25,12 @@ events_data = deque(maxlen=dataL)
 status_data = deque(maxlen=dataL)
 
 # 初始化繪圖（建立 4 個子圖）
-fig, axs = plt.subplots(4, 1, figsize=(10, 8), sharex=True)
+fig, axs = plt.subplots(
+    4, 1,
+    figsize=(10, 8),
+    sharex=True,
+    gridspec_kw={'height_ratios': [2.5, 1, 1, 1]}  # s_data 高度為其他的 2 倍
+)
 (line_s,) = axs[0].plot([], [], label="magnitude", lw=1)
 (line_x,) = axs[1].plot([], [], label="ax", color='orange', lw=1)
 (line_y,) = axs[2].plot([], [], label="ay", color='green', lw=1)
