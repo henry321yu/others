@@ -28,7 +28,7 @@ status_data = deque(maxlen=dataL)
 fig, axs = plt.subplots(4, 1, figsize=(10, 8), sharex=True)
 (line_s,) = axs[0].plot([], [], label="magnitude", lw=1)
 (line_x,) = axs[1].plot([], [], label="ax", color='orange', lw=1)
-(line_y,) = axs[2].plot([], [], label="ay", color='lime', lw=1)
+(line_y,) = axs[2].plot([], [], label="ay", color='green', lw=1)
 (line_z,) = axs[3].plot([], [], label="az", color='red', lw=1)
 
 # 設定子圖標題與 Y 標籤
