@@ -32,16 +32,16 @@ fig, axs = plt.subplots(
     sharex=True,
     gridspec_kw={'height_ratios': [2.5, 1, 1, 1]}  # s_data 高度為其他的 2 倍
 )
-(line_s,) = axs[0].plot([], [], label="magnitude", lw=1)
+(line_s,) = axs[0].plot([], [], label="bia", lw=1)
 (line_x,) = axs[1].plot([], [], label="ax", color='orange', lw=1)
 (line_y,) = axs[2].plot([], [], label="ay", color='green', lw=1)
 (line_z,) = axs[3].plot([], [], label="az", color='red', lw=1)
 
 # 設定子圖標題與 Y 標籤
-axs[0].set_ylabel("magnitude")
-axs[1].set_ylabel("ax")
-axs[2].set_ylabel("ay")
-axs[3].set_ylabel("az")
+axs[0].set_ylabel("bia (g)")
+axs[1].set_ylabel("ax (g)")
+axs[2].set_ylabel("ay (g)")
+axs[3].set_ylabel("az (g)")
 axs[3].set_xlabel("Program time (s)")
 
 for ax in axs:
@@ -68,8 +68,12 @@ def update_plot(frame):
         axs[3].set_xlim(min(timee), max(timee))
 
         # 更新標題
-        axs[0].set_title(f"time: {timee[-1]} , ax: {x_data[-1]:.5f} , ay: {y_data[-1]:.5f} , az: {z_data[-1]:.5f}\nmagnitude: {s_data[-1]:.5f} , events: {events_data[-1]:.0f}, status: {status_data[-1]}" if time_data else "")
-        axs[3].set_xlabel(f"{time_data[-1]} , last event time: {last_event_time}" if last_event_time else f"{time_data[-1]}")
+        axs[0].set_title(f"time: {timee[-1]} , {time_data[-1]}\nevents: {events_data[-1]:.0f} , status: {status_data[-1]} , last event time: {last_event_time}" if last_event_time else f"time: {timee[-1]} , {time_data[-1]}\nevents: {events_data[-1]:.0f} , status: {status_data[-1]}")
+
+        axs[0].set_xlabel(f"bia: {s_data[-1]:.5f}")
+        axs[1].set_xlabel(f"ax: {x_data[-1]:.5f}")
+        axs[2].set_xlabel(f"ay: {y_data[-1]:.5f}")
+        axs[3].set_xlabel(f"az: {z_data[-1]:.5f}")
 
     return line_s, line_x, line_y, line_z
 
@@ -105,8 +109,8 @@ def read_serial_data():
                         if(last_event_time == start_time):
                             last_event_time = None
                 
-                    #設定要繪圖的3軸                    
-                    x = ax 
+                    #設定要繪圖的3軸
+                    x = ax
                     y = ay
                     z = az
                     
