@@ -7,7 +7,6 @@
 #include <SoftwareSerial.h> //HC12(mcu's rx、hc-12's tx,   mcu's tx、hc-12's rx) 
 #include "register.h"
 
-#define MPU_ADDR 0x68
 #define SAMPLE_HZ 200
 #define SAMPLE_INTERVAL_MS (1000 / SAMPLE_HZ)
 #define THRESHOLD_G 0.03
@@ -39,6 +38,8 @@ int ID;
 const int acc_I2c = 0x1D;
 long values[10], t[12];
 float x[3], y[3], z[3], ta[3], atemp;
+String event = "untrigger";
+int events = 0;
 
 void setup() {
   WDT_timings_t config;
@@ -46,6 +47,8 @@ void setup() {
   wdt.begin(config);
 
   pinMode(beeper, OUTPUT);
+  digitalWrite(beeper, HIGH);
+  delay(200);
   digitalWrite(beeper, LOW);
 
   Serial.begin(115200);
@@ -60,7 +63,6 @@ void setup() {
   }
 
   Wire.begin();
-
   Serial.println(F("HC12.reset"));  //115200
   pinMode(setpin, OUTPUT); digitalWrite(setpin, LOW); // for reset
   HC12.begin(9600);
@@ -72,12 +74,17 @@ void setup() {
   delay(100);
   HC12.print("AT+B115200");
   delay(100);
-  HC12.print("AT+C117"); //127 for imu //117 for mag sensor gps //112 for mag sensor //107 for gps//097 for rtk // 087 for rasp power
+  HC12.print("AT+C067"); //127 for imu //117 for mag sensor gps //112 for mag sensor //107 for gps//097 for rtk // 087 for rasp power
   delay(100);
   HC12.print("AT+P8");
   delay(100);
   digitalWrite(setpin, HIGH);
   Serial.println(F("HC12.set"));
+
+  while (HC12.available()) {
+    Serial.write(HC12.read());
+  }
+
 
   //adxl355 setting
   writeRegister(acc_I2c, RESET, 0x52);  // reset sensor
@@ -88,6 +95,7 @@ void setup() {
   delay(30);
   writeRegister(acc_I2c, SELF_TEST, 0x00);  // writing 3 to to enable self test
   delay(30);
+  delay(500);
 
   if (!SD.begin(SD_CS)) {
     Serial.println("SD card initialization failed!");
@@ -100,20 +108,30 @@ void setup() {
   int_az = az;
 
   Serial.println("System ready.");
-  delay(1000);
+  digitalWrite(beeper, HIGH);
+  delay(100);
+  digitalWrite(beeper, LOW);
+  delay(500);
+  digitalWrite(beeper, HIGH);
+  delay(100);
+  digitalWrite(beeper, LOW);
+  delay(2000);
   switchTempLogFile();  // 產生初始 temp 檔案
 }
 
 void loop() {
   wdt.feed();
 
+  float error_acc = sqrt(ax * ax + ay * ay + az * az);
+  while (error_acc == 0);
+
   if (millis() - last_sample_time >= SAMPLE_INTERVAL_MS) {
     last_sample_time = millis();
 
     acc_data();
     float magnitude = sqrt((ax - int_ax) * (ax - int_ax) + (ay - int_ay) * (ay - int_ay) + (az - int_az) * (az - int_az));
-    String data = timeStamp() + "," + String(ax, 5) + "," + String(ay, 5) + "," + String(az, 5) + "," + String(magnitude, 5);
-    Serial.println(data);
+    String data = timeStamp() + "," + String(ax, 5) + "," + String(ay, 5) + "," + String(az, 5) + "," + String(magnitude, 5) + "," + String(events) + "," + event;
+//    Serial.println(data);
     HC12.println(data);
 
     // 儲存到 circular buffer
@@ -127,6 +145,7 @@ void loop() {
     if (f && !triggered) {
       f.println(data);
       f.close();
+      event = "untrigger";
     }
 
 
@@ -134,10 +153,13 @@ void loop() {
     if (magnitude > THRESHOLD_G) {
       f.close();
       if (!triggered) {
+        events += 1;
+        event = "triggered";
         triggered = true;
         preTriggerSaved = false;  // 尚未儲存 pre-trigger 資料
         triggerEndTime = millis() + 3UL * 60 * 1000 * SETT;  // ➜ 後 3 分鐘
         currentPermFile = "perm_" + nextLogFileName_perm();
+        Serial.println(String(magnitude, 5));
         Serial.println("⚠ Trigger detected! Saving 30s before + 3 min after...");
         Serial.println("🔒 Saving to: " + currentPermFile);
         digitalWrite(beeper, HIGH);
@@ -147,6 +169,7 @@ void loop() {
     // 觸發狀態下寫入 perm 檔案
     if (triggered) {
       if (magnitude > THRESHOLD_G) {
+        Serial.println(String(magnitude, 5));
         Serial.println("⚠ More trigger detected! add 1 more min...");
         triggerEndTime = millis() + 1UL * 60 * 1000 * SETT;  // ➜ 再加 1 分鐘
       }
@@ -198,11 +221,24 @@ String twoDigit(int num) {
 }
 
 String timeStamp() {
-  char ms[4];
-  sprintf(ms, "%03d", (int)(millis() % 1000));
-  return String(year()) + "-" + twoDigit(month()) + "-" + twoDigit(day()) + " " +
-         twoDigit(hour()) + ":" + twoDigit(minute()) + ":" + twoDigit(second()) + "." + ms;
+  static uint32_t lastMillis = millis();
+  static time_t lastSecond = now();
+
+  uint32_t nowMillis = millis();
+  if (nowMillis - lastMillis >= 1000) {
+    lastSecond += 1;
+    lastMillis += 1000;
+  }
+
+  int ms = nowMillis - lastMillis;
+  char buf[32];
+  sprintf(buf, "%04d-%02d-%02d %02d:%02d:%02d.%03d",
+          year(lastSecond), month(lastSecond), day(lastSecond),
+          hour(lastSecond), minute(lastSecond), second(lastSecond),
+          ms);
+  return String(buf);
 }
+
 
 time_t getTeensy3Time() {
   return Teensy3Clock.get();
