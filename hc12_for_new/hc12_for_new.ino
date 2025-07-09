@@ -38,7 +38,7 @@ void setup()
   delay(100);
   HC12.print("AT+B115200");
   delay(100);
-  HC12.print("AT+C117"); //127 for imu //117 for mag sensor gps //112 for mag sensor //107 for gps//097 for rtk // 087 for rasp power
+  HC12.print("AT+C067"); //127 for imu //117 for mag sensor gps //112 for mag sensor //107 for gps//097 for rtk // 087 for rasp power// 067 for seismograph
   delay(100);
   HC12.print("AT+P8");
   delay(100);
