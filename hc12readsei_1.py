@@ -120,7 +120,7 @@ def read_serial_data():
 
                     # 將時間和 x, y, z,s 存入 deque
                     timee.append(elapsed_seconds)
-                    time_data.append(time_value)
+                    time_data.append(time_value.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3])
                     s_data.append(s)
                     x_data.append(x)
                     y_data.append(y)
