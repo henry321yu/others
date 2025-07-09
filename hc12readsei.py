@@ -52,7 +52,7 @@ def update_plot(frame):
         #             max(max(x_data), max(y_data), max(z_data)) + k)
         
         # 更新軸標籤
-        ax.set_xlabel(f"timee: {timee[-1]} , {time_data[-1]}")
+        ax.set_xlabel(f"program time: {timee[-1]} , {time_data[-1]}")
         ax.set_title(f"ax: {x_data[-1]:.5f} , ay: {y_data[-1]:.5f} , az: {z_data[-1]:.5f}\nmagnitude: {s_data[-1]:.5f} , events: {events_data[-1]:.0f}, status: {status_data[-1]}" if time_data else "")
         
     return line_x, line_y, line_z, line_s
