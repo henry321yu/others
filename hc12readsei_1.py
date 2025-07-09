@@ -11,8 +11,9 @@ from datetime import datetime
 port = "COM6"
 baudrate = 115200  # 根據實際情況調整
 dataL = 500 # 設定要繪圖的資料數
-k=5 #y軸留白大小
+k = 0.01 #y軸留白大小
 start_time = None  # 新增這行
+eventst = 0
 
 # 建立存放資料的 deque，只保留最新 100 筆資料
 timee = deque(maxlen=dataL)
@@ -45,9 +46,10 @@ axs[3].set_xlabel("Program time (s)")
 
 for ax in axs:
     ax.grid(True)
-    ax.legend(loc="upper right")
+    # ax.legend(loc="upper right")
 
 def update_plot(frame):
+    global last_event_time
     """更新繪圖資料"""
     if timee and s_data:
         # 更新每條線的資料
@@ -66,13 +68,13 @@ def update_plot(frame):
         axs[3].set_xlim(min(timee), max(timee))
 
         # 更新標題
-        axs[0].set_title(f"ax: {x_data[-1]:.5f} , ay: {y_data[-1]:.5f} , az: {z_data[-1]:.5f}\nmagnitude: {s_data[-1]:.5f} , events: {events_data[-1]:.0f}, status: {status_data[-1]}" if time_data else "")
-        axs[3].set_xlabel(f"program time: {timee[-1]} , {time_data[-1]}")
+        axs[0].set_title(f"time: {timee[-1]} , ax: {x_data[-1]:.5f} , ay: {y_data[-1]:.5f} , az: {z_data[-1]:.5f}\nmagnitude: {s_data[-1]:.5f} , events: {events_data[-1]:.0f}, status: {status_data[-1]}" if time_data else "")
+        axs[3].set_xlabel(f"{time_data[-1]} , last event time: {last_event_time}" if last_event_time else f"{time_data[-1]}")
 
     return line_s, line_x, line_y, line_z
 
 def read_serial_data():
-    global start_time
+    global start_time , eventst
     """讀取序列埠資料並更新 deque"""
     while True:
         # 讀取一行資料並解碼
@@ -95,15 +97,18 @@ def read_serial_data():
                     magnitude = float(data[4])
                     events = float(data[5])
                     status = data[6]
-                    
-                    global k
 
-                    #設定要繪圖的3軸
-                    
-                    x=ax 
-                    y=ay
-                    z=az
-                    k=0.01 #y軸留白大小
+                    global last_event_time
+                    if(events != eventst):
+                        last_event_time = time_value
+                        eventst = events
+                        if(last_event_time == start_time):
+                            last_event_time = None
+                
+                    #設定要繪圖的3軸                    
+                    x = ax 
+                    y = ay
+                    z = az
                     
                     # 計算向量長度 s（若需要）
                     # s = sqrt(x**2 + y**2 + z**2)
