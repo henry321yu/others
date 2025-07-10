@@ -85,7 +85,6 @@ void setup() {
     Serial.write(HC12.read());
   }
 
-
   //adxl355 setting
   writeRegister(acc_I2c, RESET, 0x52);  // reset sensor
   delay(100);
