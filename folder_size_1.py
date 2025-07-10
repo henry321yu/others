@@ -9,7 +9,7 @@ def get_folder_size(folder, show_progress=False):
                 if os.path.isfile(fp):
                     total_size += os.path.getsize(fp)
                     if show_progress:
-                        print(f"\r目前大小：{format_size(total_size)}", end='', flush=True)
+                        print(f"\r目前大小：{format_size(total_size)}    ", end='', flush=True)
             except Exception as e:
                 print(f"\n⚠️ 無法讀取檔案 {fp}: {e}")
     if show_progress:
