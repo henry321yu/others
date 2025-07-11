@@ -11,7 +11,7 @@
 #define SAMPLE_INTERVAL_MS (1000 / SAMPLE_HZ)
 #define THRESHOLD_G 0.03
 #define SD_CS BUILTIN_SDCARD
-#define MAX_STORAGE_BYTES (uint64_t)(25.0 * 1024 * 1024 * 1024)  // 12GB
+#define MAX_STORAGE_BYTES (uint64_t)(0.55 * 1024 * 1024 * 1024)  // 12GB
 #define PRE_TRIGGER_SECONDS 40
 #define BUFFER_SIZE (SAMPLE_HZ * PRE_TRIGGER_SECONDS)
 #define SETT 1
@@ -144,7 +144,7 @@ void loop() {
 
   acc_data();
   float magnitude = sqrt((ax - int_ax) * (ax - int_ax) + (ay - int_ay) * (ay - int_ay) + (az - int_az) * (az - int_az));
-  String acc_String_data = String(ax, 5) + "," + String(ay, 5) + "," + String(az, 5) + "," + String(magnitude, 5);
+  String acc_String_data = String(ax, 5) + "," + String(ay, 5) + "," + String(az, 5) + "," + String(magnitude, 5) + "," + String(atemp,3);
   String data = String(nowmillis * 0.001, 3) + "," + timeStamp() + "," + acc_String_data + "," + String(events) + "," + statuss + "," + String(freq, 2) + "," + nowfile;
 
   //  Serial.println(data);
