@@ -7,7 +7,7 @@
 #include <SoftwareSerial.h> //HC12(mcu's rx、hc-12's tx,   mcu's tx、hc-12's rx) 
 #include "register.h"
 
-#define SAMPLE_HZ 100
+#define SAMPLE_HZ 1000
 #define SAMPLE_INTERVAL_MS (1000 / SAMPLE_HZ)
 #define THRESHOLD_G 0.03
 #define SD_CS BUILTIN_SDCARD
@@ -61,7 +61,7 @@ void setup() {
   
   Serial.println("Initializing...");
 
-  Serial.printf("Watchdog timeout :%ds\n",wdtt/1000);
+  Serial.printf("Watchdog timeout : %ds\n",wdtt/1000);
   
   setSyncProvider(getTeensy3Time);
   if (timeStatus() != timeSet) {
@@ -142,7 +142,7 @@ void loop() {
     acc_data();
     float magnitude = sqrt((ax - int_ax) * (ax - int_ax) + (ay - int_ay) * (ay - int_ay) + (az - int_az) * (az - int_az));
     String acc_String_data = String(ax, 5) + "," + String(ay, 5) + "," + String(az, 5) + "," + String(magnitude, 5);
-    String data = timeStamp() + "," + acc_String_data + "," + String(events) + "," + statuss + "," + String(freq, 2) + "," + nowfile;
+    String data = String(nowmillis*0.001, 3) + "," + timeStamp() + "," + acc_String_data + "," + String(events) + "," + statuss + "," + String(freq, 2) + "," + nowfile;
 
     Serial.println(data);
     HC12.println(data);
@@ -160,6 +160,7 @@ void loop() {
     if (f && !triggered) {
       f.println(data);
       statuss = "untrigger";
+      nowfile = currentTempFile;
     }
 
 
@@ -223,7 +224,6 @@ void loop() {
     // 每 5 分鐘更換 temp 檔案
     if (nowmillis - last_file_switch_time >= 5UL * 60 * 1000 * SETT && !triggered) {
       switchTempLogFile();
-      nowfile = currentTempFile;
     }
   }
 }
