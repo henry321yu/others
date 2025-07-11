@@ -160,7 +160,7 @@ void loop() {
   if (!f && !triggered) {
     f = SD.open(currentTempFile.c_str(), FILE_WRITE);
   }
-  if (f && !triggered) {
+  if (f && !triggered && !trigger_pending) {
     f.println(data);
     statuss = "untrigger";
     nowfile = currentTempFile;
@@ -226,6 +226,7 @@ void loop() {
       triggered = false;
       digitalWrite(beeper, LOW);
       Serial.println("✅ Trigger recording completed.");
+      switchTempLogFile();
     }
   }
 
