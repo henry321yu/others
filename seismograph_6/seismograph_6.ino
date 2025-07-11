@@ -14,8 +14,8 @@
 #define MAX_STORAGE_BYTES (uint64_t)(25.0 * 1024 * 1024 * 1024)  // 12GB
 #define PRE_TRIGGER_SECONDS 30
 #define BUFFER_SIZE (SAMPLE_HZ * PRE_TRIGGER_SECONDS)
-#define SETT 1
-//#define SETT 0.083 //for testing
+//#define SETT 1
+#define SETT 0.083 //for testing
 
 File f;
 File pf;
@@ -45,9 +45,9 @@ long i = 0;
 float nowmillis;
 int wdtt = 30000;
 
-double tt[10], timee,freq = 100;
+double tt[10], freq = 200;
 long ii = 500; long iii = 1000;
-int delayy = 1000, setF = 100;
+int delayy = 1000, setF = 200;
 
 void setup() {
   WDT_timings_t config;
@@ -65,7 +65,7 @@ void setup() {
 
   Serial.println("Initializing...");
 
-  Serial.printf("Watchdog timeout :%ds\n", wdtt / 1000);
+  Serial.printf("Watchdog timeout : %ds\n", wdtt / 1000);
 
   setSyncProvider(getTeensy3Time);
   if (timeStatus() != timeSet) {
@@ -142,7 +142,7 @@ void loop() {
   acc_data();
   float magnitude = sqrt((ax - int_ax) * (ax - int_ax) + (ay - int_ay) * (ay - int_ay) + (az - int_az) * (az - int_az));
   String acc_String_data = String(ax, 5) + "," + String(ay, 5) + "," + String(az, 5) + "," + String(magnitude, 5);
-  String data = String(timee, 3) + "," + timeStamp() + "," + acc_String_data + "," + String(events) + "," + statuss + "," + String(freq, 2) + "," + nowfile;
+  String data = String(nowmillis * 0.001, 3) + "," + timeStamp() + "," + acc_String_data + "," + String(events) + "," + statuss + "," + String(freq, 2) + "," + nowfile;
 
   Serial.println(data);
   HC12.println(data);
@@ -160,6 +160,7 @@ void loop() {
   if (f && !triggered) {
     f.println(data);
     statuss = "untrigger";
+    nowfile = currentTempFile;
   }
 
 
@@ -223,7 +224,6 @@ void loop() {
   // 每 5 分鐘更換 temp 檔案
   if (nowmillis - last_file_switch_time >= 5UL * 60 * 1000 * SETT && !triggered) {
     switchTempLogFile();
-    nowfile = currentTempFile;
   }
   timer_v2();
   delayMicroseconds(delayy);
@@ -275,9 +275,6 @@ String nextLogFileName() {
 }
 String nextLogFileName_perm() {
   // 關閉目前檔案
-  if (f) {
-    f.close();
-  }
   if (pf) {
     pf.close();
   }
@@ -412,7 +409,7 @@ void acc_data() {
 
 void timer_v2() {
   i++;
-  timee = nowmillis * 0.001;
+  float timee = nowmillis * 0.001;
 
   if (i >= iii) {
     iii = i + 500;
