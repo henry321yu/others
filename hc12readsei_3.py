@@ -8,9 +8,9 @@ from datetime import datetime
 
 
 # 設定序列埠
-port = "COM3"
+port = "COM6"
 baudrate = 115200  # 根據實際情況調整
-dataL = 300 # 設定要繪圖的資料數
+dataL = 1000 # 設定要繪圖的資料數
 k = 0.01 #y軸留白大小
 start_time = None
 last_event_time = None
@@ -48,7 +48,7 @@ for ax in axs:
     # ax.legend(loc="upper right")
 
 def update_plot(frame):
-    global last_event_time, events, status, f, file
+    global last_event_time, events, status, f, file, atemp
     """更新繪圖資料"""
     if timee_data and s_data:
         # 更新每條線的資料
@@ -67,7 +67,7 @@ def update_plot(frame):
         axs[3].set_xlim(min(timee_data), max(timee_data))
 
         # 更新標題
-        axs[0].set_title(f"time: {timee_data[-1]} , {time_data[-1]} , freq: {f}\nevents: {events} , status: {status} , last event: {last_event_time}\n{file}" if last_event_time else f"time: {timee_data[-1]} , {time_data[-1]} , freq: {f}\nevents: {events} , status: {status}\n{file}")
+        axs[0].set_title(f"time: {timee_data[-1]} , {time_data[-1]} , freq: {f} , {atemp}°C\nevents: {events} , status: {status} , last event: {last_event_time}\n{file}" if last_event_time else f"time: {timee_data[-1]} , {time_data[-1]} , freq: {f} , {atemp}°C\nevents: {events} , status: {status}\n{file}")
 
         axs[0].set_xlabel(f"bia: {s_data[-1]:.5f}")
         axs[1].set_xlabel(f"ax: {x_data[-1]:.5f}")
@@ -77,7 +77,7 @@ def update_plot(frame):
     return line_s, line_x, line_y, line_z
 
 def read_serial_data():
-    global start_time, eventst,events, status, f, file,last_event_time
+    global start_time, eventst,events, status, f, file,last_event_time, atemp
     """讀取序列埠資料並更新 deque"""
     while True:
         # 讀取一行資料並解碼
@@ -85,7 +85,7 @@ def read_serial_data():
         if line:  # 確保資料不為空
             data = line.split(',')  # 以 "," 分割資料
             # 檢查資料是否有正確的 14 個數據
-            if len(data) == 10:
+            if len(data) == 11:
                 try:
                     # 將各個資料轉為浮點數
                     timee = float(data[0])
@@ -99,10 +99,11 @@ def read_serial_data():
                     ay = float(data[3])
                     az = float(data[4])
                     magnitude = float(data[5])
-                    events = int(data[6])
-                    status = data[7]
-                    f = float(data[8])
-                    file = data[9]
+                    atemp = float(data[6])
+                    events = int(data[7])
+                    status = data[8]
+                    f = float(data[9])
+                    file = data[10]
 
                     if(events != eventst):
                         last_event_time = time_value
