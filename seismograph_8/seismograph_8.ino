@@ -188,7 +188,7 @@ void loop() {
     digitalWrite(beeper, HIGH);
   }
 
-  if (trigger_pending && (nowmillis - trigger_detected_time >= 500)) { // 5000ms後再處裡 以防掉幀
+  if (trigger_pending && (nowmillis - trigger_detected_time >= 10000)) { // 10s後再處裡 以防掉幀
     trigger_pending = false;
     triggered = true;
     preTriggerSaved = false;
@@ -251,8 +251,6 @@ void loop() {
   if (nowmillis - last_file_switch_time >= 5UL * 60 * 1000 * SETT && !triggered) {
     switchTempLogFile();
   }
-  if (f) f.flush();
-  if (pf) pf.flush();
   timer_v2();
   delayMicroseconds(delayy);
 }
@@ -471,7 +469,9 @@ void timer_v2() {
     tt[1] = timee;
     tt[3] = tt[0];
     tt[2] = tt[1] - tt[0];
-    freq = 500 / tt[2];
+    freq = 500 / tt[2];    
+    if (f) f.flush();
+    if (pf) pf.flush();
 
     if (abs(freq - setF) > 1) {
       if (setF > freq) {
