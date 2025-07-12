@@ -206,10 +206,10 @@ void loop() {
       Serial.printf("End perm file at %ds...\n", triggerEndTime / 1000);
     }
     if (!pf) {
+      pf = SD.open(currentPermFile.c_str(), FILE_WRITE);
       if (!pf) {
         Serial.println("⚠ 無法寫入 perm 檔案：" + currentPermFile);
       }
-      pf = SD.open(currentPermFile.c_str(), FILE_WRITE);
     }
     // 第一次觸發後先儲存過去 1 分鐘資料
     if (!preTriggerSaved) {
@@ -228,10 +228,10 @@ void loop() {
     // 觸發期間持續寫入
     if (nowmillis <= triggerEndTime) {
       if (!pf) {
+        pf = SD.open(currentPermFile.c_str(), FILE_WRITE);
         if (!pf) {
           Serial.println("⚠ 無法寫入 perm 檔案：" + currentPermFile);
         }
-        pf = SD.open(currentPermFile.c_str(), FILE_WRITE);
       }
       if (pf) {
         pf.println(data);
