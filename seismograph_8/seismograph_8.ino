@@ -11,7 +11,7 @@
 #define SAMPLE_INTERVAL_MS (1000 / SAMPLE_HZ)
 #define THRESHOLD_G 0.03
 #define SD_CS BUILTIN_SDCARD
-#define MAX_STORAGE_BYTES (uint64_t)(0.2 * 1024 * 1024 * 1024)  // 12GB
+#define MAX_STORAGE_BYTES 335544320  // byte = mb*2^20  (100hz 38.75mb/hr )
 #define PRE_TRIGGER_SECONDS 40
 #define BUFFER_SIZE (SAMPLE_HZ * PRE_TRIGGER_SECONDS)
 #define SETT 1
@@ -123,10 +123,8 @@ void setup() {
   listSDContents();
 
   Serial.println("產生初始 temp 檔案...");
-  currentTempFile = "temp_" + nextLogFileName();  // 不呼叫 switchTempLogFile()，只先決定檔名
-  last_file_switch_time = millis();               // 重設切換時間
+  switchTempLogFile();
   nowfile = currentTempFile;
-  Serial.println("New temp file: " + currentTempFile);
   Serial.println("System ready.");
   digitalWrite(beeper, HIGH);
   delay(100);
@@ -153,7 +151,7 @@ void loop() {
   String acc_String_data = String(ax, 5) + "," + String(ay, 5) + "," + String(az, 5) + "," + String(magnitude, 5) + "," + String(atemp, 3);
   String data = String(nowmillis * 0.001, 3) + "," + timeStamp() + "," + acc_String_data + "," + String(events) + "," + statuss + "," + String(freq, 2) + "," + nowfile;
 
-  Serial.println(data);
+  //  Serial.println(data);
   HC12.println(data);
 
   if (!triggered) {
@@ -351,7 +349,8 @@ void switchTempLogFile() {
 
 // ===== 空間與檔案管理 =====
 void checkStorageLimit() {
-  uint64_t total = 0;
+  int total = 0;
+  float mbb = (1 << 20);  // 2 的 20 次方 byte to mb
   File root = SD.open("/");
   while (true) {
     File entry = root.openNextFile();
@@ -361,11 +360,14 @@ void checkStorageLimit() {
     }
     entry.close();
   }
+  Serial.printf("目前檔案大小：%.2f mb ", total / mbb);
 
   if (total >= MAX_STORAGE_BYTES) {
-    Serial.println("⚠ 超過 12GB，刪除最舊 temp 檔案...");
+    Serial.printf("⚠ 超過設定的 %.2f mb，刪除最舊 temp 檔案...\n", MAX_STORAGE_BYTES / mbb);
     deleteOldestTempLog();
   }
+  else
+    Serial.printf("小於設定的檔案限制 %.2f mb.繼續...\n", MAX_STORAGE_BYTES / mbb);
 }
 
 void deleteOldestTempLog() {
@@ -469,7 +471,7 @@ void timer_v2() {
     tt[1] = timee;
     tt[3] = tt[0];
     tt[2] = tt[1] - tt[0];
-    freq = 500 / tt[2];    
+    freq = 500 / tt[2];
     if (f) f.flush();
     if (pf) pf.flush();
 
@@ -500,7 +502,8 @@ void listSDContents() {
     if (!entry) break;
     Serial.print(entry.name());
     Serial.print(" - ");
-    Serial.println(entry.size());
+    Serial.print(entry.size());
+    Serial.println(" bytes");
     entry.close();
   }
 }
