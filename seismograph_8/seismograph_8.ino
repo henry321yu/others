@@ -11,7 +11,7 @@
 #define SAMPLE_INTERVAL_MS (1000 / SAMPLE_HZ)
 #define THRESHOLD_G 0.03
 #define SD_CS BUILTIN_SDCARD
-#define MAX_STORAGE_BYTES 335544320  // byte = mb*2^20  (100hz 38.75mb/hr )
+#define MAX_STORAGE_MEGABYTES 930  // byte = mb*2^20  (100hz 38.75mb/hr )
 #define PRE_TRIGGER_SECONDS 40
 #define BUFFER_SIZE (SAMPLE_HZ * PRE_TRIGGER_SECONDS)
 #define SETT 1
@@ -350,7 +350,9 @@ void switchTempLogFile() {
 // ===== 空間與檔案管理 =====
 void checkStorageLimit() {
   int total = 0;
+  float maxx = MAX_STORAGE_MEGABYTES;
   float mbb = (1 << 20);  // 2 的 20 次方 byte to mb
+  maxx = maxx * mbb;
   File root = SD.open("/");
   while (true) {
     File entry = root.openNextFile();
@@ -362,12 +364,12 @@ void checkStorageLimit() {
   }
   Serial.printf("目前檔案大小：%.2f mb ", total / mbb);
 
-  if (total >= MAX_STORAGE_BYTES) {
-    Serial.printf("⚠ 超過設定的 %.2f mb，刪除最舊 temp 檔案...\n", MAX_STORAGE_BYTES / mbb);
+  if (total >= maxx) {
+    Serial.printf("⚠ 超過設定的 %.2f mb，刪除最舊 temp 檔案...\n", maxx / mbb);
     deleteOldestTempLog();
   }
   else
-    Serial.printf("小於設定的檔案限制 %.2f mb.繼續...\n", MAX_STORAGE_BYTES / mbb);
+    Serial.printf("小於設定的檔案限制 %.2f mb.繼續...\n", maxx / mbb);
 }
 
 void deleteOldestTempLog() {
