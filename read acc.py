@@ -3,8 +3,9 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 
 # 讀取資料
-file_path = r"C:\Users\sgrc - 325\Desktop\seismograph data\perm_0711_91.txt"
-df = pd.read_csv(file_path, header=None, names=["timee","time", "ax", "ay", "az", "magnitude", "events", "status", "f", "file"])
+dataname = "perm_0714_3.txt"
+file_path = r"C:\Users\sgrc - 325\Desktop\seismograph data\\" + dataname
+df = pd.read_csv(file_path, header=None, names=["timee","time", "ax", "ay", "az", "magnitude", "atemp", "events", "status", "f", "file"])
 markersizee = 0.1
 
 # 將時間欄位轉為 datetime 格式
