@@ -23,7 +23,7 @@ if not os.path.exists(ini_file):
         'dataL': '1000',
         'k': '0.01',
         'figsize_w': '8',
-        'figsize_h': '6'
+        'figsize_h': '7'
     }
     with open(ini_file, 'w') as configfile:
         config.write(configfile)
