@@ -64,16 +64,16 @@ void setup() {
 
   Serial.begin(115200);
   delay(100);
-  while (!Serial && millis() < 4000);
 
   Serial.println("Initializing...");
 
-  Serial.printf("Watchdog timeout : %ds\n", wdtt / 1000);
-
+  Serial.println("" __FILE__ " " __DATE__ " " __TIME__);
   setSyncProvider(getTeensy3Time);
   if (timeStatus() != timeSet) {
     Serial.println("RTC time not set!");
   }
+  
+  Serial.printf("Watchdog timeout : %ds\n", wdtt / 1000);
 
   Wire.begin();
   Serial.println(F("HC12.reset"));  //115200
