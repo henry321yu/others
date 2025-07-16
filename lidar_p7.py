@@ -38,7 +38,7 @@ render_option = vis.get_render_option()
 render_option.point_size = 2.0
 
 # 畫格線
-def draw_grid_lines(grid_size=1, extent=15): #設定網格長度
+def draw_grid_lines(grid_size=5, extent=16): #設定網格長度 40M
     lines = []
     points = []
     for i in range(-extent, extent + 1):
@@ -155,6 +155,18 @@ def pointcloud_updater():
                 vc = vis.get_view_control()
                 vc.set_lookat([0, 0, 0])
                 vc.set_zoom(0.5)
+
+                # 旋轉 180 度（Z 軸）###
+                R = np.eye(3)
+                R[:2, :2] = [[-1, 0], [0, -1]]
+
+                view_params = vc.convert_to_pinhole_camera_parameters()
+                extrinsic = view_params.extrinsic.copy()
+                extrinsic[:3, :3] = R @ extrinsic[:3, :3]
+                view_params.extrinsic = extrinsic
+                vc.convert_from_pinhole_camera_parameters(view_params)                
+                # 旋轉 180 度（Z 軸）####
+
                 gotnp = 1
                 i_max_points = max_points
 
