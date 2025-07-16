@@ -10,7 +10,7 @@
 #define SAMPLE_HZ 100
 #define SAMPLE_INTERVAL_MS (1000 / SAMPLE_HZ)
 #define THRESHOLD_G 0.03
-#define SD_CS BUILTIN_SDCARD
+#define SD_CS 10
 #define MAX_STORAGE_MEGABYTES 2790  // byte = mb*2^20  (100hz 38.75mb/hr )
 #define PRE_TRIGGER_SECONDS 40
 #define BUFFER_SIZE (SAMPLE_HZ * PRE_TRIGGER_SECONDS)
@@ -29,7 +29,7 @@ unsigned long last_file_switch_time = 0;
 unsigned long triggerEndTime = 0;
 bool triggered = false;
 String currentTempFile = "";
-int beeper = 13;
+int beeper = 14;
 String currentPermFile = "";  // 儲存目前的 perm 檔案名
 String preTriggerBuffer[BUFFER_SIZE];
 int bufferIndex = 0;
@@ -66,13 +66,13 @@ void setup() {
   delay(100);
 
   Serial.println("Initializing...");
-
-  Serial.println("" __FILE__ " " __DATE__ " " __TIME__);
+  
+//  Serial.println("" __FILE__ " " __DATE__ " " __TIME__);
   setSyncProvider(getTeensy3Time);
   if (timeStatus() != timeSet) {
     Serial.println("RTC time not set!");
   }
-  
+
   Serial.printf("Watchdog timeout : %ds\n", wdtt / 1000);
 
   Wire.begin();
@@ -140,8 +140,11 @@ void loop() {
   wdt.feed();
 
   float error_acc = sqrt(ax * ax + ay * ay + az * az);
-  while (error_acc == 0)
+  while (error_acc == 0) {
     Serial.println("error_acc");
+    HC12.println("error_acc");
+    delay(1000);
+  }
 
   nowmillis = millis();
   last_sample_time = nowmillis;
