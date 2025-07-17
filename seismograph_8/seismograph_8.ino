@@ -352,7 +352,7 @@ void switchTempLogFile() {
 
 // ===== 空間與檔案管理 =====
 void checkStorageLimit() {
-  int total = 0;
+  unsigned long total = 0;
   float maxx = MAX_STORAGE_MEGABYTES;
   float mbb = (1 << 20);  // 2 的 20 次方 byte to mb
   maxx = maxx * mbb;
