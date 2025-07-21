@@ -11,11 +11,11 @@
 #define SAMPLE_INTERVAL_MS (1000 / SAMPLE_HZ)
 #define THRESHOLD_G 0.03
 #define SD_CS 10
-#define MAX_STORAGE_MEGABYTES 2790  // byte = mb*2^20  (100hz 38.75mb/hr )
+#define MAX_STORAGE_MEGABYTES 1860  // byte = mb*2^20  (100hz 38.75mb/hr )
 #define PRE_TRIGGER_SECONDS 40
 #define BUFFER_SIZE (SAMPLE_HZ * PRE_TRIGGER_SECONDS)
 #define SETT 1
-//#define SETT 0.083 //for testing
+//#define SETT 0.1 //for testing
 
 File f;
 File pf;
@@ -248,8 +248,8 @@ void loop() {
     }
   }
 
-  // 每 5 分鐘更換 temp 檔案
-  if (nowmillis - last_file_switch_time >= 5UL * 60 * 1000 * SETT && !triggered) {
+  // 每 10 分鐘更換 temp 檔案
+  if (nowmillis - last_file_switch_time >= 10UL * 60 * 1000 * SETT && !triggered) {
     switchTempLogFile();
   }
   timer_v2();
