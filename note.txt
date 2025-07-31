@@ -1,0 +1,133 @@
+cmd 指令
+
+
+cd Desktop\py 到指定相對目錄
+cd .. 上一層
+dir 顯示所有資料夾、檔案
+mkdir "test" 創建資料夾名test
+rmdir "test" 刪除資料夾名test
+type a.txt 查看a.txt
+ren a.txt newa.txt 重新命名a.txt成newa.txt
+dir /s /b C:\*.txt 在 C: 磁碟上搜尋所有 .txt 檔案，並顯示其完整路徑。
+rem 附註(無作用)
+; 附註(無作用)
+echo hello 列印hello
+
+(
+echo ;請輸入來源與輸出資料夾路徑，不要含空格
+echo.
+echo [Path1]
+echo from_folder_path=來源資料夾路徑
+echo [Path2]
+echo to_folder_path=輸出資料夾路徑
+) > a.txt 創建a.txt 並輸入括號內echo後的內容
+
+pause 停止程式 輸入任意鍵繼續
+timeout /t 5 倒數5秒 可按任意鍵跳過
+timeout /t 5 /nobreak 倒數5秒 只能ctrl+c跳過
+copy C:\copier.cmd C:\test\copier.cmd 複製C:\copier.cmd到C:\test
+copy /Y C:\copier.cmd C:\test\copier.cmd 複製並覆蓋C:\copier.cmd到C:\test
+copy "log data\*.txt" "log2" 複製log data內所有txt檔到log2不含子目錄
+move "log data\*" "log2" 移動log data內所有txt檔到log2不含子目錄
+del "log data\*.txt"  刪除子目錄log data內所有txt檔不含子目錄
+del *.txt   刪除此目錄所有.txt檔不含子目錄
+del /s *    刪除此目錄所有檔含子目錄的檔案 但不刪資料夾
+del /s /d *   不確認全刪除 此目錄所有檔含子目錄的檔案 但不刪資料夾
+del /s “log data"  刪除子目錄log data全數資料不含子目錄
+rd /s “log data”   刪除子目錄log data全數資料
+rmdir /s “log data”  同rd
+
+%localappdata%\LINE\bin\LineLauncher.exe
+
+尋找port占用的PID
+netstat -aon | findstr :2368
+尋找port占用的程式 依據PID
+tasklist /FI "PID eq 1234"
+尋找關閉該port占用的程式
+taskkill /PID 1234 /F
+
+
+
+
+
+
+
+
+linux
+
+資料夾修改成英文
+1.執行以下指令，把所有 XDG 資料夾設成英文名稱：
+
+xdg-user-dirs-update --set DESKTOP "$HOME/Desktop"
+xdg-user-dirs-update --set DOWNLOAD "$HOME/Downloads"
+xdg-user-dirs-update --set TEMPLATES "$HOME/Templates"
+xdg-user-dirs-update --set PUBLICSHARE "$HOME/Public"
+xdg-user-dirs-update --set DOCUMENTS "$HOME/Documents"
+xdg-user-dirs-update --set MUSIC "$HOME/Music"
+xdg-user-dirs-update --set PICTURES "$HOME/Pictures"
+xdg-user-dirs-update --set VIDEOS "$HOME/Videos"
+
+xdg-user-dirs-update
+
+
+2.將舊的「中文資料夾」移到英文資料夾：
+
+mv ~/桌面/* ~/Desktop/ 2>/dev/null
+mv ~/文件/* ~/Documents/ 2>/dev/null
+mv ~/下載/* ~/Downloads/ 2>/dev/null
+mv ~/音樂/* ~/Music/ 2>/dev/null
+mv ~/圖片/* ~/Pictures/ 2>/dev/null
+mv ~/影片/* ~/Videos/ 2>/dev/null
+mv ~/公共/* ~/Public/ 2>/dev/null
+mv ~/範本/* ~/Templates/ 2>/dev/null
+
+
+3.如果確認資料都搬好了，也可以把原本的中文資料夾刪掉：
+
+rmdir ~/桌面 ~/文件 ~/下載 ~/音樂 ~/圖片 ~/影片 ~/公共 ~/範本 2>/dev/null
+
+
+4.
+cat ~/.config/user-dirs.dirs
+
+你應該會看到像這樣的結果（以英文為主）：
+XDG_DESKTOP_DIR="$HOME/Desktop"
+XDG_DOWNLOAD_DIR="$HOME/Downloads"
+XDG_DOCUMENTS_DIR="$HOME/Documents"
+...
+
+
+
+
+新增一檔案雙擊執行腳本
+
+1.建立一個 Shell 腳本
+nano lslidar.sh
+
+2.將以下內容貼進檔案中：{
+
+#!/bin/bash
+
+cd ~/lidar_ws || exit
+catkin_make
+source devel/setup.bash
+roslaunch lslidar_cx_driver lslidar_cx.launch
+
+}按下 Ctrl + O 儲存，然後 Ctrl + X 離開。
+
+3. 賦予執行權限(並重開機?：
+chmod +x ~/lidar_ws/start_lidar.sh
+
+
+
+
+新增腳本至terminal
+
+1.複製.sh檔案到/home/bin內 並檔名修改成 lslidar   (可選)
+
+2.
+chmod +x ~/bin/start_lidar
+echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+3.以後只要在終端機輸入：lslidar
