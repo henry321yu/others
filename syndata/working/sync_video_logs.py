@@ -169,14 +169,23 @@ def send_file(file_path):
             s.send(filename.encode())
             s.send(filesize.to_bytes(8, 'big'))
 
-            sending = 1 
             # 等待對方是否要跳過此檔案
-            response = s.recv(4).decode()
-            if response == "SKIP":
+            sending = 1 
+            s.settimeout(10)  # 最多等待 10 秒回應
+            try:
+                response = s.recv(4).decode()
+                if response == "SKIP":
+                    print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')
+                    print(f"\r[SENDER][SKIP EXISTING] {filename}                                                ", end='', flush=True)
+                    sending = 0
+                    return True
+            except socket.timeout:
                 print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')
-                print(f"\r[SENDER][SKIP EXISTING] {filename}                                                ", end='', flush=True)
+                print(f"[SEND ERROR][{datetime.now().strftime('%H:%M:%S')}] {filename} - 等待對方回應超時 (10秒)")
                 sending = 0
-                return True
+                return False
+            finally:
+                s.settimeout(None)  # 重設 timeout
 
             with open(file_path, 'rb') as f:
                 sent = 0

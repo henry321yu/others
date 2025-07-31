@@ -9,7 +9,7 @@ from datetime import datetime
 import psutil
 
 BASE_DIR = os.getcwd()
-CONFIG_FILE = os.path.join(BASE_DIR, "config_sync_video_logs_from_ipc.ini")
+CONFIG_FILE = os.path.join(BASE_DIR, "config_sync_video_logs_to_pc.ini")
 def get_port():
     config = configparser.ConfigParser()
     
