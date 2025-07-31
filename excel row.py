@@ -13,8 +13,10 @@ def main():
             return
         col_name = number_to_column_name(col)
         print(f"Excel 儲存格名稱為：{col_name}")
+        input() 
     except ValueError:
-        print("請輸入有效的整數！")
+        print("請輸入有效的整數！")         
+        input() 
 
 if __name__ == "__main__":
     main()
