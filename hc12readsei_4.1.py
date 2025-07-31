@@ -107,60 +107,67 @@ def read_serial_data():
     global start_time, eventst,events, status, f, file,last_event_time, atemp
     """讀取序列埠資料並更新 deque"""
     while True:
-        # 讀取一行資料並解碼
-        line = ser.readline().decode('utf-8').strip()
-        if line:  # 確保資料不為空
-            data = line.split(',')  # 以 "," 分割資料
-            # 檢查資料是否有正確的 14 個數據
-            if len(data) == 11:
-                try:
-                    # 將各個資料轉為浮點數
-                    timee = float(data[0])
+        try:
+            try:
+                # 讀取一行資料並解碼
+                line = ser.readline().decode('utf-8', errors='ignore').strip()
+            except UnicodeDecodeError as e:
+                print(f"解碼錯誤: {e}")
+                continue  # 跳過這筆資料
+            if line:  # 確保資料不為空
+                data = line.split(',')  # 以 "," 分割資料
+                # 檢查資料是否有正確的 14 個數據
+                if len(data) == 11:
+                    try:
+                        # 將各個資料轉為浮點數
+                        timee = float(data[0])
 
-                    time_value = datetime.strptime(data[1], "%Y-%m-%d %H:%M:%S.%f")
+                        time_value = datetime.strptime(data[1], "%Y-%m-%d %H:%M:%S.%f")
 
-                    if start_time is None:
-                        start_time = time_value  # 初始化起始時間
+                        if start_time is None:
+                            start_time = time_value  # 初始化起始時間
 
-                    ax = float(data[2])
-                    ay = float(data[3])
-                    az = float(data[4])
-                    magnitude = float(data[5])
-                    atemp = float(data[6])
-                    events = int(data[7])
-                    status = data[8]
-                    f = float(data[9])
-                    file = data[10]
+                        ax = float(data[2])
+                        ay = float(data[3])
+                        az = float(data[4])
+                        magnitude = float(data[5])
+                        atemp = float(data[6])
+                        events = int(data[7])
+                        status = data[8]
+                        f = float(data[9])
+                        file = data[10]
 
-                    if(events != eventst):
-                        last_event_time = time_value
-                        eventst = events
-                        if(last_event_time == start_time):
-                            last_event_time = None
-                
-                    #設定要繪圖的3軸
-                    x = ax
-                    y = ay
-                    z = az
+                        if(events != eventst):
+                            last_event_time = time_value
+                            eventst = events
+                            if(last_event_time == start_time):
+                                last_event_time = None
                     
-                    # 計算向量長度 s（若需要）
-                    # s = sqrt(x**2 + y**2 + z**2)
-                    s = magnitude
+                        #設定要繪圖的3軸
+                        x = ax
+                        y = ay
+                        z = az
+                        
+                        # 計算向量長度 s（若需要）
+                        # s = sqrt(x**2 + y**2 + z**2)
+                        s = magnitude
 
-                    # 將時間和 x, y, z,s 存入 deque
-                    timee_data.append(timee)
-                    time_data.append(time_value.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3])
-                    s_data.append(s)
-                    x_data.append(x)
-                    y_data.append(y)
-                    z_data.append(z)
+                        # 將時間和 x, y, z,s 存入 deque
+                        timee_data.append(timee)
+                        time_data.append(time_value.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3])
+                        s_data.append(s)
+                        x_data.append(x)
+                        y_data.append(y)
+                        z_data.append(z)
 
-                    # 印出資料
-                    print(line)
-                except ValueError:
-                    print(f"資料轉換失敗: {line}")
-            else:
-                print(f"接收到錯誤的資料格式: {line}")
+                        # 印出資料
+                        print(line)
+                    except ValueError:
+                        print(f"資料轉換失敗: {line}")
+                else:
+                    print(f"接收到錯誤的資料格式: {line}")
+        except Exception as e:
+            print(f"發生未知錯誤: {e}")
 
 try:
     # 開啟序列埠
