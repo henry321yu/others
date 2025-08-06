@@ -29,7 +29,7 @@ unsigned long last_file_switch_time = 0;
 unsigned long triggerEndTime = 0;
 bool triggered = false;
 String currentTempFile = "";
-int beeper = 14;
+const int beeper = 14;
 String currentPermFile = "";  // 儲存目前的 perm 檔案名
 String preTriggerBuffer[BUFFER_SIZE];
 int bufferIndex = 0;
@@ -44,6 +44,7 @@ int events = 0;
 long i = 0;
 float nowmillis;
 int wdtt = 20000;
+const int vcc_355 = 17;
 
 double tt[10], freq = SAMPLE_HZ;
 long ii = 500; long iii = 1000;
@@ -58,9 +59,12 @@ void setup() {
   wdt.begin(config);
 
   pinMode(beeper, OUTPUT);
+  pinMode(vcc_355, OUTPUT);
+  digitalWrite(vcc_355, LOW);
   digitalWrite(beeper, HIGH);
-  delay(200);
-  digitalWrite(beeper, LOW);
+  delay(500);
+  digitalWrite(vcc_355, HIGH);
+  digitalWrite(beeper, HIGH);
 
   Serial.begin(115200);
   delay(100);
