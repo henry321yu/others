@@ -56,7 +56,7 @@ if __name__ == "__main__":
     # 互動輸入
     lat = 22.997814
     lon = 120.221267
-    local_time_str = "2025-08-06 15:53"
+    local_time_str = "2025-08-06 17:53"
 
     # 解析台灣時間 (UTC+8)
     local_dt = datetime.strptime(local_time_str, "%Y-%m-%d %H:%M")
