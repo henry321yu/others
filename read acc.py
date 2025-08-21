@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 
 # 讀取資料
-dataname = "perm_250731_2.txt"
+dataname = "perm_250813_6.txt"
 file_path = r"C:\Users\sgrc - 325\Desktop\seismograph data\\" + dataname
 df = pd.read_csv(file_path, header=None, names=["timee","time", "ax", "ay", "az", "magnitude", "atemp", "events", "status", "f", "file"])
 markersizee = 0.1
