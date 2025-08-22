@@ -9,7 +9,7 @@
 
 #define SAMPLE_HZ 100
 #define SAMPLE_INTERVAL_MS (1000 / SAMPLE_HZ)
-#define THRESHOLD_G 0.03
+#define THRESHOLD_G 0.01
 #define SD_CS 10
 #define MAX_STORAGE_MEGABYTES 1860  // byte = mb*2^20  (100hz 38.75mb/hr )
 #define PRE_TRIGGER_SECONDS 40
