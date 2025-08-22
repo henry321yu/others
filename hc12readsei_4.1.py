@@ -23,7 +23,8 @@ if not os.path.exists(ini_file):
         'dataL': '1000',
         'k': '0.01',
         'figsize_w': '8',
-        'figsize_h': '7'
+        'figsize_h': '7',
+        'line_width': '2.5'
     }
     with open(ini_file, 'w') as configfile:
         config.write(configfile)
@@ -38,6 +39,7 @@ k = config['SEIS_CONFIGURE'].getfloat('k', 0.01)
 figsize_w = config['SEIS_CONFIGURE'].getfloat('figsize_w', 8)
 figsize_h = config['SEIS_CONFIGURE'].getfloat('figsize_h', 6)
 figsize = (figsize_w, figsize_h)
+line_width = config['SEIS_CONFIGURE'].getfloat('line_width', 2.5)
 
 start_time = None
 last_event_time = None
@@ -58,10 +60,10 @@ fig, axs = plt.subplots(
     sharex=True,
     gridspec_kw={'height_ratios': [1, 1, 1, 2.5]}  # s_data 高度為其他的 2 倍
 )
-(line_x,) = axs[0].plot([], [], label="ax", lw=1)
-(line_y,) = axs[1].plot([], [], label="ay", color='orange', lw=1)
-(line_z,) = axs[2].plot([], [], label="az", color='green', lw=1)
-(line_s,) = axs[3].plot([], [], label="bia", color='red', lw=1)
+(line_x,) = axs[0].plot([], [], label="ax", lw=line_width)
+(line_y,) = axs[1].plot([], [], label="ay", color='orange', lw=line_width)
+(line_z,) = axs[2].plot([], [], label="az", color='green', lw=line_width)
+(line_s,) = axs[3].plot([], [], label="bia", color='red', lw=line_width)
 
 # 設定子圖標題與 Y 標籤
 axs[0].set_ylabel("ax (g)")
