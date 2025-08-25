@@ -5,10 +5,15 @@ from datetime import datetime
 # 取得今天日期，格式：日月年，例如 250825
 today_str = datetime.now().strftime("%d%m%y")
 
+# # 壓縮來源資料夾
+# source_folder = Path(r"D:\fly_data")
+# # 輸出壓縮檔路徑
+# output_file = Path(fr"D:\fly_data_{today_str}.7z")
+
 # 壓縮來源資料夾
-source_folder = Path(r"D:\fly_data")
+source_folder = Path(r"C:\Users\sgrc - 325\Desktop\seismograph data\old")
 # 輸出壓縮檔路徑
-output_file = Path(fr"D:\fly_data_{today_str}.7z")
+output_file = Path(fr"C:\Users\sgrc - 325\Desktop\seismograph data\old_{today_str}.7z")
 
 # 如果檔案已存在，先刪除
 if output_file.exists():
@@ -28,9 +33,9 @@ cmd = [
     "-t7z",
     "-mx=7",
     "-m0=LZMA2",
-    "-md=512m",
+    "-md=1024m",
     "-mfb=273",
-    "-mmt=8"
+    "-mmt=10"
 ]
 
 # 執行命令
