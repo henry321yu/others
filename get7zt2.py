@@ -51,12 +51,6 @@ if final_file.exists():
 if tmp_file.exists():
     tmp_file.unlink()
 
-# 如果有舊檔，先刪除
-if final_file.exists():
-    final_file.unlink()
-if tmp_file.exists():
-    tmp_file.unlink()
-
 # 計算來源資料夾總大小
 total_size = get_folder_size(source_folder)
 print(f"來源資料夾總大小: {format_size(total_size)}")
@@ -78,7 +72,7 @@ def monitor_file_size(path: Path, stop_flag: list, start_time, total_size):
                 percent = 0
 
             print(
-                f"\t[進度] {format_time(elapsed)} | "
+                f"\t | {format_time(elapsed)} | "
                 f"目前大小 {format_size(current_size)}"
             )
 
