@@ -6,9 +6,14 @@ from datetime import datetime
 today_str = datetime.now().strftime("%d%m%y")
 
 # 壓縮來源資料夾
-source_folder = Path(r"C:\Users\sgrc - 325\Desktop\seismograph data\old")
+source_folder = Path(r"D:\fly_data")
 # 輸出壓縮檔路徑
-output_file = Path(fr"C:\Users\sgrc - 325\Desktop\seismograph data\old_{today_str}.7z")
+output_file = Path(fr"D:\fly_data_{today_str}.7z")
+
+# 如果檔案已存在，先刪除
+if output_file.exists():
+    output_file.unlink()
+    print(f"舊檔已刪除: {output_file}")
 
 # 7z 壓縮命令
 # -t7z: 7z 格式
