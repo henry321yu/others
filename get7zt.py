@@ -12,12 +12,16 @@ def get_folder_size(path: Path):
             total += file.stat().st_size
     return total
 
-# 壓縮來源資料夾
-source_folder = Path(r"C:\Users\sgrc - 325\Desktop\seismograph data\old")
-
 # 生成日期壓縮檔名
 today_str = datetime.now().strftime("%d%m%y")
-final_file = Path(fr"C:\Users\sgrc - 325\Desktop\seismograph data\old_{today_str}.7z")
+
+# # 壓縮來源資料夾
+# source_folder = Path(r"C:\Users\sgrc - 325\Desktop\seismograph data\old")
+# final_file = Path(fr"C:\Users\sgrc - 325\Desktop\seismograph data\old_{today_str}.7z")
+# 壓縮來源資料夾
+source_folder = Path(r"D:\fly_data")
+final_file = Path(fr"D:\fly_data_{today_str}.7z")
+
 tmp_file = final_file.with_suffix(".7z.tmp")
 
 # 如果有舊檔，先刪除
