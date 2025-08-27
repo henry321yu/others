@@ -103,13 +103,13 @@ def get_peer_ip():
     global recive_mod
     config = configparser.ConfigParser()
 
-    iface, ip = get_zerotier_ip()
-    # iface, ip = get_radmin_ip()
+    # iface, ip = get_zerotier_ip()
+    iface, ip = get_radmin_ip()
     if ip:
         print(f"虛擬LAN介面：{iface}\n本機虛擬LAN IP位址：{ip}")
     else:
-        print("未偵測到 ZeroTier 虛擬LAN介面")
-        # print("未偵測到 Radmin 虛擬LAN介面")
+        # print("未偵測到 ZeroTier 虛擬LAN介面")
+        print("未偵測到 Radmin 虛擬LAN介面")
 
     if os.path.exists(CONFIG_FILE):
         config.read(CONFIG_FILE)
