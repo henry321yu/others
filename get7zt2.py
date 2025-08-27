@@ -36,12 +36,12 @@ def get_folder_size(path: Path):
 # 生成日期壓縮檔名
 today_str = datetime.now().strftime("%d%m%y")
 
+# # 壓縮來源資料夾
+# source_folder = Path(r"C:\Users\sgrc - 325\Desktop\seismograph data\old")
+# final_file = Path(fr"C:\Users\sgrc - 325\Desktop\seismograph data\old_{today_str}.7z")
 # 壓縮來源資料夾
-source_folder = Path(r"C:\Users\sgrc - 325\Desktop\seismograph data\old")
-final_file = Path(fr"C:\Users\sgrc - 325\Desktop\seismograph data\old_{today_str}.7z")
-# 壓縮來源資料夾
-# source_folder = Path(r"D:\fly_data")
-# final_file = Path(fr"D:\fly_data_{today_str}.7z")
+source_folder = Path(r"D:\fly_data")
+final_file = Path(fr"D:\fly_data_{today_str}.7z")
 
 tmp_file = final_file.with_suffix(".7z.tmp")
 
@@ -72,7 +72,7 @@ def monitor_file_size(path: Path, stop_flag: list, start_time, total_size):
                 percent = 0
 
             print(
-                f"\t | {format_time(elapsed)} | "
+                f" | {format_time(elapsed)} | "
                 f"目前大小 {format_size(current_size)}"
             )
 
@@ -89,7 +89,7 @@ cmd = [
     "-m0=LZMA2",
     "-mfb=273",
     # "-md=1024m",
-    # "-mmt=10",
+    # "-mmt=8",
     "-md=512m",
     "-mmt=18",
     "-y"
