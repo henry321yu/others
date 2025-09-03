@@ -34,7 +34,7 @@ def get_folder_size(path: Path):
     return total
 
 # 生成日期壓縮檔名
-today_str = datetime.now().strftime("%d%m%y")
+today_str = datetime.now().strftime("%y%m%d")
 
 # # 壓縮來源資料夾
 # source_folder = Path(r"C:\Users\sgrc - 325\Desktop\seismograph data\old")
