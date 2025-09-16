@@ -36,10 +36,20 @@ while True:
         base_date = datetime.strptime(date_str, '%y%m%d').date()
 
         print(f'讀取：{filename}，起始日期：{base_date}')
+        # 嘗試讀取檔案
+        try:
+            T = pd.read_csv(filepath, sep=None, engine='python')
+        except Exception as e:
+            print(f'⚠️ 無法讀取 {filename}，錯誤：{e}')
+            continue
 
-        T = pd.read_csv(filepath, sep=None, engine='python')
+        # 判斷是否有資料
+        if T.empty:
+            print(f'⚠️ 檔案 {filename} 沒有任何資料，略過。')
+            continue
 
         if 'time' not in T.columns:
+            print(f'⚠️ 檔案 {filename} 缺少 time 欄位，略過。')
             continue
 
         T['time'] = pd.to_datetime(T['time'], format='%H:%M:%S.%f', errors='coerce').dt.time
@@ -94,7 +104,7 @@ while True:
     if ymax > 400:
         ax.set_ylim(min(y) - 10, 400)
     else:
-        ax.set_ylim(min(y) - 10, max(y) + 10)
+        ax.set_ylim(min(y) - 10, max(y) + 20)
 
     ax.set_title(f'資料為 {x_0.strftime("%Y-%m-%d %H:%M:%S")} 到 {x_1.strftime("%Y-%m-%d %H:%M:%S")} 的多筆欄位資料')
     ax.set_xlabel('Time')
