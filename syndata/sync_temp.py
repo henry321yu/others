@@ -30,7 +30,7 @@ def get_port():
             print("port 格式錯誤，使用預設值")
 
     # 預設值
-    port = 5001
+    port = 5099
     config.set("SETTINGS", "port", str(port))
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         config.write(f)
@@ -49,8 +49,8 @@ def get_sync_folder():
         if folder_name:
             return os.path.join(BASE_DIR, folder_name)
     
-    # 預設為 sync_data
-    folder_name = "sync_data"
+    # 預設為 temp_sync
+    folder_name = "temp_sync"
     full_path = os.path.join(BASE_DIR, folder_name)
     os.makedirs(full_path, exist_ok=True)
     
@@ -65,7 +65,7 @@ SCAN_INTERVAL = 5
 file_status = {}
 sending = 0
 receiving = 0
-disnamelen = 30
+disnamelen = 23
 extranamelen = 89
 recive_mod = 0
 
@@ -199,7 +199,11 @@ def send_file(file_path):
                     speed = sent / megabyte / elapsed if elapsed > 0 else 0
                     print_name = (filename[:disnamelen - 3] + '...') if len(filename) > disnamelen else filename            
                     eta = (filesize - sent)/ megabyte / speed if speed > 0 else 0
-                    eta_str = time.strftime('%M:%S', time.gmtime(eta))
+                    h, m, s = time.gmtime(eta).tm_hour, time.gmtime(eta).tm_min, time.gmtime(eta).tm_sec
+                    if h > 0:
+                        eta_str = f"{h:d}:{m:02d}:{s:02d}"
+                    else:
+                        eta_str = f"{m:02d}:{s:02d}"
                     print(f"\r[SENDING] ↑ 傳送中 {print_name}:{filesize / megabyte:.2f} MB/{sent / megabyte:.2f} MB({sent / filesize*100:.2f}%, {speed:.2f} MB/S, {eta_str})", end='', flush=True)
 
                 # 清除 SEND START 和 傳送進度輸出行
@@ -280,7 +284,11 @@ def receiver():
                             speed = received / megabyte / elapsed if elapsed > 0 else 0
                             print_name = (filename[:disnamelen-3] + '...') if len(filename) > disnamelen else filename
                             eta = (filesize - received)/ megabyte / speed if speed > 0 else 0
-                            eta_str = time.strftime('%M:%S', time.gmtime(eta))
+                            h, m, s = time.gmtime(eta).tm_hour, time.gmtime(eta).tm_min, time.gmtime(eta).tm_sec
+                            if h > 0:
+                                eta_str = f"{h:d}:{m:02d}:{s:02d}"
+                            else:
+                                eta_str = f"{m:02d}:{s:02d}"
                             print(f"\r[RECEIVING][From:{addr[0]}] ↓ 接收中 {print_name}:{filesize / megabyte:.2f} MB/{received / megabyte:.2f} MB({received / filesize*100:.2f}%, {speed:.2f} MB/S, {eta_str})", end='', flush=True)
 
                     if os.path.exists(final_file_path):

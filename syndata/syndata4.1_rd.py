@@ -9,7 +9,7 @@ from datetime import datetime
 import psutil
 
 BASE_DIR = os.getcwd()
-CONFIG_FILE = os.path.join(BASE_DIR, "config_sync_temp.ini")
+CONFIG_FILE = os.path.join(BASE_DIR, "config.ini")
 def get_port():
     config = configparser.ConfigParser()
     
@@ -30,7 +30,7 @@ def get_port():
             print("port 格式錯誤，使用預設值")
 
     # 預設值
-    port = 5099
+    port = 5001
     config.set("SETTINGS", "port", str(port))
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         config.write(f)
@@ -49,8 +49,8 @@ def get_sync_folder():
         if folder_name:
             return os.path.join(BASE_DIR, folder_name)
     
-    # 預設為 temp_sync
-    folder_name = "temp_sync"
+    # 預設為 sync_data
+    folder_name = "sync_data"
     full_path = os.path.join(BASE_DIR, folder_name)
     os.makedirs(full_path, exist_ok=True)
     
@@ -103,13 +103,13 @@ def get_peer_ip():
     global recive_mod
     config = configparser.ConfigParser()
 
-    iface, ip = get_zerotier_ip()
-    # iface, ip = get_radmin_ip()
+    # iface, ip = get_zerotier_ip()
+    iface, ip = get_radmin_ip()
     if ip:
         print(f"虛擬LAN介面：{iface}\n本機虛擬LAN IP位址：{ip}")
     else:
-        print("未偵測到 ZeroTier 虛擬LAN介面")
-        # print("未偵測到 Radmin 虛擬LAN介面")
+        # print("未偵測到 ZeroTier 虛擬LAN介面")
+        print("未偵測到 Radmin 虛擬LAN介面")
 
     if os.path.exists(CONFIG_FILE):
         config.read(CONFIG_FILE)
