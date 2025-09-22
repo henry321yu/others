@@ -199,11 +199,11 @@ def send_file(file_path):
                     speed = sent / megabyte / elapsed if elapsed > 0 else 0
                     print_name = (filename[:disnamelen - 3] + '...') if len(filename) > disnamelen else filename            
                     eta = (filesize - sent)/ megabyte / speed if speed > 0 else 0
-                    h, m, s = time.gmtime(eta).tm_hour, time.gmtime(eta).tm_min, time.gmtime(eta).tm_sec
-                    if h > 0:
-                        eta_str = f"{h:d}:{m:02d}:{s:02d}"
+                    hh, mm, ss = time.gmtime(eta).tm_hour, time.gmtime(eta).tm_min, time.gmtime(eta).tm_sec
+                    if hh > 0:
+                        eta_str = f"{hh:d}:{mm:02d}:{ss:02d}"
                     else:
-                        eta_str = f"{m:02d}:{s:02d}"
+                        eta_str = f"{mm:02d}:{ss:02d}"
                     print(f"\r[SENDING] ↑ 傳送中 {print_name}:{filesize / megabyte:.2f} MB/{sent / megabyte:.2f} MB({sent / filesize*100:.2f}%, {speed:.2f} MB/S, {eta_str})", end='', flush=True)
 
                 # 清除 SEND START 和 傳送進度輸出行
@@ -284,11 +284,11 @@ def receiver():
                             speed = received / megabyte / elapsed if elapsed > 0 else 0
                             print_name = (filename[:disnamelen-3] + '...') if len(filename) > disnamelen else filename
                             eta = (filesize - received)/ megabyte / speed if speed > 0 else 0
-                            h, m, s = time.gmtime(eta).tm_hour, time.gmtime(eta).tm_min, time.gmtime(eta).tm_sec
-                            if h > 0:
-                                eta_str = f"{h:d}:{m:02d}:{s:02d}"
+                            hh, mm, ss = time.gmtime(eta).tm_hour, time.gmtime(eta).tm_min, time.gmtime(eta).tm_sec
+                            if hh > 0:
+                                eta_str = f"{hh:d}:{mm:02d}:{ss:02d}"
                             else:
-                                eta_str = f"{m:02d}:{s:02d}"
+                                eta_str = f"{mm:02d}:{ss:02d}"
                             print(f"\r[RECEIVING][From:{addr[0]}] ↓ 接收中 {print_name}:{filesize / megabyte:.2f} MB/{received / megabyte:.2f} MB({received / filesize*100:.2f}%, {speed:.2f} MB/S, {eta_str})", end='', flush=True)
 
                     if os.path.exists(final_file_path):
