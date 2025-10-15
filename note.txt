@@ -118,15 +118,15 @@ sudo chmod +x /usr/local/bin/syncdata
 
 ----------------
 開機自動啟動(簡易版?):
-sudo nano /etc/systemd/system/camr.service
+sudo nano /etc/systemd/system/syncdata.service
 
 [Unit]
-Description=2 Cam Record Background Service
+Description=Syncdata
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /home/admin/Desktop/2camr_ngui.py
+ExecStart=/usr/bin/python3 /home/admin/Desktop/syndata4.1_zt_ras_bg.py
 WorkingDirectory=/home/admin/Desktop
 Restart=always
 RestartSec=5
@@ -137,10 +137,20 @@ WantedBy=multi-user.target
 ----------------
 
 
+安裝ZEROTIER
+curl -s https://install.zerotier.com | sudo bash
+安裝完成後，會有一個服務自動啟動：
+systemctl status zerotier-one
+加入指定的 ZeroTier 網路
+sudo zerotier-cli join d5e5fb653749492c
+確認狀態
+sudo zerotier-cli info
 
 
 
-cmd 指令
+
+
+#########cmd 指令###########
 
 
 cd Desktop\py 到指定相對目錄
@@ -190,6 +200,10 @@ taskkill /PID 1234 /F
 
 cmd後 定時開啟某檔案(也可以存成.bat直接執行)
 timeout /t 10 && start "" "C:\Users\sgrc - 325\Desktop\Emlid Studio.lnk"
+
+在目標資料夾打開命令提示字元，執行：
+ren *.txt *.ubx
+一次把全部 .txt 改成 .ubx。
 
 
 
