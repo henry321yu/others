@@ -8,6 +8,7 @@ from moviepy import editor  # 新版 moviepy 用法
 import keyboard  # 監控鍵盤
 import cv2
 from datetime import datetime
+import os
 
 # 取得當前時間
 now = datetime.now()
@@ -100,5 +101,11 @@ if __name__ == "__main__":
     audio_clip = editor.AudioFileClip(AUDIO_FILENAME)
     final_clip = video_clip.set_audio(audio_clip)
     final_clip.write_videofile(OUTPUT_FILENAME, codec='libx264', audio_codec='aac')
+
+    # 合併完成後刪除臨時檔案
+    if os.path.exists(VIDEO_FILENAME):
+        os.remove(VIDEO_FILENAME)
+    if os.path.exists(AUDIO_FILENAME):
+        os.remove(AUDIO_FILENAME)
 
     print("✅ 完成！輸出檔案：", OUTPUT_FILENAME)
