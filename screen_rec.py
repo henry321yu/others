@@ -7,11 +7,16 @@ import time
 from moviepy import editor  # 新版 moviepy 用法
 import keyboard  # 監控鍵盤
 import cv2
+from datetime import datetime
 
-# === 檔名設定 ===
-AUDIO_FILENAME = "audio.wav"
-VIDEO_FILENAME = "video_temp.mp4"
-OUTPUT_FILENAME = "screen_record_with_audio.mp4"
+# 取得當前時間
+now = datetime.now()
+timestamp = now.strftime("%Y-%m-%d %H-%M-%S")
+
+# 自動生成檔名
+VIDEO_FILENAME = f"{timestamp}_temp.mp4"
+AUDIO_FILENAME = f"{timestamp}_audio.wav"
+OUTPUT_FILENAME = f"{timestamp}.mp4"
 
 samplerate = 44100
 channels = 2
