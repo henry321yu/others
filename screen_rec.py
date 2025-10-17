@@ -68,16 +68,6 @@ def record_screen():
         frame = img[:, :, :3]  # 移除 alpha 通道
         frames.append(frame)
 
-        # 偵測連續按下 [ + ] 停止錄影
-        if keyboard.is_pressed("[") and keyboard.is_pressed("]"):
-            start = time.time()
-            while keyboard.is_pressed("[") and keyboard.is_pressed("]"):
-                if time.time() - start >= 1.0:
-                    stop_flag = True
-                    break
-            if stop_flag:
-                break
-
         # 控制錄影頻率
         elapsed = time.time() - start_time
         if elapsed < frame_interval:
@@ -92,6 +82,18 @@ def record_screen():
     out.release()
     print("✅ 影片儲存完成。")
 
+
+# === 安全監聽 End 鍵（不會報錯） ===
+def stop_on_pause():
+    global stop_flag
+    print("⌨️ 可按下 [End] 鍵停止錄影。")
+    while not stop_flag:
+        if keyboard.is_pressed("pause"):  # 安全判斷鍵盤狀態
+            stop_flag = True
+            print("⏸️ 偵測到 End 鍵，停止錄影中...")
+            break
+        time.sleep(0.01)  # 避免佔用過多 CPU
+
 # === 主程式 ===
 if __name__ == "__main__":
     print("🎬 錄影程式啟動中...")
@@ -99,6 +101,7 @@ if __name__ == "__main__":
 
     t1 = threading.Thread(target=record_audio)
     t2 = threading.Thread(target=record_screen)
+    threading.Thread(target=stop_on_pause, daemon=True).start()
 
     t1.start()
     t2.start()
@@ -119,10 +122,24 @@ if __name__ == "__main__":
         fps=FPS
     )
 
-    # 自動刪除暫存檔案
-    if os.path.exists(VIDEO_FILENAME):
-        os.remove(VIDEO_FILENAME)
-    if os.path.exists(AUDIO_FILENAME):
-        os.remove(AUDIO_FILENAME)
+    # === 刪除暫存檔案（含重試機制） ===
+    print("\n🧹 清理暫存檔案中...")
+    for temp_file in [VIDEO_FILENAME, AUDIO_FILENAME]:
+        if not os.path.exists(temp_file):
+            continue
+        for attempt in range(10):  # 最多重試 10 次
+            try:
+                os.remove(temp_file)
+                print(f"🗑️ 已刪除暫存檔案：{temp_file}")
+                break
+            except Exception as e:
+                print(f"⚠️ 無法刪除 {temp_file}（第 {attempt + 1} 次嘗試）: {e}")
+                time.sleep(0.5)
+        else:
+            print(f"❌ 無法刪除 {temp_file}，請手動移除。")
 
-    print("🎉 完成！輸出檔案：", OUTPUT_FILENAME)
+    # === 完成訊息與自動結束 ===
+    print("\n🎉 完成！輸出檔案：", OUTPUT_FILENAME)
+    print("🚪 程式將於 3 秒後自動關閉...")
+    time.sleep(3)
+    os._exit(0)
