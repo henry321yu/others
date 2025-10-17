@@ -133,7 +133,7 @@ if __name__ == "__main__":
     threading.Thread(target=stop_on_pause, daemon=True).start()
 
     t_screen.start()
-    time.sleep(0.05)  # 螢幕錄影先啟動
+    time.sleep(0.001)  # 螢幕錄影先啟動
     t_audio.start()
 
     t_screen.join()
