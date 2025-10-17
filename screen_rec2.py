@@ -169,12 +169,20 @@ if __name__ == "__main__":
         fps=FPS
     )
 
-    # ---------------- 刪除暫存檔案 ----------------
+    # === 刪除暫存檔案（含重試機制） ===
+    print("\n清理暫存檔案中...")
     for temp_file in [VIDEO_FILENAME, AUDIO_FILENAME]:
-        if os.path.exists(temp_file):
+        if not os.path.exists(temp_file):
+            continue
+        for attempt in range(30):  # 最多重試 10 次
             try:
                 os.remove(temp_file)
-            except:
-                pass
+                print(f"已刪除暫存檔案：{temp_file}")
+                break
+            except Exception as e:
+                print(f"無法刪除 {temp_file}（第 {attempt + 1} 次嘗試）: {e}")
+                time.sleep(0.5)
+        else:
+            print(f"無法刪除 {temp_file}，請手動移除。")
 
     print(f"完成，輸出檔案：{OUTPUT_FILENAME}")
