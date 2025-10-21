@@ -205,6 +205,15 @@ timeout /t 10 && start "" "C:\Users\sgrc - 325\Desktop\Emlid Studio.lnk"
 ren *.txt *.ubx
 一次把全部 .txt 改成 .ubx。
 
+啟用 ssh server 讓 winSCP連線
+檢查狀態
+Get-WindowsCapability -Online | Where-Object Name -like 'OpenSSH*'
+安裝
+# Install the OpenSSH Client
+Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0
+
+# Install the OpenSSH Server
+Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
 
 
 
