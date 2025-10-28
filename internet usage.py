@@ -6,7 +6,7 @@ from collections import deque
 ZEROTIER_INTERFACE = '乙太網路'  # 可換成自動尋找程式或實際介面名稱
 
 # 儲存最近 k 秒的 TX 和 RX 資料（Byte）
-k = 10
+k = 2
 tx_history = deque(maxlen=k)
 rx_history = deque(maxlen=k)
 
