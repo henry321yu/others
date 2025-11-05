@@ -3,7 +3,7 @@ import time
 from collections import deque
 
 # 設定要監控的 ZeroTier 網卡名稱
-ZEROTIER_INTERFACE = '乙太網路'  # 可換成自動尋找程式或實際介面名稱
+ZEROTIER_INTERFACE = '乙太網路 3'  # 可換成自動尋找程式或實際介面名稱
 
 # 儲存最近 k 秒的 TX 和 RX 資料（Byte）
 k = 2
