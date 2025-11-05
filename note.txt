@@ -223,7 +223,45 @@ Set-Service -Name sshd -StartupType 'Automatic'
 Stop-Service sshd
 Set-Service -Name sshd -StartupType 'Disabled'
 
-linux
+
+
+電腦A開 FTP 伺服器
+一、
+控制台\程式集\程式和功能\開啟或關閉 Windows 功能
+internet information services
+勾選：
+FTP 伺服器 全勾
+Web 管理工具 - IIS 管理控制台 勾
+二、
+搜尋IIS
+開啟 IIS 管理員
+站台 → 新增 FTP 站台
+輸入FTP名稱與路徑
+"指定LAN IP"
+啟用「無 TLS」（明文）：SSL → 不使用 TLS
+驗證：選擇「基本驗證」
+所有使用者登入(if u wan 2)
+
+其他設定:
+如該帳戶無密碼:設定\家人與其他使用者\將其他人新增至此電腦
+
+防火牆連線異常:
+雙擊右邊「FTP 防火牆支援 (FTP Firewall Support)
+設定：Data Channel Port Range：50000-51000
+External IP Address：填入你的內網IP
+
+管理員 PowerShell）執行：
+# FTP 控制連線、 FTP 被動通道、 啟用 FTP Server 群組
+netsh advfirewall firewall add rule name="FTP Control (21)" dir=in action=allow protocol=TCP localport=21
+netsh advfirewall firewall add rule name="FTP Passive Ports (50000-51000)" dir=in action=allow protocol=TCP localport=50000-51000
+Set-NetFirewallRule -DisplayGroup "FTP Server" -Enabled True
+
+iisreset、或restart FTP站台
+仍異常就重開機
+
+
+
+#########linux 指令###########
 
 資料夾修改成英文
 1.執行以下指令，把所有 XDG 資料夾設成英文名稱：
