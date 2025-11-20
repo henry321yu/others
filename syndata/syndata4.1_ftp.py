@@ -8,13 +8,49 @@ from ftplib import FTP
 BASE_DIR = os.getcwd()
 CONFIG_FILE = os.path.join(BASE_DIR, "config.ini")
 
+def get_ftp_config():
+    """從 config.ini 讀取或建立 FTP 設定"""
+    config = configparser.ConfigParser()
+
+    # 若檔案存在就讀取
+    if os.path.exists(CONFIG_FILE):
+        config.read(CONFIG_FILE, encoding="utf-8")
+
+    # 若無 FTP 區塊 → 建立
+    if not config.has_section("FTP"):
+        config.add_section("FTP")
+
+    # 讀取若不存在就建立
+    default_values = {
+        "host": "192.168.138.207",
+        "user": "admin",
+        "password": "123",
+        "folder": "/"
+    }
+
+    updated = False
+    for key, val in default_values.items():
+        if not config.has_option("FTP", key):
+            config.set("FTP", key, val)
+            updated = True
+
+    # 寫回 config.ini
+    if updated:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            config.write(f)
+
+    # 回傳實際值
+    return (
+        config.get("FTP", "host").strip(),
+        config.get("FTP", "user").strip(),
+        config.get("FTP", "password").strip(),
+        config.get("FTP", "folder").strip()
+    )
+
 # =====================================================
-#                設定 FTP 連線資訊
+#                設定 FTP 連線資訊（改由 config.ini 讀取）
 # =====================================================
-ftp_host = "192.168.138.207"   # ← 修改成你的 FTP Server IP
-ftp_user = "admin"      # ← 修改帳號
-ftp_pass = "123"      # ← 修改密碼
-ftp_folder = "/"            # ← FTP Server 目錄，可改
+ftp_host, ftp_user, ftp_pass, ftp_folder = get_ftp_config()
 SCAN_INTERVAL = 5
 disnamelen = 23
 extranamelen = 89
