@@ -62,7 +62,7 @@ extranamelen = 89
 def get_sync_folder():
     config = configparser.ConfigParser()
     if os.path.exists(CONFIG_FILE):
-        config.read(CONFIG_FILE)
+        config.read(CONFIG_FILE, encoding="utf-8")
 
     if not config.has_section("SETTINGS"):
         config.add_section("SETTINGS")
@@ -90,12 +90,33 @@ FOLDER = get_sync_folder()
 # =====================================================
 #                 FTP 工具函式
 # =====================================================
+def ftp_makedirs(ftp, path):
+    """確保 FTP Server 存在指定目錄，沒有就建立"""
+    original = ftp.pwd()
+    parts = path.strip("/").split("/")
+
+    for p in parts:
+        if not p:
+            continue
+        try:
+            ftp.cwd(p)
+        except:
+            ftp.mkd(p)
+            ftp.cwd(p)
+
+    ftp.cwd(original)
+
+
 def ftp_connect():
-    """建立 FTP 連線"""
+    """建立 FTP 連線（支援 UTF-8）"""
     ftp = FTP()
+    ftp.encoding = "utf-8"    # <-- 重要：允許中文檔名
     ftp.connect(ftp_host, 21, timeout=10)
     ftp.login(ftp_user, ftp_pass)
+
+    ftp_makedirs(ftp, ftp_folder)  # 確保資料夾存在
     ftp.cwd(ftp_folder)
+
     return ftp
 
 
@@ -111,6 +132,11 @@ def ftp_get_file_size(ftp: FTP, filename):
 # =====================================================
 #                 使用 FTP 上傳檔案
 # =====================================================
+def encode_ftp_name(name):
+    """FTP 指令只允許 Latin-1，因此需轉換以支援中文檔名"""
+    return name.encode("utf-8").decode("latin-1")
+
+
 def send_file_via_ftp(file_path):
     filename = os.path.basename(file_path)
     filesize = os.path.getsize(file_path)
@@ -119,16 +145,18 @@ def send_file_via_ftp(file_path):
     try:
         ftp = ftp_connect()
 
-        # 檢查是否存在且大小相同
-        remote_size = ftp_get_file_size(ftp, filename)
+        # 檢查是否存在相同檔案
+        remote_filename = encode_ftp_name(filename)
+        remote_size = ftp_get_file_size(ftp, remote_filename)
         if remote_size == filesize:
             print(f"[SKIP EXISTING] {filename} 已在 FTP 上且大小相同 → 跳過")
             ftp.quit()
             return True
 
-        # 開始上傳
+        # 上傳開始
         print_name = (filename[:disnamelen - 3] + '...') if len(filename) > disnamelen else filename
         start_time = time.time()
+        sent = 0
 
         with open(file_path, "rb") as f:
 
@@ -142,14 +170,13 @@ def send_file_via_ftp(file_path):
 
                 print(
                     f"\r[UPLOADING][FTP] ↑ {print_name}: "
-                    f"{filesize/megabyte:.2f} MB / {sent/megabyte:.2f} MB "
-                    f"({sent/filesize*100:.2f}%, {speed:.2f} MB/s, {mm:02d}:{ss:02d})",
+                    f"{filesize / megabyte:.2f} MB / {sent / megabyte:.2f} MB "
+                    f"({sent / filesize * 100:.2f}%, {speed:.2f} MB/s, {mm:02d}:{ss:02d})",
                     end="",
                     flush=True
                 )
 
-            sent = 0
-            ftp.storbinary(f"STOR {filename}", f, blocksize=4096, callback=callback)
+            ftp.storbinary(f"STOR {remote_filename}", f, blocksize=4096, callback=callback)
 
         ftp.quit()
         print("\n[SEND DONE][FTP] " + filename)
@@ -158,7 +185,6 @@ def send_file_via_ftp(file_path):
     except Exception as e:
         print(f"\n[SEND ERROR][FTP] {filename} - {e}")
         return False
-
 
 
 # =====================================================
