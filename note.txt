@@ -146,6 +146,9 @@ sudo zerotier-cli join d5e5fb653749492c
 確認狀態
 sudo zerotier-cli info
 
+找攝像頭
+v4l2-ctl --list-devices
+
 
 
 
