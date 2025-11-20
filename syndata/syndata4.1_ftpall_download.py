@@ -1,144 +1,185 @@
 import os
-import ftplib
+import time
 import configparser
+import ftplib
+from datetime import datetime
 
-CONFIG_FILE = "config.ini"
+# =====================================================
+#                     基本設定
+# =====================================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_FILE = os.path.join(BASE_DIR, "config_download.ini")
+disnamelen = 23
+extranamelen = 89
+SCAN_INTERVAL = 5
 
 # =====================================================
-#                   讀取 FTP 設定
+#                   讀取 config
 # =====================================================
-def get_ftp_config():
-    config = configparser.ConfigParser()
+def get_config():
+    cfg = configparser.ConfigParser()
     if os.path.exists(CONFIG_FILE):
-        config.read(CONFIG_FILE, encoding="utf-8")
-
-    if not config.has_section("FTP"):
-        config.add_section("FTP")
-
+        cfg.read(CONFIG_FILE, encoding="utf-8")
+    if not cfg.has_section("FTP"):
+        cfg.add_section("FTP")
+    if not cfg.has_section("LOCAL"):
+        cfg.add_section("LOCAL")
     defaults = {
         "host": "192.168.138.207",
         "user": "admin",
         "password": "123",
-        "folder": "/"  # FTP 遠端資料夾
+        "folder": "/",
+        "download_folder": "download_data"
     }
     updated = False
-
-    for key, val in defaults.items():
-        if not config.has_option("FTP", key):
-            config.set("FTP", key, val)
+    for k, v in defaults.items():
+        sec = "LOCAL" if k=="download_folder" else "FTP"
+        if not cfg.has_option(sec, k):
+            cfg.set(sec, k, v)
             updated = True
-
     if updated:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            config.write(f)
-
+            cfg.write(f)
     return (
-        config.get("FTP", "host"),
-        config.get("FTP", "user"),
-        config.get("FTP", "password"),
-        config.get("FTP", "folder")
+        cfg.get("FTP", "host").strip(),
+        cfg.get("FTP", "user").strip(),
+        cfg.get("FTP", "password").strip(),
+        cfg.get("FTP", "folder").strip(),
+        os.path.join(BASE_DIR, cfg.get("LOCAL", "download_folder").strip())
     )
 
 # =====================================================
-#            設定本地下載資料夾 (config.ini)
+#             安全列出 FTP 目錄
 # =====================================================
-def get_download_folder():
-    config = configparser.ConfigParser()
-    if os.path.exists(CONFIG_FILE):
-        config.read(CONFIG_FILE, encoding="utf-8")
-
-    if not config.has_section("LOCAL"):
-        config.add_section("LOCAL")
-
-    if config.has_option("LOCAL", "download_folder"):
-        folder_name = config.get("LOCAL", "download_folder")
-    else:
-        folder_name = "download_data"
-        config.set("LOCAL", "download_folder", folder_name)
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            config.write(f)
-
-    full_path = os.path.join(BASE_DIR, folder_name)
-    os.makedirs(full_path, exist_ok=True)
-    return full_path
+def safe_nlst(ftp):
+    buf = bytearray()
+    try:
+        ftp.retrbinary("NLST", buf.extend)
+        lines = [b.decode("utf-8", errors="ignore") for b in buf.split(b"\r\n") if b.strip()]
+    except:
+        try:
+            lines = ftp.nlst()
+        except:
+            lines = []
+    return lines
 
 # =====================================================
-#               遞迴下載 FTP 資料夾
+#             FTP 編碼轉換與 size
+# =====================================================
+def try_cwd(ftp, path):
+    try:
+        ftp.cwd(path)
+        return True
+    except:
+        try:
+            ftp.cwd(path.encode("utf-8").decode("latin-1"))
+            return True
+        except:
+            return False
+
+def try_size(ftp, path):
+    try:
+        return ftp.size(path)
+    except:
+        try:
+            return ftp.size(path.encode("utf-8").decode("latin-1"))
+        except:
+            return -1
+
+def try_retrbinary(ftp, path, callback):
+    try:
+        ftp.retrbinary(f"RETR {path}", callback)
+        return True
+    except:
+        try:
+            ftp.retrbinary(f"RETR {path.encode('utf-8').decode('latin-1')}", callback)
+            return True
+        except:
+            return False
+
+# =====================================================
+#           遞迴下載主函式
 # =====================================================
 def ftp_download_all(ftp, remote_folder, local_folder):
-    try:
-        ftp.cwd(remote_folder)
-    except:
+    if not try_cwd(ftp, remote_folder):
         print(f"[ERROR] FTP 資料夾不存在：{remote_folder}")
         return
-
     os.makedirs(local_folder, exist_ok=True)
-
-    try:
-        items = ftp.nlst()
-    except Exception as e:
-        print(f"[ERROR] 無法列出：{remote_folder} → {e}")
-        return
+    items = safe_nlst(ftp)
 
     for item in items:
         item_remote = f"{remote_folder}/{item}".replace("//", "/")
         item_local = os.path.join(local_folder, item)
 
-        # 判斷是否為資料夾
-        is_dir = False
-        try:
-            ftp.cwd(item_remote)
-            ftp.cwd("..")
-            is_dir = True
-        except:
-            is_dir = False
-
-        # ───────────────────────
-        #   子資料夾處理
-        # ───────────────────────
+        is_dir = try_cwd(ftp, item_remote)
         if is_dir:
+            ftp.cwd(remote_folder)
             ftp_download_all(ftp, item_remote, item_local)
             continue
 
-        # ───────────────────────
-        #   檔案下載
-        # ───────────────────────
-        try:
-            remote_size = ftp.size(item_remote)
-        except:
-            remote_size = -1
-
-        # 若本地已有同大小 → 跳過
-        if os.path.exists(item_local) and os.path.getsize(item_local) == remote_size:
+        remote_size = try_size(ftp, item_remote)
+        if os.path.exists(item_local) and remote_size > 0 and os.path.getsize(item_local)==remote_size:
             print(f"[SKIP EXISTING] {item_local}")
             continue
 
-        print(f"[DOWNLOAD] {item_remote} → {item_local}")
+        print_name = (item[:disnamelen-3]+"...") if len(item)>disnamelen else item
+        start_time = time.time()
+        downloaded = 0
+        os.makedirs(os.path.dirname(item_local) or ".", exist_ok=True)
 
-        with open(item_local, "wb") as f:
-            ftp.retrbinary(f"RETR {item_remote}", f.write)
+        def callback(chunk):
+            nonlocal downloaded, start_time
+            f.write(chunk)
+            downloaded += len(chunk)
+            elapsed = time.time()-start_time
+            speed = downloaded/(1024*1000)/elapsed if elapsed>0 else 0
+            eta = (remote_size-downloaded)/(1024*1000)/speed if remote_size>0 and speed>0 else 0
+            hh, mm, ss = int(eta//3600), int((eta%3600)//60), int(eta%60)
+            eta_str = f"{hh:d}:{mm:02d}:{ss:02d}" if hh>0 else f"{mm:02d}:{ss:02d}"
+            print(f"\r[DOWNLOADING][FTP] ↓ {print_name}:{(remote_size/1024/1024) if remote_size>0 else 0:.2f}MB/{downloaded/1024/1024:.2f}MB"
+                  f"({downloaded/remote_size*100:.2f}%, {speed:.2f} MB/S, {eta_str})" if remote_size>0 else
+                  f"\r[DOWNLOADING][FTP] ↓ {print_name}:{downloaded/1024/1024:.2f}MB ({speed:.2f} MB/S)",
+                  end="", flush=True)
+
+        try:
+            with open(item_local+".tmp","wb") as f:
+                if not try_retrbinary(ftp, item_remote, callback):
+                    raise Exception("RETR failed")
+        except Exception as e:
+            if os.path.exists(item_local+".tmp"):
+                os.remove(item_local+".tmp")
+            print('\r'+' '* (disnamelen+extranamelen)+'\r', end='')
+            print(f"[DOWNLOAD ERROR][{datetime.now().strftime('%H:%M:%S')}] {item_remote} - {e}")
+            continue
+
+        try:
+            if os.path.exists(item_local):
+                os.remove(item_local)
+            os.rename(item_local+".tmp", item_local)
+        except:
+            pass
+        print('\r'+' '* (disnamelen+extranamelen)+'\r', end='')
+        print(f"[DOWNLOAD DONE][{datetime.now().strftime('%H:%M:%S')}] {item_local} ({remote_size/1024/1024:.2f} MB)")
 
     print(f"[DONE] {remote_folder}")
 
 # =====================================================
-#                     主程式執行
+#                     主程式
 # =====================================================
-if __name__ == "__main__":
-
-    ftp_host, ftp_user, ftp_pass, ftp_folder = get_ftp_config()
-    download_folder = get_download_folder()
-
-    ftp = ftplib.FTP()
-    ftp.encoding = "utf-8"
+if __name__=="__main__":
+    ftp_host, ftp_user, ftp_pass, ftp_folder, download_folder = get_config()
 
     print(f"\n[CONNECT] 連線到 FTP: {ftp_host} ...")
-    ftp.connect(ftp_host, 21, timeout=10)
-    ftp.login(ftp_user, ftp_pass)
+    ftp = ftplib.FTP()
+    ftp.connect(ftp_host,21,timeout=10)
+    ftp.login(ftp_user,ftp_pass)
 
     print(f"[START DOWNLOAD] 從 FTP {ftp_folder} ↓ 本地 {download_folder}\n")
-
     ftp_download_all(ftp, ftp_folder, download_folder)
 
-    ftp.quit()
+    try:
+        ftp.quit()
+    except:
+        pass
+
     print("\n[ALL DOWNLOAD COMPLETED]")
