@@ -136,29 +136,35 @@ def encode_ftp_name(name):
     """FTP 指令只允許 Latin-1，因此需轉換以支援中文檔名"""
     return name.encode("utf-8").decode("latin-1")
 
-
-def send_file_via_ftp(file_path):
-    filename = os.path.basename(file_path)
-    filesize = os.path.getsize(file_path)
+def send_file_via_ftp(full_path, relative_path):
+    filename = relative_path.replace("\\", "/")  # Windows 路徑 → FTP 路徑
+    filesize = os.path.getsize(full_path)
     megabyte = 1024 * 1000
 
     try:
         ftp = ftp_connect()
 
-        # 檢查是否存在相同檔案
-        remote_filename = encode_ftp_name(filename)
+        # 建立子資料夾（如果有）
+        directory = os.path.dirname(filename)
+        if directory not in ["", "."]:
+            ftp_makedirs(ftp, directory)
+            ftp.cwd(directory)
+
+        # 取得遠端檔案大小
+        remote_filename = encode_ftp_name(os.path.basename(filename))
         remote_size = ftp_get_file_size(ftp, remote_filename)
+
         if remote_size == filesize:
-            print(f"[SKIP EXISTING] {filename} 已在 FTP 上且大小相同 → 跳過")
+            print(f"[SKIP EXISTING] {filename}")
             ftp.quit()
             return True
 
-        # 上傳開始
+        # 開始上傳
         print_name = (filename[:disnamelen - 3] + '...') if len(filename) > disnamelen else filename
         start_time = time.time()
         sent = 0
 
-        with open(file_path, "rb") as f:
+        with open(full_path, "rb") as f:
 
             def callback(chunk):
                 nonlocal sent, start_time
@@ -179,7 +185,7 @@ def send_file_via_ftp(file_path):
             ftp.storbinary(f"STOR {remote_filename}", f, blocksize=4096, callback=callback)
 
         ftp.quit()
-        print("\n[SEND DONE][FTP] " + filename)
+        print(f"\n[SEND DONE][FTP] {filename}")
         return True
 
     except Exception as e:
@@ -190,15 +196,30 @@ def send_file_via_ftp(file_path):
 # =====================================================
 #                 主同步掃描函式
 # =====================================================
+def get_all_local_files(base_folder):
+    """遞迴取得所有檔案（包含子資料夾）"""
+    file_list = []
+    for root, dirs, files in os.walk(base_folder):
+        for f in files:
+            if not f.endswith(".tmp"):
+                full_path = os.path.join(root, f)
+
+                # 相對路徑 = 要上傳到 FTP 的目標路徑
+                relative_path = os.path.relpath(full_path, base_folder)
+
+                file_list.append((full_path, relative_path))
+    return file_list
+
 def scan_and_sync_datasize_once():
     print("\n[SCAN] 掃描資料夾並同步...")
 
-    for fname in os.listdir(FOLDER):
-        full_path = os.path.join(FOLDER, fname)
-        if os.path.isfile(full_path) and not fname.endswith(".tmp"):
-            ok = send_file_via_ftp(full_path)
-            if not ok:
-                print(f"[RETRY NEXT ROUND] {fname}")
+    file_list = get_all_local_files(FOLDER)
+
+    for full_path, relative_path in file_list:
+        ok = send_file_via_ftp(full_path, relative_path)
+        if not ok:
+            print(f"[RETRY NEXT ROUND] {relative_path}")
+
 
     print(f"[SYNCED][{datetime.now().strftime('%H:%M:%S')}] --- sync finished ---")
 
