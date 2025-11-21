@@ -14,11 +14,16 @@ def read_tfmini():
     if TF.any():  # 檢查是否有資料
         data = TF.read(9)  # TFmini Plus UART 傳回 9 bytes
         if data and len(data) == 9:
+            checksum = sum(data[0:8]) & 0xFF
+            if checksum != data[8]:
+                # 校驗失敗
+                return None, None, None
             # 驗證開頭和校驗
             if data[0] == 0x59 and data[1] == 0x59:
                 distance = data[2] + (data[3] << 8)  # 兩個 bytes 代表距離 (cm)
                 strength = data[4] + (data[5] << 8)  # 信號強度
-                return distance, strength
+                temperature = data[6] + (data[7] << 8)  # 溫度
+                return distance, strength, temperature
     return None, None
 
 # ==========================
@@ -56,12 +61,15 @@ set_pin.value(1)
 print("Start reading TFmini+ at 100Hz and sending via HC-12...")
 
 while True:
-    dist, strg = read_tfmini()
+    dist, strg, tem = read_tfmini()
     
     if dist is not None:
-        msg = f"{dist}\n"      # 只傳距離 (mm)
+        dist = dist / 100 # 轉為公尺
+        tem = tem / 8 - 256 - 40
+        msg = f"{dist},{strg},{tem}\n"
+        msg = f"{dist}\n"
         hc12.write(msg)
-        print("Distance:", dist, "mm")
+        print("dis:", dist, "mm  ","strg:", strg, " ","tem:", tem, "°C")
     else:
         print("TFmini read error")
     
