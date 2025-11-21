@@ -20,4 +20,4 @@ print(f"UDP Server listening on {LISTEN_IP}:{LISTEN_PORT}")
 while True:
     data, addr = sock.recvfrom(1024)  # 最多 1024 bytes
     re_data = data.decode()
-    print(f"{addr}:{re_data}")
+    print(f"{addr}:{re_data}",end='')
