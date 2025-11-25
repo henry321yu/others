@@ -75,7 +75,7 @@ class DASWaterfall(QtWidgets.QMainWindow):
         self.plot_widget.setTitle('DAS Waterfall (MATLAB Equivalent)')
 
         # 使用 jet colormap
-        jet_lut = (cm.get_cmap('jet')(np.linspace(0, 1, 256)) * 255).astype(np.uint8)
+        jet_lut = (cm.get_cmap('gray')(np.linspace(0, 1, 256)) * 255).astype(np.uint8)
         self.img_item.setLookupTable(jet_lut)
 
         # 初始化 buffer (frames, samples)
@@ -117,7 +117,7 @@ class DASWaterfall(QtWidgets.QMainWindow):
                 smoothed_buffer[:, i] = np.convolve(self.phase_buffer[:, i], kernel, mode='same')
 
         self.img_item.setImage(smoothed_buffer, autoLevels=False)
-        self.img_item.setLevels([-0.02, 0.08])
+        self.img_item.setLevels([0, 0.01])
         self.plot_widget.repaint()
 
 # ===== 資料接收線程 =====
