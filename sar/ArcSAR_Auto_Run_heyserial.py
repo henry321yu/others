@@ -64,42 +64,65 @@ def trigger_scan_pywinauto():
         return False
 
 def main_listener():
-    """主監聽迴圈：等待來自 COM3 的訊號"""
+    """主監聽迴圈：等待來自 COM ? 的 distance,strength,temp 資料並在距離 <= ? 時觸發"""
+
     logging.info(f"腳本啟動。開始監聽 {SERIAL_PORT} (速率: {BAUD_RATE})...")
     print(f"腳本啟動。開始監聽 {SERIAL_PORT}...")
-    
-    while True: 
+
+    while True:
         try:
             with serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=None) as ser:
-                logging.info(f"成功連接到 {SERIAL_PORT}。等待訊號 '{TRIGGER_SIGNAL}'...")
-                print(f"成功連接到 {SERIAL_PORT}。等待訊號...")
-                
-                while True: 
-                    signal = ser.readline().decode('utf-8').strip()
-                    if not signal:
+                logging.info(f"成功連接到 {SERIAL_PORT}。持續接收距離資料...")
+                print(f"成功連接到 {SERIAL_PORT}。持續接收距離資料...")
+
+                while True:
+                    line = ser.readline().decode("utf-8").strip()
+                    if not line:
                         continue
-                        
-                    logging.info(f"收到原始訊號: '{signal}'")
-                    
-                    if signal == TRIGGER_SIGNAL:
-                        logging.info(f"======= 收到觸發訊號! 開始執行掃描! =======")
-                        print(f"收到觸發訊號! 開始執行 '運行'!")
-                        
+
+                    logging.info(f"收到原始資料: '{line}'")
+
+                    parts = line.split(",")
+
+                    if len(parts) != 3:
+                        logging.warning(f"資料格式錯誤: {line}")
+                        print("Invalid data:", line)
+                        continue
+
+                    try:
+                        distance = float(parts[0])
+                        strength = int(parts[1])
+                        temp = float(parts[2])
+                    except ValueError:
+                        logging.warning(f"解析錯誤: {line}")
+                        print("Parse error:", line)
+                        continue
+
+                    # 印出解析成功資料（可移除）
+                    print(f"距離={distance}m, 強度={strength}, 溫度={temp}°C")
+
+                    # =========================
+                    # ⭐ 觸發條件：距離 <= ? 公尺 ⭐
+                    # =========================
+                    if distance <= 5:
+                        logging.info("======= 距離 <= 5m，觸發掃描! =======")
+                        print("距離 <= 5m，開始觸發掃描!")
+
                         success = trigger_scan_pywinauto()
-                        
+
                         if success:
                             logging.info("掃描觸發成功。")
                             print("掃描觸發成功。")
                         else:
                             logging.error("掃描觸發失敗！請檢查日誌。")
                             print("掃描觸發失敗！")
-                        
-                        logging.info(f"======= 掃描流程結束。返回監聽狀態 =======")
-                        print("======= 掃描流程結束。返回監聽狀態 =======")
-                        
+
+                        logging.info("======= 掃描流程結束。返回監聽狀態 =======")
+                        print("======= 掃描流程結束。返回監聽狀態 =======\n")
+
+                    # 其餘資料則不做事（保持監聽）
                     else:
-                        logging.warning(f"收到非預期的訊號: '{signal}' (預期為: '{TRIGGER_SIGNAL}')")
-                        print(f"收到非預期訊號: '{signal}'")
+                        print(f"距離 {distance}m 未達觸發條件。")
 
         except serial.SerialException as e:
             logging.error(f"序列埠 {SERIAL_PORT} 錯誤: {e}。將在 5 秒後重試...")
