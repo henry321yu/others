@@ -11,11 +11,11 @@ import sys
 #-----------------------------------------
 com_port = 'COM6'
 baud_rate = 115200
-data_length = 1000  # 緩衝資料筆數
 
 #-----------------------------------------
 #  資料緩衝
 #-----------------------------------------
+data_length = 1000  # 緩衝資料筆數
 time_data = deque(maxlen=data_length)
 distance_data = deque(maxlen=data_length)
 
@@ -104,6 +104,9 @@ def serial_reader():
             distance = float(parts[0])
             strength = int(parts[1])
             temp = float(parts[2])
+            # if(distance == 0):
+            #     continue
+            temp = temp + 22
 
             # 記錄時間（程式啟動後的秒數）
             t = (datetime.now() - start_time).total_seconds()
