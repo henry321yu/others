@@ -11,7 +11,7 @@ LOG_FILE = 'scan_auto.log'
 
 # --- Lidar觸發設定 ---
 DISTANCE_THRESHOLD = 5         # 門檻距離(m)
-TRIGGER_INTERVAL = 20 * 60     # 觸發間隔(分鐘)
+TRIGGER_INTERVAL = 20 * 60     # 觸發間隔(秒)
 CONSECUTIVE_REQUIRED = 5       # 需要連續 n 次達標
 
 # --- pywinauto 設定 (根據您的偵測結果) ---
