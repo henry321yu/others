@@ -95,6 +95,9 @@ def udp_reader():
             distance = float(parts[0])
             strength = int(parts[1])
             temp = float(parts[2])
+            # if(distance == 0):
+            #     continue
+            temp = temp + 22
 
             t = (datetime.now() - start_time).total_seconds()
 
