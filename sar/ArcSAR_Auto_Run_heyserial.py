@@ -7,8 +7,12 @@ from pywinauto.application import Application
 # --- 設定區 ---
 SERIAL_PORT = 'COM3'     # COM Port
 BAUD_RATE = 9600         # 傳輸速率
-TRIGGER_SIGNAL = "TRIG"  # (重要!) 觸發訊號, 請再次確認內容
 LOG_FILE = 'scan_auto.log'
+
+# --- Lidar觸發設定 ---
+DISTANCE_THRESHOLD = 5         # 門檻距離(m)
+TRIGGER_INTERVAL = 20 * 60     # 觸發間隔(分鐘)
+CONSECUTIVE_REQUIRED = 5       # 需要連續 n 次達標
 
 # --- pywinauto 設定 (根據您的偵測結果) ---
 ARCSAR_WINDOW_TITLE = ".*全景邊坡監測雷達 系統控制與監測預警軟體.*" # ArcSAR 視窗標題
@@ -64,10 +68,13 @@ def trigger_scan_pywinauto():
         return False
 
 def main_listener():
-    """主監聽迴圈：等待來自 COM ? 的 distance,strength,temp 資料並在距離 <= ? 時觸發"""
+    """主監聽迴圈：等待來自 COM 的 distance,strength,temp 資料並在距離 <= DISTANCE_THRESHOLD 時觸發"""
 
     logging.info(f"腳本啟動。開始監聽 {SERIAL_PORT} (速率: {BAUD_RATE})...")
     print(f"腳本啟動。開始監聽 {SERIAL_PORT}...")
+
+    last_trigger_time = 0
+    consecutive_count = 0  # 計數連續達成條件的次數
 
     while True:
         try:
@@ -101,27 +108,52 @@ def main_listener():
                     # 印出解析成功資料（可移除）
                     print(f"距離={distance}m, 強度={strength}, 溫度={temp}°C")
 
-                    # =========================
-                    # ⭐ 觸發條件：距離 <= ? 公尺 ⭐
-                    # =========================
-                    if distance <= 5:
-                        logging.info("======= 距離 <= 5m，觸發掃描! =======")
-                        print("距離 <= 5m，開始觸發掃描!")
+                    # 取得現在時間
+                    now = time.time()
 
-                        success = trigger_scan_pywinauto()
+                    # =========================
+                    # ⭐ 觸發條件：距離 <= DISTANCE_THRESHOLD 公尺 並且間隔滿 TRIGGER_INTERVAL 分鐘
+                    # =========================
+                    if distance <= DISTANCE_THRESHOLD:
+                        consecutive_count += 1
+                        print(f"[達標] 已連續 {consecutive_count}/{CONSECUTIVE_REQUIRED} 次距離 <= {DISTANCE_THRESHOLD}m")
 
-                        if success:
-                            logging.info("掃描觸發成功。")
-                            print("掃描觸發成功。")
+                        # 若未達到連續要求次數 → 不觸發
+                        if consecutive_count < CONSECUTIVE_REQUIRED:
+                            continue  
+
+                        # 達標次數達到要求後 → 檢查是否滿足時間間隔
+                        if now - last_trigger_time >= TRIGGER_INTERVAL:
+                            logging.info(f"======= 距離連續 {CONSECUTIVE_REQUIRED} 次 <= {DISTANCE_THRESHOLD}m，觸發掃描! =======")
+                            print(f"距離連續 {CONSECUTIVE_REQUIRED} 次 <= {DISTANCE_THRESHOLD}m，觸發掃描!")
+
+                            last_trigger_time = now   # 記錄觸發時間
+                            consecutive_count = 0      # 重置連續計數
+
+                            success = trigger_scan_pywinauto()
+
+                            if success:
+                                logging.info("掃描觸發成功。")
+                                print("掃描觸發成功。")
+                            else:
+                                logging.error("掃描觸發失敗！請檢查日誌。")
+                                print("掃描觸發失敗！")
+
+                            logging.info("======= 掃描流程結束。返回監聽狀態 =======")
+                            print("======= 掃描流程結束。返回監聽狀態 =======\n")
                         else:
-                            logging.error("掃描觸發失敗！請檢查日誌。")
-                            print("掃描觸發失敗！")
+                            # 間隔時間不足
+                            remaining = int(TRIGGER_INTERVAL - (now - last_trigger_time))
+                            mins = remaining // 60
+                            secs = remaining % 60
+                            print(f"距離達觸發條件，但仍需等待 {mins} 分 {secs} 秒 才能再次觸發。")
 
-                        logging.info("======= 掃描流程結束。返回監聽狀態 =======")
-                        print("======= 掃描流程結束。返回監聽狀態 =======\n")
-
-                    # 其餘資料則不做事（保持監聽）
                     else:
+                        # 未達標 → 清空連續計數器
+                        if consecutive_count != 0:
+                            print(f"[重置] 距離 > {DISTANCE_THRESHOLD}m，連續達標次數清空。")
+                        consecutive_count = 0
+
                         print(f"距離 {distance}m 未達觸發條件。")
 
         except serial.SerialException as e:
