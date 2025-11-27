@@ -1,2 +1,3 @@
 cd C:/Users/sgrc-325/Desktop
-"syndata4.1_ftpall_download_ipc.py"
+%"syndata4.1_ftpall_download_ipc.py"
+"乙太網路usage.py"
