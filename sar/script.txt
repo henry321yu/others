@@ -1,4 +1,5 @@
-%cd C:/Users/sgrc-325/Desktop
-%"乙太網路usage.py"
-cd /d E:\
-python "syndata4.1_ftpall_download_ipc.py"
+cd C:/Users/sgrc-325/Desktop
+"乙太網路usage.py"
+
+%cd /d E:\
+%python "syndata4.1_ftpall_download_ipc.py"
