@@ -1,0 +1,4 @@
+cd C:/Users/admin/Desktop
+%python COMreader.py
+python wifi.py
+%python ArcSAR_Auto_Run_heyserial.py
