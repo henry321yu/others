@@ -8,7 +8,7 @@ from datetime import datetime
 #                     基本設定
 # =====================================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_FILE = os.path.join(BASE_DIR, "config_download.ini")
+CONFIG_FILE = os.path.join(BASE_DIR, "config_ftp_d.ini")
 disnamelen = 23
 extranamelen = 89
 SCAN_INTERVAL = 5
@@ -18,34 +18,36 @@ SCAN_INTERVAL = 5
 # =====================================================
 def get_config():
     cfg = configparser.ConfigParser()
-    if os.path.exists(CONFIG_FILE):
-        cfg.read(CONFIG_FILE, encoding="utf-8")
-    if not cfg.has_section("FTP"):
-        cfg.add_section("FTP")
-    if not cfg.has_section("LOCAL"):
-        cfg.add_section("LOCAL")
-    defaults = {
-        "host": "192.168.138.207",
-        "user": "admin",
-        "password": "123",
-        "folder": "/",
-        "download_folder": "download_data"
+
+    # 預設設定內容
+    default_cfg = {
+        "FTP": {
+            "host": "26.208.29.50",
+            "user": "",
+            "password": "",
+            "folder": "/"
+        },
+        "LOCAL": {
+            "download_folder": "ftp_download"
+        }
     }
-    updated = False
-    for k, v in defaults.items():
-        sec = "LOCAL" if k=="download_folder" else "FTP"
-        if not cfg.has_option(sec, k):
-            cfg.set(sec, k, v)
-            updated = True
-    if updated:
+
+    # 若設定檔不存在 → 直接建立
+    if not os.path.exists(CONFIG_FILE):
+        cfg.read_dict(default_cfg)
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             cfg.write(f)
+        print(f"[CONFIG] 已建立預設設定檔")
+    else:
+        cfg.read(CONFIG_FILE, encoding="utf-8")
+
+    # 回傳設定
     return (
-        cfg.get("FTP", "host").strip(),
-        cfg.get("FTP", "user").strip(),
-        cfg.get("FTP", "password").strip(),
-        cfg.get("FTP", "folder").strip(),
-        os.path.join(BASE_DIR, cfg.get("LOCAL", "download_folder").strip())
+        cfg.get("FTP", "host"),
+        cfg.get("FTP", "user"),
+        cfg.get("FTP", "password"),   # 密碼允許空白
+        cfg.get("FTP", "folder"),
+        os.path.join(BASE_DIR, cfg.get("LOCAL", "download_folder"))
     )
 
 # =====================================================
@@ -190,7 +192,11 @@ if __name__=="__main__":
     print(f"\n[CONNECT] 連線到 FTP: {ftp_host} ...")
     ftp = ftplib.FTP()
     ftp.connect(ftp_host,21,timeout=10)
-    ftp.login(ftp_user,ftp_pass)
+    if ftp_user.lower() == "anonymous":
+        ftp.login("anonymous", "")
+    else:
+        ftp.login(ftp_user, ftp_pass)
+
     os.makedirs(download_folder, exist_ok=True)
 
     try:
