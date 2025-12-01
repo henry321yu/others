@@ -1,5 +1,7 @@
-cd C:/Users/sgrc-325/Desktop
-"乙太網路usage.py"
+echo === checking task ===
+schtasks /query /tn arcsar_auto
 
-%cd /d E:\
-%python "syndata4.1_ftpall_download_ipc.py"
+echo === running task ===
+schtasks /run /tn arcsar_auto
+
+exit
