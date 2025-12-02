@@ -25,6 +25,15 @@ KEY_MAP = {
     "註解": "Comment",
     "Comment": "Comment",
 }
+# 欄位對應中文欄位名稱（用於 print）
+CHINESE_LABELS = {
+    "TaskName": "工作名稱",
+    "Status": "狀態",
+    "LastRunTime": "上次執行時間",
+    "TaskToRun": "執行工作",
+    "StartIn": "開始位置",
+    "Comment": "註解",
+}
 
 def get_task_status():
     cmd = f'schtasks /query /fo LIST /v /tn {TASK_NAME}'
@@ -56,7 +65,7 @@ def live_monitor(interval=1):
 
         print(f"=== ArcSAR 任務即時狀態 {now} ===")
         for k, v in status.items():
-            print(f"{k}: {v}")
+            print(f"{CHINESE_LABELS[k]}: {v}")
 
         time.sleep(interval)
 
