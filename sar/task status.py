@@ -27,7 +27,7 @@ KEY_MAP = {
 
 def get_task_status():
     cmd = f'schtasks /query /fo LIST /v /tn {TASK_NAME}'
-    output = subprocess.check_output(cmd, shell=True, encoding="big5", errors="ignore")
+    output = subprocess.check_output(cmd, shell=True, encoding="cp950", errors="ignore")
 
     result = {v: "" for v in set(KEY_MAP.values())}
 
@@ -36,16 +36,15 @@ def get_task_status():
             continue
 
         key_raw, value = line.split(":", 1)
-        key_raw = key_raw.strip()
+        key_raw = key_raw.strip().replace("\u3000", "")
         value = value.strip()
 
-        # 逐項比對 "包含關鍵字"（避免空白、BOM 造成匹配失敗）
         for k in KEY_MAP:
             if k in key_raw:
-                result[KEY_MAP[k]] = value
+                if not result[KEY_MAP[k]]:
+                    result[KEY_MAP[k]] = value
 
     return result
-
 
 def live_monitor(interval=1):
     while True:
@@ -57,7 +56,6 @@ def live_monitor(interval=1):
             print(f"{k}: {v}")
 
         time.sleep(interval)
-
 
 if __name__ == "__main__":
     live_monitor()
