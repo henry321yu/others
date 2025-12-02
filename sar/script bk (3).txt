@@ -1,0 +1,5 @@
+schtasks /run /tn arcsar_auto2
+wmic process where "name='cmd.exe'" get ProcessId,CommandLine
+cmd
+
+exit

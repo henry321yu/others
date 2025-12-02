@@ -1,0 +1,6 @@
+cd C:/Users/admin/Desktop
+%python wifi.py
+%python COMreader.py
+%python ArcSAR_Auto_Run_heyserial.py
+schtasks /query /fo LIST /v | findstr /i "arcsar_auto"
+schtasks /run /tn "arcsar_auto"

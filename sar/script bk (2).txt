@@ -1,3 +1,7 @@
+echo === checking task ===
 schtasks /query /tn arcsar_auto
+
+echo === running task ===
 schtasks /run /tn arcsar_auto
+
 exit
