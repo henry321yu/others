@@ -1,0 +1,1 @@
+for /f "tokens=1,* delims=:" %A in ('schtasks /query /fo LIST /v /tn arcsar') do @echo %A:%B | findstr /i "工作名稱 狀態 上次執行時間 執行工作 開始位置 註解"
