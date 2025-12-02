@@ -1,7 +1,7 @@
 import subprocess
 import time
 
-TASK_NAME = "sign"
+TASK_NAME = "arcsar_auto"
 
 # 關鍵字可能的多語系對應
 KEY_MAP = {

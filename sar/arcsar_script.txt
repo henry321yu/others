@@ -1,0 +1,3 @@
+schtasks /query /tn arcsar_auto
+schtasks /run /tn arcsar_auto
+exit
