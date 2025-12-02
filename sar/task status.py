@@ -1,6 +1,7 @@
 import subprocess
 import time
 from datetime import datetime
+from collections import OrderedDict
 
 TASK_NAME = "arcsar_auto"
 
@@ -29,7 +30,9 @@ def get_task_status():
     cmd = f'schtasks /query /fo LIST /v /tn {TASK_NAME}'
     output = subprocess.check_output(cmd, shell=True, encoding="cp950", errors="ignore")
 
-    result = {v: "" for v in set(KEY_MAP.values())}
+    # 使用 OrderedDict 保持欄位順序
+    field_order = ["TaskName", "Status", "LastRunTime", "TaskToRun", "StartIn", "Comment"]
+    result = OrderedDict((field, "") for field in field_order)
 
     for line in output.splitlines():
         if ":" not in line:
