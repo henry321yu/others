@@ -1,5 +1,6 @@
 import subprocess
 import time
+from datetime import datetime
 
 TASK_NAME = "arcsar_auto"
 
@@ -49,11 +50,11 @@ def get_task_status():
 def live_monitor(interval=1):
     while True:
         status = get_task_status()
+        now = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
 
-        print("=== ArcSAR 任務即時狀態 ===")
+        print(f"=== ArcSAR 任務即時狀態 {now} ===")
         for k, v in status.items():
             print(f"{k}: {v}")
-        print("\nCtrl+C 結束監控\n")
 
         time.sleep(interval)
 
