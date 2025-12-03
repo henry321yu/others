@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 
-echo Running remote python on both machines...
+echo Running remote python...
 
 (
     echo cd C:/Users/admin/Desktop
