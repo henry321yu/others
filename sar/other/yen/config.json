@@ -1,0 +1,7 @@
+{
+  "monitor_indices": [4363, 4483, 5036, 6341, 10025],
+  "threshold_mm": 5.0, 
+  "coherence_threshold": 0.4,
+  "fc_start": 1.7e10, 
+  "bw": 400.0e6
+}
