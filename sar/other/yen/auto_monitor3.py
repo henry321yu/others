@@ -310,31 +310,44 @@ class ArcSARMonitor:
 # =============================
 def main():
     print("==========================================")
-    print("   ArcSAR 自動監測系統 (整合版)")
+    print("   ArcSAR 自動監測系統 (常駐模式)")
     print("==========================================")
-    
-    # 尋找最新的 .dphase 檔案
-    files = glob.glob(os.path.join(DATA_DIR, "*.dphase"))
-    if not files:
-        print("[Main] 資料夾內沒有 .dphase 檔案，結束程式。")
-        sys.exit(0)
 
-    # 依時間排序找最新的
-    latest_file = max(files, key=os.path.getmtime)
-    print(f"[Main] 鎖定最新檔案: {latest_file}")
-
-    # 初始化監測器 (傳入 DATA_DIR 以便讀取 image.txt)
+    # 初始化監測器（只做一次）
     monitor = ArcSARMonitor(CONFIG_PATH, LOG_DIR, DATA_DIR)
-    
-    # 執行檢查
-    alarm = monitor.process_rebound(latest_file)
 
-    if alarm:
-        print("\n[Main] !!! 檢測到警報狀態 !!!")
-        sys.exit(1) # 回傳 1 讓外部批次檔知道出事了
-    else:
-        print("\n[Main] 檢測正常")
-        sys.exit(0)
+    last_processed_file = None
+
+    try:
+        while True:
+            # 尋找所有 .dphase
+            files = glob.glob(os.path.join(DATA_DIR, "*.dphase"))
+            if not files:
+                print("[Main] 尚無 .dphase 檔案，5 秒後再檢查")
+                time.sleep(5)
+                continue
+
+            # 取得最新檔案
+            latest_file = max(files, key=os.path.getmtime)
+
+            # 若與上次相同，代表沒有新資料
+            if latest_file == last_processed_file:
+                print("[Main] 無新檔案，等待中...")
+            else:
+                print(f"\n[Main] 發現新檔案: {latest_file}")
+                alarm = monitor.process_rebound(latest_file)
+
+                if alarm:
+                    print("[Main] !!! 警報狀態（程式持續運行）!!!")
+
+                last_processed_file = latest_file
+
+            # 每 5 秒檢查一次
+            time.sleep(5)
+
+    except KeyboardInterrupt:
+        print("\n[Main] 使用者中斷程式 (Ctrl+C)，安全結束。")
+
 
 if __name__ == "__main__":
     main()
