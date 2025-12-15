@@ -1,2 +1,26 @@
 Timestamp,Status,Filename,Max_Rebound_mm,Avg_Rebound_mm,Threshold_mm,Top3_Details (Real Coords)
 2025-12-15 11:00:43,NORMAL,2025_12_15_10_58_04.dphase,nan,nan,5.0,None
+2025-12-15 11:14:15,NORMAL,2025_12_15_11_11_45.dphase,nan,nan,5.0,None
+2025-12-15 11:14:29,NORMAL,2025_12_15_11_11_45.dphase,nan,nan,5.0,None
+2025-12-15 11:21:30,NORMAL,2025_12_15_11_11_45.dphase,nan,nan,5.0,None
+2025-12-15 11:25:48,NORMAL,2025_12_15_11_25_03.dphase,nan,nan,5.0,None
+2025-12-15 11:30:31,NORMAL,2025_12_15_11_25_03.dphase,nan,nan,5.0,None
+2025-12-15 11:30:50,NORMAL,2025_12_15_11_25_03.dphase,nan,nan,5.0,None
+2025-12-15 11:32:19,NORMAL,2025_12_15_11_25_03.dphase,nan,nan,5.0,None
+2025-12-15 11:35:06,NORMAL,2025_12_15_11_34_25.dphase,nan,nan,5.0,None
+2025-12-15 11:40:59,NORMAL,2025_12_15_11_34_25.dphase,nan,nan,5.0,None
+2025-12-15 11:42:15,NORMAL,2025_12_15_11_34_25.dphase,nan,nan,5.0,None
+2025-12-15 11:42:48,NORMAL,2025_12_15_11_34_25.dphase,nan,nan,5.0,None
+2025-12-15 11:45:21,NORMAL,2025_12_15_11_44_39.dphase,nan,nan,5.0,None
+2025-12-15 12:24:45,NORMAL,2025_12_15_11_44_39.dphase,nan,nan,5.0,None
+2025-12-15 12:37:01,NORMAL,2025_12_15_12_36_22.dphase,nan,nan,5.0,None
+2025-12-15 12:40:41,NORMAL,2025_12_15_12_40_01.dphase,nan,nan,5.0,None
+2025-12-15 12:43:45,NORMAL,2025_12_15_12_43_09.dphase,nan,nan,5.0,None
+2025-12-15 14:12:18,NORMAL,2025_12_15_14_11_36.dphase,nan,nan,5.0,None
+2025-12-15 14:12:18,NORMAL,2025_12_15_14_11_36.dphase,nan,nan,5.0,None
+2025-12-15 14:13:21,NORMAL,2025_12_15_14_12_42.dphase,nan,nan,5.0,None
+2025-12-15 14:13:22,NORMAL,2025_12_15_14_12_42.dphase,nan,nan,5.0,None
+2025-12-15 14:16:02,NORMAL,2025_12_15_14_15_23.dphase,nan,nan,5.0,None
+2025-12-15 14:16:03,NORMAL,2025_12_15_14_15_23.dphase,nan,nan,5.0,None
+2025-12-15 14:17:07,NORMAL,2025_12_15_14_16_29.dphase,nan,nan,5.0,None
+2025-12-15 14:17:08,NORMAL,2025_12_15_14_16_29.dphase,nan,nan,5.0,None
