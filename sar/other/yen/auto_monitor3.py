@@ -26,10 +26,10 @@ LOG_DIR = os.path.join(BASE_DIR, "logs")
 # 3. 自動切換資料來源路徑 (依據電腦名稱)
 hostname = socket.gethostname()
 if "DELL" in hostname:  # 假設 DELL 電腦
-    DATA_DIR = r"C:\ArcSAR_Data_Folder"
+    DATA_DIR = r"C:\Users\b5566\Desktop\ftp_download\cache"
 else:
     # 測試用路徑
-    DATA_DIR = r"H:\20250908_TS\20250908_TS_test8_really_angle_m40\cache"
+    DATA_DIR = r"C:\Users\b5566\Desktop\ftp_download\cache"
 
 print(f"[Info] 當前電腦: {hostname}")
 print(f"[Info] 程式基地: {BASE_DIR}")
