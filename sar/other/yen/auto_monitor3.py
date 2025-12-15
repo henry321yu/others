@@ -323,8 +323,8 @@ def main():
             # 尋找所有 .dphase
             files = glob.glob(os.path.join(DATA_DIR, "*.dphase"))
             if not files:
-                print("[Main] 尚無 .dphase 檔案，5 秒後再檢查")
-                time.sleep(5)
+                print("[Main] 尚無 .dphase 檔案，1 秒後再檢查")
+                time.sleep(1)
                 continue
 
             # 取得最新檔案
@@ -332,9 +332,9 @@ def main():
 
             # 若與上次相同，代表沒有新資料
             if latest_file == last_processed_file:
-                print("[Main] 無新檔案，等待中...")
+                print(f"\r[Main] {time.strftime('%H:%M:%S')} 無新檔案，等待中...", end="", flush=True)
             else:
-                print(f"\n[Main] 發現新檔案: {latest_file}")
+                print(f"\n[Main] {time.strftime('%H:%M:%S')} 發現新檔案: {latest_file}")
                 alarm = monitor.process_rebound(latest_file)
 
                 if alarm:
@@ -342,8 +342,8 @@ def main():
 
                 last_processed_file = latest_file
 
-            # 每 5 秒檢查一次
-            time.sleep(5)
+            # 每 1 秒檢查一次
+            time.sleep(1)
 
     except KeyboardInterrupt:
         print("\n[Main] 使用者中斷程式 (Ctrl+C)，安全結束。")
