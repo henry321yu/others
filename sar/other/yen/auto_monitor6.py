@@ -17,7 +17,7 @@ CHECK_INTERVAL = 1      # 每隔幾秒檢查一次
 
 # 2. 影像判斷邏輯
 SCAN_TIME_MIN = 30       
-SCAN_TIME_MAX = 420      
+SCAN_TIME_MAX = 300      
 
 # 3. 路徑設定
 try:
