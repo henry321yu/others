@@ -1,103 +1,110 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import re
-from datetime import datetime, timedelta
+from pathlib import Path
 
 # ================= 使用者設定 =================
 file = r"C:\Blastware 10\Event\ascii\ASCII.TXT"
-Fs_default = 1024.0   # 備援 sample rate
+Fs_default = 1024
 # =============================================
 
-# ---------- 初始化 ----------
-meta = {}
-MicL1 = []
-read_data = False
+file = Path(file)
 
-# ---------- 讀檔 ----------
+if not file.exists():
+    raise FileNotFoundError("無法開啟檔案")
+
+# ================= 初始化 =================
+meta = {}
+data = []
+read_data = False
+channel_names = []
+nCh = 0
+
+# ================= 逐行讀檔 =================
 with open(file, "r", encoding="utf-8", errors="ignore") as f:
-    for raw in f:
-        line = raw.strip()
+    for raw_line in f:
+        line = raw_line.strip()
         if not line:
             continue
 
         # ---------- Metadata ----------
-        if line.startswith('"'):
+        if line.startswith('"') and not read_data:
             line = line.replace('"', '')
             m = re.match(r'^(.*?)\s*:\s*(.*)$', line)
             if m:
-                key = m.group(1).strip().replace(' ', '_')
+                key = re.sub(r'\W|^(?=\d)', '_', m.group(1).strip())
                 val = m.group(2).strip()
                 meta[key] = val
 
-        # ---------- 欄位名稱 ----------
-        elif line == "MicL1":
-            read_data = True
+        # ---------- 欄位名稱（資料起始） ----------
+        elif not read_data:
+            names = line.split()
+            if (any("mic" in n.lower() for n in names) or
+                any(k.lower() in n.lower() for n in names
+                    for k in ["tran", "vert", "long"])):
+
+                channel_names = names
+                nCh = len(channel_names)
+                read_data = True
 
         # ---------- 波形資料 ----------
         elif read_data:
-            try:
-                MicL1.append(float(line))
-            except ValueError:
-                pass
+            nums = np.fromstring(line, sep=' ')
+            if len(nums) == nCh:
+                data.append(nums)
 
-MicL1 = np.asarray(MicL1)
+data = np.array(data)
 
-# ---------- Sample Rate ----------
+# ================= Sample Rate =================
 if "Sample_Rate" in meta:
-    Fs = float(meta["Sample_Rate"].replace("sps", "").strip())
+    Fs = float(meta["Sample_Rate"].replace("sps", ""))
 else:
     Fs = Fs_default
 
-# ---------- Pre-trigger ----------
+# ================= Pre-trigger =================
 preT = 0.0
 if "Pre_trigger_Length" in meta:
-    preT = float(meta["Pre_trigger_Length"].replace("sec", "").strip())
+    preT = float(meta["Pre_trigger_Length"].replace("sec", ""))
 
-# ---------- 時間軸 ----------
-N = len(MicL1)
+# ================= 時間軸 =================
+N = data.shape[0]
 t = np.arange(N) / Fs + preT
 
-# ---------- 最大值 ----------
-idx = np.argmax(np.abs(MicL1))
-maxMic = MicL1[idx]
-
-# ---------- 事件真實時間 ----------
-eventDT = datetime.strptime(meta['Event_Time'], '%H:%M:%S')
-peakDT = eventDT + timedelta(seconds=float(t[idx]))
-
-# ---------- 印出 Metadata ----------
-print("\n===== Event Metadata =====")
-print(f"Event Type   : {meta.get('Event_Type','')}")
-print(f"Event Date   : {meta.get('Event_Date','')}")
-print(f"Event Time   : {meta.get('Event_Time','')}")
-print(f"Trigger      : {meta.get('Trigger','')}")
-print(f"Sample Rate  : {Fs:.0f} sps")
-print(f"Record Time  : {meta.get('Record_Time','')}")
-print(f"Pre-trigger  : {preT:.3f} sec")
-print(f"Mic Peak     : {MicL1[idx]:.3f} Pa @ {peakDT.strftime('%H:%M:%S.%f')[:-3]}")
-print("===========================\n")
+# ================= 單位判斷 =================
+units = []
+for name in channel_names:
+    if "mic" in name.lower():
+        units.append("Pa")
+    else:
+        units.append("mm/s")
 
 # ================= 繪圖 =================
-plt.figure(figsize=(10, 4))
-plt.plot(t, MicL1, linewidth=1.2)
-plt.plot(t[idx], MicL1[idx], 'ro')
-plt.grid(True)
+for ch in range(nCh):
+    sig = data[:, ch]
+    idx = np.argmax(np.abs(sig))
+    pk = sig[idx]
 
-plt.xlabel("Time (sec)")
-plt.ylabel("Mic Pressure (Pa)")
+    plt.figure(figsize=(9, 4))
+    plt.plot(t, sig, linewidth=1.2)
+    plt.plot(t[idx], sig[idx], 'ro')
 
-# ---------- Title 加入 metadata ----------
-plt.title(f"MiniMate Plus – MicL1 Full Waveform\n"
-          f"Date: {meta.get('Event_Date','')}  "
-          f"Time: {meta.get('Event_Time','')}  "
-          f"Record: {meta.get('Record_Time','')}  "
-          f"Peak: {maxMic:.3f} Pa")
+    plt.grid(True)
+    plt.xlabel("Time (sec)")
+    plt.ylabel(f"{channel_names[ch]} ({units[ch]})")
 
-# ---------- 標註 Peak 真實時間 ----------
-plt.text(t[idx], MicL1[idx],
-         f"Peak = {maxMic:.3f} Pa @ {peakDT.strftime('%H:%M:%S.%f')[:-3]}",
-         verticalalignment='bottom')
+    title = (
+        "MiniMate Plus – Full Waveform\n"
+        f"{channel_names[ch]}   "
+        f"Date: {meta.get('EventDate','')}   "
+        f"Time: {meta.get('EventTime','')}"
+    )
+    plt.title(title)
 
-plt.tight_layout()
+    plt.text(
+        t[idx], sig[idx],
+        f"  Peak = {pk:.3f} {units[ch]} @ {t[idx]:.3f} s",
+        verticalalignment="bottom"
+    )
+
+    plt.tight_layout()
 plt.show()
-# ======================================
