@@ -97,7 +97,7 @@ def main():
         return
     print(f"找到 Copy/Print 按鈕: {copy_btn.window_text()}，開始點擊")
     copy_btn.invoke()
-    time.sleep(1.5)  # 等待對話框彈出
+    time.sleep(5)  # 等待對話框彈出
 
     # -----------------------------
     # 點擊 Yes 按鈕
