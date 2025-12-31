@@ -15,7 +15,8 @@ POLL_INTERVAL = 1.0
 
 
 def log(msg):
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+    ms = int(datetime.now().microsecond / 10000)  # 微秒除以 10000 → 0~99
+    print(f"[{datetime.now().strftime('%H:%M:%S')}.{ms:02d}] {msg}")
 
 
 def find_button_by_text(parent, target_text):
@@ -73,11 +74,11 @@ def main():
     try:
         blastware = desktop.window(title_re=BLASTWARE_TITLE_RE)
         blastware.wait("visible", timeout=5)
-        log("已找到 Blastware")
+        log("已找到啟動中的 Blastware")
     except:
-        log("未找到 Blastware，啟動中...")
+        log("未找到啟動中的 Blastware，啟動中...")
         Application(backend="win32").start(BLASTWARE_PATH)
-        time.sleep(6)
+        time.sleep(15)
         blastware = desktop.window(title_re=BLASTWARE_TITLE_RE)
         blastware.wait("visible", timeout=30)
         log("Blastware 已啟動")
@@ -89,7 +90,7 @@ def main():
     if not toolbars:
         raise RuntimeError("找不到 ToolbarWindow32")
 
-    log("點擊 Copy / Print")
+    log("點擊 Copy/Print")
     toolbars[0].button(COPY_INDEX).click_input()
 
     time.sleep(5)
@@ -105,9 +106,9 @@ def main():
         log("找不到 Yes 對話框，流程中止")
         return
 
-    log("Copy / Print 已確認")
+    log("Copy/Print 已確認")
     wait_for_copy_finished()
-    log("程式完成，即將結束")
+    log("程式完成，即將關閉程式 ...")
     time.sleep(5)
 
 
