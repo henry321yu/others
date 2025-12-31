@@ -124,6 +124,8 @@ def main():
         print("✅ Copy/Print 對話框已確認")
 
     wait_for_copy_finished()
+    print("程式完成，即將退出 ...")
+    time.sleep(5)
 
 if __name__ == "__main__":
     main()
