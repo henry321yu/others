@@ -90,7 +90,7 @@ def main():
         print("Blastware 已啟動")
 
     blastware.set_focus()
-    blastware.maximize()
+    # blastware.maximize()
     time.sleep(1)
 
     # 點擊 Copy / Print
@@ -100,7 +100,7 @@ def main():
     toolbar = toolbars[0]
     print(f"點擊 Toolbar index={COPY_INDEX}（Copy / Print）")
     toolbar.button(COPY_INDEX).click_input()
-    print("✅ Copy / Print 已觸發")
+    print("Copy/Print 已觸發")
 
     # 等待 5 秒讓 Copy/Print 對話框出現
     time.sleep(5)
@@ -119,9 +119,11 @@ def main():
             break
 
     if not yes_clicked:
-        print("⚠️ 找不到 Yes 按鈕，請確認是否有彈窗")
+        print("找不到 Yes 按鈕，請確認是否有彈窗")
+        time.sleep(5)
+        return
     else:
-        print("✅ Copy/Print 對話框已確認")
+        print("Copy/Print 對話框已確認")
 
     wait_for_copy_finished()
     print("程式完成，即將退出 ...")
