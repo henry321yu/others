@@ -14,3 +14,5 @@
 /acc_logger3/data
 /seismograph_1/data
 /seismograph_3/data
+/sar/__pycache__
+/sar/other/yen/__pycache__

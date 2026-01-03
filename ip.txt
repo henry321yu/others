@@ -1,12 +1,38 @@
-    ('10.241.0.114', 0), # my office
-    # ('10.241.215.99', 0),  # dell
-    # ('10.241.180.148', 0), # my pc
-    # ('10.241.199.211', 0), # fly office
-    # ('10.241.183.64', 0), # ipc
-    # ('10.241.66.133', 0), # broken
-    # ('10.241.178.17', 0), # my phone
-    # ('10.241.135.1', 0), # my new office
+ # my old office
+receiver_ip = 10.241.0.114
+ # my pc
+# receiver_ip = 10.241.180.148
+ # ipc
+# receiver_ip = 10.241.183.64
+ # dell
+# receiver_ip = 10.241.215.99
+ # fly office
+# receiver_ip = 10.241.199.211
+ # my new office
+# receiver_ip = 10.241.135.1
+ #rasp
+# receiver_ip = 10.241.156.153
+ #rasp2
+# receiver_ip = 10.241.194.18
+ #rasp3
+# receiver_ip = 10.241.136.93
 
-rasp raslan@10.241.156.153
-rasp2 admin@10.241.194.18
-rasp3 admin@10.241.136.93
+
+# receiver_ip = 140.116.45.14
+# receiver_ip = 192.168.137.10
+
+
+
+# receiver_ip = 10.241.0.114 # my old office
+# receiver_ip = 10.241.180.148 # my pc
+# receiver_ip = 10.241.183.64 # ipc
+# receiver_ip = 10.241.215.99 # dell
+# receiver_ip = 10.241.199.211 # fly office
+# receiver_ip = 10.241.135.1 # my new office
+# receiver_ip = 10.241.156.153 #rasp
+# receiver_ip = 10.241.194.18 #rasp2
+# receiver_ip = 10.241.136.93 #rasp3
+
+#rasp raslan@10.241.156.153
+#rasp2 admin@10.241.194.18
+#rasp3 admin@10.241.136.93
