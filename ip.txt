@@ -36,3 +36,34 @@ receiver_ip = 10.241.0.114
 #rasp raslan@10.241.156.153
 #rasp2 admin@10.241.194.18
 #rasp3 admin@10.241.136.93
+
+
+HEY-PC
+ip: 10.241.0.114 or 26.208.29.50
+user: sgrc-325
+passowrd: eos31470.
+
+IPC
+ip: 10.241.183.64
+user: admin
+passowrd: 123
+
+Dell
+ip: 10.241.215.99 or 26.214.58.255
+user: grrc#31470
+passowrd: 31470
+
+淡水線rasp
+ip: 10.241.156.153
+user: raslan
+passowrd: 123
+
+淡水線rasp2
+ip: 10.241.136.93
+user: admin
+passowrd: 123
+
+監視影像rasp3
+ip: 10.241.194.18
+user: admin
+passowrd: 123
