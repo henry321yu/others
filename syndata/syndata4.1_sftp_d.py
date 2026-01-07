@@ -26,10 +26,10 @@ def get_config():
             "port": "22",
             "user": "",
             "password": "",
-            "folder": "/"
+            "target_folder": "/"
         },
         "LOCAL": {
-            "download_folder": "sftp_download"
+            "local_folder": "sftp_download"
         }
     }
 
@@ -46,8 +46,8 @@ def get_config():
         cfg.getint("SFTP", "port"),
         cfg.get("SFTP", "user"),
         cfg.get("SFTP", "password"),
-        cfg.get("SFTP", "folder"),
-        os.path.join(BASE_DIR, cfg.get("LOCAL", "download_folder"))
+        cfg.get("SFTP", "target_folder"),
+        os.path.join(BASE_DIR, cfg.get("LOCAL", "local_folder"))
     )
 
 # =====================================================
