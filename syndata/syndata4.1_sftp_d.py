@@ -53,6 +53,17 @@ def get_config():
 # =====================================================
 #          SFTP 單層下載（不含子資料夾）
 # =====================================================
+def format_size(size_bytes):
+    """自動將大小轉換為 B/KB/MB/GB"""
+    if size_bytes < 1024:
+        return f"{size_bytes:.2f} bytes"
+    elif size_bytes < 1024**2:
+        return f"{size_bytes/1024:.2f} KB"
+    elif size_bytes < 1024**3:
+        return f"{size_bytes/1024**2:.2f} MB"
+    else:
+        return f"{size_bytes/1024**3:.2f} GB"
+        
 def sftp_download_flat(sftp, remote_dir, local_dir):
     os.makedirs(local_dir, exist_ok=True)
 
@@ -82,37 +93,47 @@ def sftp_download_flat(sftp, remote_dir, local_dir):
 
         start_time = time.time()
         downloaded = 0
+        last_len = 0
 
         def progress(transferred, total):
-            nonlocal downloaded
+            nonlocal downloaded, last_len
             downloaded = transferred
             elapsed = time.time() - start_time
-            speed = downloaded / (1024 * 1000) / elapsed if elapsed > 0 else 0
+            speed = downloaded / elapsed if elapsed > 0 else 0  # bytes/s
             percent = downloaded / total * 100 if total > 0 else 0
-            eta = (total - downloaded) / (1024 * 1000) / speed if speed > 0 else 0
+            eta = (total - downloaded) / speed if speed > 0 else 0
             hh, mm, ss = int(eta // 3600), int((eta % 3600) // 60), int(eta % 60)
             eta_str = f"{hh:d}:{mm:02d}:{ss:02d}" if hh > 0 else f"{mm:02d}:{ss:02d}"
 
-            print(
-                f"\r[DOWNLOADING][SFTP] ↓ {print_name}: "
-                f"{downloaded/1024/1024:.2f}/{total/1024/1024:.2f} MB "
-                f"({percent:.2f}%, {speed:.2f} MB/s, {eta_str})",
-                end="", flush=True
+            progress_line = (
+                f"[DOWNLOADING][SFTP] ↓ {print_name}: "
+                f"{format_size(downloaded)}/{format_size(total)} "
+                f"({percent:.2f}%, {format_size(speed)}/s, {eta_str})"
             )
 
-        try:
-            sftp.get(r_path, l_path + ".tmp", callback=progress)
-            os.replace(l_path + ".tmp", l_path)
-        except Exception as e:
-            if os.path.exists(l_path + ".tmp"):
-                os.remove(l_path + ".tmp")
-            print(f"\n[DOWNLOAD ERROR][{datetime.now().strftime('%H:%M:%S')}] {r_path} - {e}")
-            continue
+            # 計算剩餘空格覆蓋舊行
+            extra_space = max(last_len - len(progress_line), 0)
+            print('\r' + progress_line + ' ' * extra_space, end='', flush=True)
+            last_len = len(progress_line)
 
-        print(
-            f"\n[DOWNLOAD DONE][{datetime.now().strftime('%H:%M:%S')}] "
-            f"{l_path} ({remote_size/1024/1024:.2f} MB)"
-        )
+        tmp_path = l_path + ".tmp"
+        try:
+            sftp.get(r_path, tmp_path, callback=progress)
+            os.replace(tmp_path, l_path)
+
+            # 清除進度行
+            print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')
+
+            print(f"[DOWNLOAD DONE][{datetime.now().strftime('%H:%M:%S')}] "
+                  f"{l_path} ({format_size(remote_size)})")
+
+        except Exception as e:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            # 清除進度行
+            print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')
+            print(f"[DOWNLOAD ERROR][{datetime.now().strftime('%H:%M:%S')}] {r_path} - {e}")
+            continue
 
 # =====================================================
 #               SFTP 連線 / 重連
