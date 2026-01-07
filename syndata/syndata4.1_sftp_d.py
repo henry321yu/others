@@ -139,11 +139,18 @@ def sftp_download_flat(sftp, remote_dir, local_dir):
 #               SFTP 連線 / 重連
 # =====================================================
 def connect_sftp(host, port, user, password):
-    print(f"[CONNECT] SFTP {host}:{port}")
-    transport = paramiko.Transport((host, port))
-    transport.connect(username=user, password=password)
-    sftp = paramiko.SFTPClient.from_transport(transport)
-    return transport, sftp
+    while True:
+        try:
+            print(f"[CONNECT] SFTP {host}:{port}")
+            transport = paramiko.Transport((host, port))
+            transport.connect(username=user, password=password)
+            sftp = paramiko.SFTPClient.from_transport(transport)
+            print("[CONNECT] SFTP 連線成功")
+            return transport, sftp
+        except Exception as e:
+            print(f"[CONNECT ERROR] {e}")
+            print("[RETRY] 5 秒後重試...")
+            time.sleep(5)
 
 # =====================================================
 #               主循環
@@ -154,16 +161,10 @@ def main_loop(host, port, user, password, remote_dir, local_dir):
 
     while True:
         try:
-            print(f"\n[SCAN] 掃描 SFTP 目錄（僅此層）：{remote_dir}")
-            # 檢查 sftp 是否還活著
-            try:
-                sftp.listdir(remote_dir)
-            except:
-                # Socket closed, 重新建立
-                transport.close()
-                transport, sftp = connect_sftp(host, port, user, password)
-
+            print(f"\n[SCAN] 掃描 SFTP 目錄：{remote_dir}")
+            sftp.listdir(remote_dir)  # 測試連線是否還活著
             sftp_download_flat(sftp, remote_dir, local_dir)
+
             print(f"[SCAN DONE][{datetime.now().strftime('%H:%M:%S')}]")
 
         except Exception as e:
@@ -172,9 +173,11 @@ def main_loop(host, port, user, password, remote_dir, local_dir):
                 transport.close()
             except:
                 pass
-            print("[RECONNECT] 5 秒後重新連線")
-            time.sleep(5)
-            transport, sftp = connect_sftp(host, port, user, password)
+
+            print("[RECONNECT] 連線中斷，重新連線...")
+            transport, sftp = connect_sftp(
+                host, port, user, password
+            )
 
         time.sleep(SCAN_INTERVAL)
 
