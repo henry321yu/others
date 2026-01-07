@@ -132,8 +132,17 @@ def main_loop(host, port, user, password, remote_dir, local_dir):
     while True:
         try:
             print(f"\n[SCAN] 掃描 SFTP 目錄（僅此層）：{remote_dir}")
+            # 檢查 sftp 是否還活著
+            try:
+                sftp.listdir(remote_dir)
+            except:
+                # Socket closed, 重新建立
+                transport.close()
+                transport, sftp = connect_sftp(host, port, user, password)
+
             sftp_download_flat(sftp, remote_dir, local_dir)
             print(f"[SCAN DONE][{datetime.now().strftime('%H:%M:%S')}]")
+
         except Exception as e:
             print(f"[SFTP ERROR] {e}")
             try:
