@@ -89,13 +89,15 @@ def sftp_download_all(sftp, remote_dir, local_dir):
             downloaded = transferred
             elapsed = time.time() - start_time
             speed = downloaded / (1024 * 1000) / elapsed if elapsed > 0 else 0
+            percent = downloaded / total * 100 if total > 0 else 0
             eta = (total - downloaded) / (1024 * 1000) / speed if speed > 0 else 0
-            mm, ss = divmod(int(eta), 60)
+            hh, mm, ss = int(eta // 3600), int((eta % 3600) // 60), int(eta % 60)
+            eta_str = f"{hh:d}:{mm:02d}:{ss:02d}" if hh > 0 else f"{mm:02d}:{ss:02d}"
 
             print(
                 f"\r[DOWNLOADING][SFTP] ↓ {print_name}: "
                 f"{downloaded/1024/1024:.2f}/{total/1024/1024:.2f} MB "
-                f"({speed:.2f} MB/S, {mm:02d}:{ss:02d})",
+                f"({percent:.2f}%, {speed:.2f} MB/s, {eta_str})",
                 end="", flush=True
             )
 
