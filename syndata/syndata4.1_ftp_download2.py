@@ -193,6 +193,13 @@ def reconnect_ftp(ftp, host, user, password):
         ftp.login("anonymous", "")
     else:
         ftp.login(user, password)
+
+    ftp.encoding = "utf-8"
+    try:
+        ftp.sendcmd("OPTS UTF8 ON")
+    except:
+        pass
+
     return ftp
 
 
@@ -246,6 +253,12 @@ if __name__ == "__main__":
                 ftp.login("anonymous", "")
             else:
                 ftp.login(ftp_user, ftp_pass)
+
+            ftp.encoding = "utf-8"
+            try:
+                ftp.sendcmd("OPTS UTF8 ON")
+            except:
+                pass
 
             print("[CONNECTED] FTP 連線成功")
 
