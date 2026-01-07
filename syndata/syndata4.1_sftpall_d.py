@@ -9,7 +9,7 @@ from stat import S_ISDIR
 #                     基本設定
 # =====================================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_FILE = os.path.join(BASE_DIR, "config_ftp_d.ini")
+CONFIG_FILE = os.path.join(BASE_DIR, "config_sftp_d.ini")
 disnamelen = 23
 extranamelen = 89
 SCAN_INTERVAL = 5
@@ -21,7 +21,7 @@ def get_config():
     cfg = configparser.ConfigParser()
 
     default_cfg = {
-        "FTP": {
+        "SFTP": {
             "host": "127.0.0.1",
             "port": "22",
             "user": "",
@@ -29,7 +29,7 @@ def get_config():
             "folder": "/"
         },
         "LOCAL": {
-            "download_folder": "ftp_download"
+            "download_folder": "sftp_download"
         }
     }
 
@@ -42,16 +42,16 @@ def get_config():
         cfg.read(CONFIG_FILE, encoding="utf-8")
 
     return (
-        cfg.get("FTP", "host"),
-        cfg.getint("FTP", "port"),
-        cfg.get("FTP", "user"),
-        cfg.get("FTP", "password"),
-        cfg.get("FTP", "folder"),
+        cfg.get("SFTP", "host"),
+        cfg.getint("SFTP", "port"),
+        cfg.get("SFTP", "user"),
+        cfg.get("SFTP", "password"),
+        cfg.get("SFTP", "folder"),
         os.path.join(BASE_DIR, cfg.get("LOCAL", "download_folder"))
     )
 
 # =====================================================
-#               SFTP 遞迴下載
+#             SFTP 遞迴下載主函式
 # =====================================================
 def sftp_download_all(sftp, remote_dir, local_dir):
     os.makedirs(local_dir, exist_ok=True)
@@ -59,14 +59,14 @@ def sftp_download_all(sftp, remote_dir, local_dir):
     try:
         items = sftp.listdir_attr(remote_dir)
     except Exception as e:
-        print(f"[ERROR] 無法存取目錄：{remote_dir} - {e}")
+        print(f"[ERROR] 無法存取 SFTP 目錄：{remote_dir} - {e}")
         return
 
     for attr in items:
         r_path = f"{remote_dir}/{attr.filename}".replace("//", "/")
         l_path = os.path.join(local_dir, attr.filename)
 
-        # 目錄
+        # ---------- 目錄 ----------
         if S_ISDIR(attr.st_mode):
             sftp_download_all(sftp, r_path, l_path)
             continue
@@ -91,10 +91,11 @@ def sftp_download_all(sftp, remote_dir, local_dir):
             speed = downloaded / (1024 * 1000) / elapsed if elapsed > 0 else 0
             eta = (total - downloaded) / (1024 * 1000) / speed if speed > 0 else 0
             mm, ss = divmod(int(eta), 60)
+
             print(
                 f"\r[DOWNLOADING][SFTP] ↓ {print_name}: "
                 f"{downloaded/1024/1024:.2f}/{total/1024/1024:.2f} MB "
-                f"({speed:.2f} MB/s, {mm:02d}:{ss:02d})",
+                f"({speed:.2f} MB/S, {mm:02d}:{ss:02d})",
                 end="", flush=True
             )
 
@@ -104,7 +105,7 @@ def sftp_download_all(sftp, remote_dir, local_dir):
         except Exception as e:
             if os.path.exists(l_path + ".tmp"):
                 os.remove(l_path + ".tmp")
-            print(f"\n[DOWNLOAD ERROR] {r_path} - {e}")
+            print(f"\n[DOWNLOAD ERROR][{datetime.now().strftime('%H:%M:%S')}] {r_path} - {e}")
             continue
 
         print(
@@ -113,7 +114,7 @@ def sftp_download_all(sftp, remote_dir, local_dir):
         )
 
 # =====================================================
-#               SFTP 連線與重連
+#               SFTP 連線 / 重連
 # =====================================================
 def connect_sftp(host, port, user, password):
     print(f"[CONNECT] SFTP {host}:{port}")
@@ -127,10 +128,11 @@ def connect_sftp(host, port, user, password):
 # =====================================================
 def main_loop(host, port, user, password, remote_dir, local_dir):
     transport, sftp = connect_sftp(host, port, user, password)
+    print(f"[INFO][{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] SFTP 同步啟動")
 
     while True:
         try:
-            print(f"\n[SCAN] {remote_dir}")
+            print(f"\n[SCAN] 掃描 SFTP 資料夾：{remote_dir}")
             sftp_download_all(sftp, remote_dir, local_dir)
             print(f"[SCAN DONE][{datetime.now().strftime('%H:%M:%S')}]")
         except Exception as e:
@@ -139,6 +141,7 @@ def main_loop(host, port, user, password, remote_dir, local_dir):
                 transport.close()
             except:
                 pass
+            print("[RECONNECT] 5 秒後重新連線")
             time.sleep(5)
             transport, sftp = connect_sftp(host, port, user, password)
 
@@ -148,10 +151,12 @@ def main_loop(host, port, user, password, remote_dir, local_dir):
 #                     主程式
 # =====================================================
 if __name__ == "__main__":
-    host, port, user, passwd, r_dir, l_dir = get_config()
-    os.makedirs(l_dir, exist_ok=True)
+    host, port, user, passwd, remote_dir, local_dir = get_config()
+    os.makedirs(local_dir, exist_ok=True)
 
     try:
-        main_loop(host, port, user, passwd, r_dir, l_dir)
+        main_loop(host, port, user, passwd, remote_dir, local_dir)
     except KeyboardInterrupt:
         print("\n[EXIT] 使用者中斷")
+    except Exception as e:
+        print(f"[FATAL ERROR] {e}")
