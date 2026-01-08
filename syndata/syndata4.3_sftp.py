@@ -101,11 +101,11 @@ def log(msg):
 def format_size(size_bytes):
     """自動將大小轉換為 B/KB/MB/GB"""
     if size_bytes < 1024:
-        return f"{size_bytes:.2f} bytes"
+        return f"{size_bytes:.1f} bytes"
     elif size_bytes < 1024**2:
-        return f"{size_bytes/1024:.2f} KB"
+        return f"{size_bytes/1024:.1f} KB"
     elif size_bytes < 1024**3:
-        return f"{size_bytes/1024**2:.2f} MB"
+        return f"{size_bytes/1024**2:.1f} MB"
     else:
         return f"{size_bytes/1024**3:.2f} GB"
 
