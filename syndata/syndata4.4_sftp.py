@@ -118,21 +118,12 @@ def sftp_download(sftp, remote_dir, local_dir, items, sync_subdirs, scanned_cach
 
         # ---------- 目錄 ----------
         if S_ISDIR(attr.st_mode):
-            dir_key = r_path
-            if dir_key in scanned_cache:
-                continue  # 已掃描過，跳過
-
-            scanned_cache.add(dir_key)
-
             if sync_subdirs:
                 log(f"[SCAN DIR] {r_path}")
                 try:
                     log(f"[SCAN] 讀取遠端目錄清單中：{r_path} ...")
-
                     sub_items = sftp.listdir_attr(r_path)
-
                     log(f"[SCAN] 讀取完成，共 {len(sub_items)} 筆")
-
                     sftp_download(
                         sftp, r_path, l_path,
                         sub_items, sync_subdirs, scanned_cache
