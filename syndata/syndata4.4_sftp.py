@@ -109,14 +109,8 @@ def format_size(size_bytes):
     else:
         return f"{size_bytes/1024**3:.2f} GB"
 
-def sftp_download(sftp, remote_dir, local_dir, sync_subdirs):
+def sftp_download(sftp, remote_dir, local_dir, items, sync_subdirs, scanned_cache):
     os.makedirs(local_dir, exist_ok=True)
-
-    try:
-        items = sftp.listdir_attr(remote_dir)
-    except Exception as e:
-        log(f"[ERROR] 無法存取 SFTP 目錄：{remote_dir} - {e}")
-        return
 
     for attr in items:
         r_path = f"{remote_dir}/{attr.filename}".replace("//", "/")
@@ -125,13 +119,22 @@ def sftp_download(sftp, remote_dir, local_dir, sync_subdirs):
         # ---------- 目錄 ----------
         if S_ISDIR(attr.st_mode):
             if sync_subdirs:
-                sftp_download(sftp, r_path, l_path, sync_subdirs)
-            else:
-                log(f"[SKIP DIR] {r_path}")
+                log(f"[SCAN DIR] {r_path}")
+                sub_items = sftp.listdir_attr(r_path)
+                sftp_download(
+                    sftp, r_path, l_path,
+                    sub_items, sync_subdirs, scanned_cache
+                )
+            continue
+        remote_size = attr.st_size
+
+        file_key = (r_path, attr.st_size)
+        if file_key in scanned_cache:
             continue
 
-        remote_size = attr.st_size
-        if os.path.exists(l_path) and os.path.getsize(l_path) == remote_size:
+        scanned_cache.add(file_key)
+
+        if os.path.exists(l_path) and os.path.getsize(l_path) == attr.st_size:
             log(f"[SKIP EXISTING] {l_path}")
             continue
 
@@ -277,14 +280,29 @@ def main_loop(host, port, user, password, remote_dir, local_dir, sync_subdirs, m
     log(f"[INFO] 本機目錄：{local_dir}")
     log(f"[INFO] SFTP 目錄：{remote_dir}")
 
+    scanned_cache = set()
+
     while True:
         try:
             if mode == "download":
-                # 下載模式仍然檢查遠端
-                sftp.listdir(remote_dir)  # keep alive
-                print("\n")
-                log(f"[SCAN] SFTP → LOCAL : {remote_dir} → {local_dir}")
-                sftp_download(sftp, remote_dir, local_dir, sync_subdirs)
+                log(f"[SCAN] 讀取遠端目錄清單中：{remote_dir}")
+                start = time.time()
+
+                items = sftp.listdir_attr(remote_dir)
+
+                log(
+                    f"[SCAN] 讀取完成，共 {len(items)} 筆，"
+                    f"耗時 {time.time() - start:.1f}s"
+                )
+
+                sftp_download(
+                    sftp,
+                    remote_dir,
+                    local_dir,
+                    items,
+                    sync_subdirs,
+                    scanned_cache
+                )
 
             elif mode == "upload":
                 # 上傳模式先確保遠端資料夾存在
