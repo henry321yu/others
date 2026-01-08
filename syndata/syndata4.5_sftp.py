@@ -140,7 +140,7 @@ def sftp_download(sftp, remote_dir, local_dir, items, sync_subdirs, scanned_cach
         scanned_cache.add(file_key)
 
         if os.path.exists(l_path) and os.path.getsize(l_path) == attr.st_size:
-            log(f"[SKIP EXISTING] {l_path}")
+            log(f"[SKIP DOWNLOADING] {l_path}")
             continue
 
         print_name = (
@@ -185,7 +185,7 @@ def sftp_download(sftp, remote_dir, local_dir, items, sync_subdirs, scanned_cach
             print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')
             log(f"[DOWNLOAD ERROR] {r_path} - {e}")
 
-def sftp_upload(sftp, local_dir, remote_dir, sync_subdirs):
+def sftp_upload(sftp, local_dir, remote_dir, sync_subdirs, scanned_cache):
     try:
         sftp.chdir(remote_dir)
     except IOError:
@@ -199,17 +199,23 @@ def sftp_upload(sftp, local_dir, remote_dir, sync_subdirs):
         # ---------- 目錄 ----------
         if os.path.isdir(l_path):
             if sync_subdirs:
-                sftp_upload(sftp, l_path, r_path, sync_subdirs)
+                sftp_upload(sftp, l_path, r_path, sync_subdirs, scanned_cache)
             else:
                 log(f"[SKIP DIR] {l_path}")
             continue
 
         local_size = os.path.getsize(l_path)
+        file_key = (r_path, local_size)
+
+        # ---------- cache ----------
+        if file_key in scanned_cache:
+            continue
 
         try:
             r_stat = sftp.stat(r_path)
             if r_stat.st_size == local_size:
-                log(f"[SKIP EXISTING] {r_path}")
+                scanned_cache.add(file_key)
+                log(f"[SKIP UPLOADING] {r_path}")
                 continue
         except IOError:
             pass  # 遠端不存在
@@ -246,6 +252,8 @@ def sftp_upload(sftp, local_dir, remote_dir, sync_subdirs):
             sftp.put(l_path, tmp_remote, callback=progress)
             sftp.rename(tmp_remote, r_path)
 
+            scanned_cache.add(file_key)
+
             print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')
             log(f"[UPLOAD DONE] {r_path} ({format_size(local_size)})")
 
@@ -257,6 +265,14 @@ def sftp_upload(sftp, local_dir, remote_dir, sync_subdirs):
 
             print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')
             log(f"[UPLOAD ERROR] {l_path} - {e}")
+
+def count_local_items(base_dir, sync_subdirs):
+    count = 0
+    for root, dirs, files in os.walk(base_dir):
+        count += len(files)
+        if not sync_subdirs:
+            break
+    return count
 
 # =====================================================
 #               SFTP 連線 / 重連
@@ -306,7 +322,7 @@ def main_loop(host, port, user, password, remote_dir, local_dir, sync_subdirs, m
                 )
 
             elif mode == "upload":
-                # 上傳模式先確保遠端資料夾存在
+                # 確保遠端資料夾存在（你原本的程式，保持不變）
                 dirs = remote_dir.replace("\\", "/").split("/")
                 path = ""
                 for d in dirs:
@@ -321,8 +337,19 @@ def main_loop(host, port, user, password, remote_dir, local_dir, sync_subdirs, m
                         sftp.chdir(path)
 
                 print("\n")
-                log(f"[SCAN] LOCAL → SFTP : {local_dir} → {remote_dir}")
-                sftp_upload(sftp, local_dir, remote_dir, sync_subdirs)
+                log(f"[SCAN] 讀取本機目錄清單中：{local_dir} ...")
+
+                total_files = count_local_items(local_dir, sync_subdirs)
+
+                log(f"[SCAN] 讀取完成，共 {total_files} 筆")
+
+                sftp_upload(
+                    sftp,
+                    local_dir,
+                    remote_dir,
+                    sync_subdirs,
+                    scanned_cache
+                )
 
             log(f"[SCAN DONE][{datetime.now().strftime('%H:%M:%S')}]")
 
