@@ -39,14 +39,14 @@ def get_config():
         cfg.read_dict(default_cfg)
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             cfg.write(f)
-        print("[CONFIG] 已建立預設設定檔")
-        print(f"[CONFIG] 請編輯設定檔後儲存：{CONFIG_FILE}")
+        log("[CONFIG] 已建立預設設定檔")
+        log(f"[CONFIG] 請編輯設定檔後儲存：{CONFIG_FILE}")
 
         last_mtime = os.path.getmtime(CONFIG_FILE)
 
         while True:
             time.sleep(3)
-            print(f"[WAIT] 等待使用者編輯設定檔：{CONFIG_FILE}")
+            log(f"[WAIT] 等待使用者編輯設定檔：{CONFIG_FILE}")
 
             try:
                 current_mtime = os.path.getmtime(CONFIG_FILE)
@@ -54,7 +54,7 @@ def get_config():
                 continue
 
             if current_mtime != last_mtime:
-                print("[CONFIG] 偵測到設定檔變更，重新讀取")
+                log("[CONFIG] 偵測到設定檔變更，重新讀取")
                 cfg.read(CONFIG_FILE, encoding="utf-8")
                 break
     else:
@@ -65,15 +65,15 @@ def get_config():
     if mode not in ("upload", "download"):        
         while True:
             time.sleep(3)
-            print("[CONFIG ERROR] mode 必須是 upload 或 download")
-            print(f"[CONFIG ERROR] 等待使用者編輯設定檔：{CONFIG_FILE}")
+            log("[CONFIG ERROR] mode 必須是 upload 或 download")
+            log(f"[CONFIG ERROR] 等待使用者編輯設定檔：{CONFIG_FILE}")
             try:
                 current_mtime = os.path.getmtime(CONFIG_FILE)
             except FileNotFoundError:
                 continue
 
             if current_mtime != last_mtime:
-                print("[CONFIG] 偵測到設定檔變更，重新讀取")
+                log("[CONFIG] 偵測到設定檔變更，重新讀取")
                 cfg.read(CONFIG_FILE, encoding="utf-8")
                 break
 
@@ -87,6 +87,13 @@ def get_config():
         sync_subdirs,
         mode
     )
+
+def log(msg):
+    ts = datetime.now()
+    ms = int(ts.microsecond / 10000)
+    # line = f"[{ts.strftime('%Y-%m-%d %H:%M:%S')}.{ms:02d}] {msg}"
+    line = f"[{ts.strftime('%H:%M:%S')}] {msg}"
+    print(line)
 
 # =====================================================
 #             SFTP 遞迴下載\上傳主函式
@@ -108,7 +115,7 @@ def sftp_download(sftp, remote_dir, local_dir, sync_subdirs):
     try:
         items = sftp.listdir_attr(remote_dir)
     except Exception as e:
-        print(f"[ERROR] 無法存取 SFTP 目錄：{remote_dir} - {e}")
+        log(f"[ERROR] 無法存取 SFTP 目錄：{remote_dir} - {e}")
         return
 
     for attr in items:
@@ -120,12 +127,12 @@ def sftp_download(sftp, remote_dir, local_dir, sync_subdirs):
             if sync_subdirs:
                 sftp_download(sftp, r_path, l_path, sync_subdirs)
             else:
-                print(f"[SKIP DIR] {r_path}")
+                log(f"[SKIP DIR] {r_path}")
             continue
 
         remote_size = attr.st_size
         if os.path.exists(l_path) and os.path.getsize(l_path) == remote_size:
-            print(f"[SKIP EXISTING] {l_path}")
+            log(f"[SKIP EXISTING] {l_path}")
             continue
 
         print_name = (
@@ -145,7 +152,7 @@ def sftp_download(sftp, remote_dir, local_dir, sync_subdirs):
             mm, ss = divmod(int(eta), 60)
 
             line = (
-                f"[DOWNLOADING][SFTP] ↓ {print_name}: "
+                f"[DOWNLOADING] ↓ {print_name}: "
                 f"{format_size(transferred)}/{format_size(total)} "
                 f"({percent:.2f}%, {format_size(speed)}/s, {mm:02d}:{ss:02d})"
             )
@@ -161,14 +168,14 @@ def sftp_download(sftp, remote_dir, local_dir, sync_subdirs):
             os.replace(tmp_path, l_path)
 
             print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')
-            print(f"[DOWNLOAD DONE] {l_path} ({format_size(remote_size)})")
+            log(f"[DOWNLOAD DONE] {l_path} ({format_size(remote_size)})")
 
         except Exception as e:
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
 
             print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')
-            print(f"[DOWNLOAD ERROR] {r_path} - {e}")
+            log(f"[DOWNLOAD ERROR] {r_path} - {e}")
 
 def sftp_upload(sftp, local_dir, remote_dir, sync_subdirs):
     try:
@@ -186,7 +193,7 @@ def sftp_upload(sftp, local_dir, remote_dir, sync_subdirs):
             if sync_subdirs:
                 sftp_upload(sftp, l_path, r_path, sync_subdirs)
             else:
-                print(f"[SKIP DIR] {l_path}")
+                log(f"[SKIP DIR] {l_path}")
             continue
 
         local_size = os.path.getsize(l_path)
@@ -194,7 +201,7 @@ def sftp_upload(sftp, local_dir, remote_dir, sync_subdirs):
         try:
             r_stat = sftp.stat(r_path)
             if r_stat.st_size == local_size:
-                print(f"[SKIP EXISTING] {r_path}")
+                log(f"[SKIP EXISTING] {r_path}")
                 continue
         except IOError:
             pass  # 遠端不存在
@@ -216,7 +223,7 @@ def sftp_upload(sftp, local_dir, remote_dir, sync_subdirs):
             mm, ss = divmod(int(eta), 60)
 
             line = (
-                f"[UPLOADING][SFTP] ↑ {print_name}: "
+                f"[UPLOADING] ↑ {print_name}: "
                 f"{format_size(transferred)}/{format_size(total)} "
                 f"({percent:.2f}%, {format_size(speed)}/s, {mm:02d}:{ss:02d})"
             )
@@ -232,7 +239,7 @@ def sftp_upload(sftp, local_dir, remote_dir, sync_subdirs):
             sftp.rename(tmp_remote, r_path)
 
             print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')
-            print(f"[UPLOAD DONE] {r_path} ({format_size(local_size)})")
+            log(f"[UPLOAD DONE] {r_path} ({format_size(local_size)})")
 
         except Exception as e:
             try:
@@ -241,7 +248,7 @@ def sftp_upload(sftp, local_dir, remote_dir, sync_subdirs):
                 pass
 
             print('\r' + ' ' * (disnamelen + extranamelen) + '\r', end='')
-            print(f"[UPLOAD ERROR] {l_path} - {e}")
+            log(f"[UPLOAD ERROR] {l_path} - {e}")
 
 # =====================================================
 #               SFTP 連線 / 重連
@@ -249,15 +256,15 @@ def sftp_upload(sftp, local_dir, remote_dir, sync_subdirs):
 def connect_sftp(host, port, user, password):
     while True:
         try:
-            print(f"[CONNECT] SFTP {host}:{port}")
+            log(f"[CONNECT] SFTP {host}:{port}")
             transport = paramiko.Transport((host, port))
             transport.connect(username=user, password=password)
             sftp = paramiko.SFTPClient.from_transport(transport)
-            print("[CONNECT] SFTP 連線成功")
+            log("[CONNECT] SFTP 連線成功")
             return transport, sftp
         except Exception as e:
-            print(f"[CONNECT ERROR] {e}")
-            print("[RETRY] 5 秒後重試...")
+            log(f"[CONNECT ERROR] {e}")
+            log("[RETRY] 5 秒後重試...")
             time.sleep(5)
 
 # =====================================================
@@ -266,16 +273,17 @@ def connect_sftp(host, port, user, password):
 def main_loop(host, port, user, password, remote_dir, local_dir, sync_subdirs, mode):
     transport, sftp = connect_sftp(host, port, user, password)
 
-    print(f"[INFO] 同步模式：{mode.upper()}")
-    print(f"[INFO] 本機目錄：{local_dir}")
-    print(f"[INFO] SFTP 目錄：{remote_dir}")
+    log(f"[INFO] 同步模式：{mode.upper()}")
+    log(f"[INFO] 本機目錄：{local_dir}")
+    log(f"[INFO] SFTP 目錄：{remote_dir}")
 
     while True:
         try:
             if mode == "download":
                 # 下載模式仍然檢查遠端
                 sftp.listdir(remote_dir)  # keep alive
-                print(f"\n[SCAN] SFTP → LOCAL : {remote_dir}")
+                print("\n")
+                log(f"[SCAN] SFTP → LOCAL : {remote_dir} → {local_dir}")
                 sftp_download(sftp, remote_dir, local_dir, sync_subdirs)
 
             elif mode == "upload":
@@ -290,22 +298,23 @@ def main_loop(host, port, user, password, remote_dir, local_dir, sync_subdirs, m
                         sftp.chdir(path)
                     except IOError:
                         sftp.mkdir(path)
-                        print(f"[MKDIR] 建立遠端目錄：{path}")
+                        log(f"[MKDIR] 建立遠端目錄：{path}")
                         sftp.chdir(path)
 
-                print(f"\n[SCAN] LOCAL → SFTP : {local_dir}")
+                print("\n")
+                log(f"[SCAN] LOCAL → SFTP : {local_dir} → {remote_dir}")
                 sftp_upload(sftp, local_dir, remote_dir, sync_subdirs)
 
-            print(f"[SCAN DONE][{datetime.now().strftime('%H:%M:%S')}]")
+            log(f"[SCAN DONE][{datetime.now().strftime('%H:%M:%S')}]")
 
         except Exception as e:
-            print(f"[SFTP ERROR] {e}")
+            log(f"[SFTP ERROR] {e}")
             try:
                 transport.close()
             except:
                 pass
 
-            print("[RECONNECT] 重新連線...")
+            log("[RECONNECT] 重新連線...")
             transport, sftp = connect_sftp(host, port, user, password)
 
         time.sleep(SCAN_INTERVAL)
@@ -320,6 +329,6 @@ if __name__ == "__main__":
     try:
         main_loop(host, port, user, passwd, remote_dir, local_dir, sync_subdirs, mode)
     except KeyboardInterrupt:
-        print("\n[EXIT] 使用者中斷")
+        log("\n[EXIT] 使用者中斷")
     except Exception as e:
-        print(f"[FATAL ERROR] {e}")
+        log(f"[FATAL ERROR] {e}")
