@@ -101,7 +101,7 @@ def sftp_download(sftp, remote_dir, local_dir, sync_subdirs):
         # ---------- 目錄 ----------
         if S_ISDIR(attr.st_mode):
             if sync_subdirs:
-                sftp_download_all(sftp, r_path, l_path, sync_subdirs)
+                sftp_download(sftp, r_path, l_path, sync_subdirs)
             else:
                 print(f"[SKIP DIR] {r_path}")
             continue
