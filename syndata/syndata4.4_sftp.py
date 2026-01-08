@@ -140,7 +140,7 @@ def sftp_download(sftp, remote_dir, local_dir, items, sync_subdirs, scanned_cach
         scanned_cache.add(file_key)
 
         if os.path.exists(l_path) and os.path.getsize(l_path) == attr.st_size:
-            log(f"[SKIP EXISTING] {l_path}")
+            log(f"[SKIP DOWNLOADING] {l_path}")
             continue
 
         print_name = (
@@ -209,7 +209,7 @@ def sftp_upload(sftp, local_dir, remote_dir, sync_subdirs):
         try:
             r_stat = sftp.stat(r_path)
             if r_stat.st_size == local_size:
-                log(f"[SKIP EXISTING] {r_path}")
+                log(f"[SKIP UPLOADING] {r_path}")
                 continue
         except IOError:
             pass  # 遠端不存在
@@ -296,6 +296,7 @@ def main_loop(host, port, user, password, remote_dir, local_dir, sync_subdirs, m
 
                 log(f"[SCAN] 讀取完成，共 {len(items)} 筆")
 
+                log(f"[SCAN] SFTP → LOCAL : {local_dir} → {remote_dir}")
                 sftp_download(
                     sftp,
                     remote_dir,
@@ -320,7 +321,6 @@ def main_loop(host, port, user, password, remote_dir, local_dir, sync_subdirs, m
                         log(f"[MKDIR] 建立遠端目錄：{path}")
                         sftp.chdir(path)
 
-                print("\n")
                 log(f"[SCAN] LOCAL → SFTP : {local_dir} → {remote_dir}")
                 sftp_upload(sftp, local_dir, remote_dir, sync_subdirs)
 
