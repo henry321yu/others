@@ -27,7 +27,7 @@ def get_config():
             "user": "",
             "password": "",
             "target_folder": "/",
-            "sync_subdirs": "yes"   # ← 新增
+            "sync_subdirs": "yes" 
         },
         "LOCAL": {
             "local_folder": "sftp_download"
@@ -39,6 +39,23 @@ def get_config():
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             cfg.write(f)
         print("[CONFIG] 已建立預設設定檔")
+        print(f"[CONFIG] 請編輯設定檔後儲存：{CONFIG_FILE}")
+
+        last_mtime = os.path.getmtime(CONFIG_FILE)
+
+        while True:
+            time.sleep(3)
+            print(f"[WAIT] 等待使用者編輯設定檔：{CONFIG_FILE}")
+
+            try:
+                current_mtime = os.path.getmtime(CONFIG_FILE)
+            except FileNotFoundError:
+                continue
+
+            if current_mtime != last_mtime:
+                print("[CONFIG] 偵測到設定檔變更，重新讀取")
+                cfg.read(CONFIG_FILE, encoding="utf-8")
+                break
     else:
         cfg.read(CONFIG_FILE, encoding="utf-8")
 
