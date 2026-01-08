@@ -192,6 +192,16 @@ def sftp_upload(sftp, local_dir, remote_dir, sync_subdirs, scanned_cache):
         sftp.mkdir(remote_dir)
         sftp.chdir(remote_dir)
 
+    try:
+        items = os.listdir(local_dir)
+    except Exception as e:
+        log(f"[DIR ERROR] {local_dir} - {e}")
+        return
+
+    log(f"[SCAN DIR] {local_dir}")
+    log(f"[SCAN] 讀取本機目錄清單中：{local_dir} ...")
+    log(f"[SCAN] 讀取完成，共 {len(items)} 筆")
+
     for name in os.listdir(local_dir):
         l_path = os.path.join(local_dir, name)
         r_path = f"{remote_dir}/{name}".replace("//", "/")
