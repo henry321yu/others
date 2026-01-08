@@ -9,7 +9,7 @@ from stat import S_ISDIR
 #                     基本設定
 # =====================================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_FILE = os.path.join(BASE_DIR, "config_sftp_d.ini")
+CONFIG_FILE = os.path.join(BASE_DIR, "config_sftp.ini")
 disnamelen = 23
 extranamelen = 89
 SCAN_INTERVAL = 5
