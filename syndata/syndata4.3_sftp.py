@@ -272,13 +272,27 @@ def main_loop(host, port, user, password, remote_dir, local_dir, sync_subdirs, m
 
     while True:
         try:
-            sftp.listdir(remote_dir)  # keep alive
-
             if mode == "download":
+                # 下載模式仍然檢查遠端
+                sftp.listdir(remote_dir)  # keep alive
                 print(f"\n[SCAN] SFTP → LOCAL : {remote_dir}")
                 sftp_download(sftp, remote_dir, local_dir, sync_subdirs)
 
             elif mode == "upload":
+                # 上傳模式先確保遠端資料夾存在
+                dirs = remote_dir.replace("\\", "/").split("/")
+                path = ""
+                for d in dirs:
+                    if not d:  # 忽略空字串
+                        continue
+                    path += "/" + d
+                    try:
+                        sftp.chdir(path)
+                    except IOError:
+                        sftp.mkdir(path)
+                        print(f"[MKDIR] 建立遠端目錄：{path}")
+                        sftp.chdir(path)
+
                 print(f"\n[SCAN] LOCAL → SFTP : {local_dir}")
                 sftp_upload(sftp, local_dir, remote_dir, sync_subdirs)
 
