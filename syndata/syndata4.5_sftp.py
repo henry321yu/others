@@ -109,7 +109,7 @@ def format_size(size_bytes):
     else:
         return f"{size_bytes/1024**3:.2f} GB"
 
-def sftp_download(sftp, remote_dir, local_dir, items, sync_subdirs, scanned_cache):
+def sftp_download(sftp, remote_dir, local_dir, items, sync_subdirs, scanned_cache, remote_file_count):
     os.makedirs(local_dir, exist_ok=True)
 
     for attr in items:
@@ -121,9 +121,9 @@ def sftp_download(sftp, remote_dir, local_dir, items, sync_subdirs, scanned_cach
             if sync_subdirs:
                 log(f"[SCAN DIR] {r_path}")
                 try:
-                    log(f"[SCAN] 讀取遠端目錄清單中：{r_path} ...")
+                    log(f"[SCAN] 讀取遠端子目錄清單中：{r_path} ...")
                     sub_items = sftp.listdir_attr(r_path)
-                    log(f"[SCAN] 讀取完成，共 {len(sub_items)} 筆")
+                    log(f"[SCAN] 遠端子目錄讀取完成，共 {len(sub_items)} 個檔案")
                     sftp_download(
                         sftp, r_path, l_path,
                         sub_items, sync_subdirs, scanned_cache
@@ -132,6 +132,8 @@ def sftp_download(sftp, remote_dir, local_dir, items, sync_subdirs, scanned_cach
                     log(f"[DIR ERROR] {r_path} - {e}")
             continue
         remote_size = attr.st_size
+
+        remote_file_count["total"] += 1
 
         file_key = (r_path, attr.st_size)
         if file_key in scanned_cache:
@@ -199,8 +201,8 @@ def sftp_upload(sftp, local_dir, remote_dir, sync_subdirs, scanned_cache):
         return
 
     log(f"[SCAN DIR] {local_dir}")
-    log(f"[SCAN] 讀取本機目錄清單中：{local_dir} ...")
-    log(f"[SCAN] 讀取完成，共 {len(items)} 筆")
+    log(f"[SCAN] 讀取本機子目錄清單中：{local_dir} ...")
+    log(f"[SCAN] 本機子目錄讀取完成，共 {len(items)} 個檔案")
 
     for name in os.listdir(local_dir):
         l_path = os.path.join(local_dir, name)
@@ -315,12 +317,13 @@ def main_loop(host, port, user, password, remote_dir, local_dir, sync_subdirs, m
 
     while True:
         try:
+            remote_file_count = {"total": 0} # 計算遠端檔案數
             if mode == "download":
-                log(f"[SCAN] 讀取遠端目錄清單中：{remote_dir} ...")
+                log(f"[SCAN MAIN DIR] 讀取遠端主目錄清單中：{remote_dir} ...")
 
                 items = sftp.listdir_attr(remote_dir)
 
-                log(f"[SCAN] 讀取完成，共 {len(items)} 筆")
+                log(f"[SCAN] 遠端主目錄讀取完成，共 {len(items)} 筆")
 
                 sftp_download(
                     sftp,
@@ -328,8 +331,10 @@ def main_loop(host, port, user, password, remote_dir, local_dir, sync_subdirs, m
                     local_dir,
                     items,
                     sync_subdirs,
-                    scanned_cache
+                    scanned_cache,
+                    remote_file_count
                 )
+                log(f"[SCAN] 遠端全數檔案下載完成，總共：{remote_file_count['total']} 個檔案")
 
             elif mode == "upload":
                 # 確保遠端資料夾存在（你原本的程式，保持不變）
@@ -347,11 +352,11 @@ def main_loop(host, port, user, password, remote_dir, local_dir, sync_subdirs, m
                         sftp.chdir(path)
 
                 print("\n")
-                log(f"[SCAN] 讀取本機目錄清單中：{local_dir} ...")
+                log(f"[SCAN MAIN DIR] 讀取本機主目錄清單中：{local_dir} ...")
 
                 total_files = count_local_items(local_dir, sync_subdirs)
 
-                log(f"[SCAN] 讀取完成，共 {total_files} 筆")
+                log(f"[SCAN] 本機主目錄讀取完成，總共 {total_files} 個檔案")
 
                 sftp_upload(
                     sftp,
