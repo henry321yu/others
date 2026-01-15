@@ -32,6 +32,7 @@ receiver_ip = 10.241.0.114
 # receiver_ip = 10.241.156.153 #rasp
 # receiver_ip = 10.241.194.18 #rasp2
 # receiver_ip = 10.241.136.93 #rasp3
+# receiver_ip = 26.131.52.20 #EOSPHD
 
 #rasp raslan@10.241.156.153
 #rasp2 admin@10.241.194.18
@@ -59,11 +60,15 @@ user: raslan
 passowrd: 123
 
 淡水線rasp2
-ip: 10.241.136.93
+ip: 10.241.194.18
 user: admin
 passowrd: 123
 
 監視影像rasp3
-ip: 10.241.194.18
+ip: 10.241.136.93
 user: admin
 passowrd: 123
+
+ip: 26.131.52.20 or
+user: eosphd
+passowrd: P@ssw0rd@Ncku
