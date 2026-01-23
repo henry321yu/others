@@ -128,7 +128,7 @@ def format_size(size_bytes):
     else:
         return f"{size_bytes/1024**3:.2f} GB"
 
-def sftp_download(sftp, remote_dir, local_dir, items, sync_subdirs, scanned_cache, remote_file_count):
+def sftp_download(sftp, remote_dir, local_dir, items, sync_subdirs, scanned_cache, remote_file_count, downloaded_file_count):
     os.makedirs(local_dir, exist_ok=True)
     print_count = False
 
@@ -153,7 +153,8 @@ def sftp_download(sftp, remote_dir, local_dir, items, sync_subdirs, scanned_cach
                         sub_items,
                         sync_subdirs,
                         scanned_cache,
-                        sub_file_count
+                        sub_file_count,
+                        downloaded_file_count
                     )
 
                 except Exception as e:
@@ -162,6 +163,7 @@ def sftp_download(sftp, remote_dir, local_dir, items, sync_subdirs, scanned_cach
         remote_size = attr.st_size
 
         remote_file_count["done"] += 1
+        downloaded_file_count["done"] += 1
         print_progress(
             remote_file_count["done"],
             remote_file_count["total"],
@@ -420,6 +422,7 @@ def main_loop(host, port, user, password, remote_dir, local_dir, sync_subdirs, m
                 "total": 0,
                 "done": 0
             }
+            downloaded_file_count = {"done": 0}   # 用於累積所有檔案數
             if mode == "download":
                 items = listdir_with_progress(sftp,remote_dir,label="遠端主目錄")
                 remote_file_count["total"] = len(items)
@@ -431,9 +434,10 @@ def main_loop(host, port, user, password, remote_dir, local_dir, sync_subdirs, m
                     items,
                     sync_subdirs,
                     scanned_cache,
-                    remote_file_count
+                    remote_file_count,
+                    downloaded_file_count
                 )
-                log(f"[Download Done] 遠端全數檔案下載完成，總共：{remote_file_count['total']} 個檔案")
+                log(f"[Download Done] 遠端全數檔案下載完成，總共：{downloaded_file_count['done']} 個檔案")
                 set_console_title(f"SFTP Download Done", end=True)
 
             elif mode == "upload":                
