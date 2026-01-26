@@ -4,6 +4,9 @@
 @echo off
 setlocal enabledelayedexpansion
 
+rem 強制切換到本 .cmd 所在資料夾（解決工作排程路徑問題）
+cd /d "%~dp0"
+
 rem 切換到 UTF-8 編碼
 chcp 65001
 echo.
