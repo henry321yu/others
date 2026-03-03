@@ -49,6 +49,9 @@ packet_queue_full = 0
 frame_count = dframe_count = 0
 start_time_ns = time.perf_counter_ns()
 
+imu_frame_count = 0
+imu_last_time_ns = time.perf_counter_ns()
+
 def parse_packet(data):
     blocks = 12
     channels = 16
@@ -118,7 +121,7 @@ def pointcloud_updater():
                 # print(f"{current_time}, {elapsed_s:.3f}s, {vert_angle}, {azimuth:.2f}, {distance:.2f}, {ax}, {ay}, {az}, {tem}°C, Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
                 if elapsed_s_total > printclock:
                     printclock = printclock + 0.5
-                    print(f"{current_time}, {elapsed_s_total:.3f}s, {vert_angle}, {azimuth:.2f}, {distance:.2f}, {board2_temp:.2f}°C, {ax}, {ay}, {az}, {tem}°C, Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
+                    # print(f"{current_time}, {elapsed_s_total:.3f}s, {vert_angle}, {azimuth:.2f}, {distance:.2f}, {board2_temp:.2f}°C, {ax}, {ay}, {az}, {tem}°C, Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
 
             data_list.clear()
             intensity_list.clear()
@@ -136,6 +139,8 @@ def monitor():
 
 def get_355():
     global ax, ay, az, tem
+    global imu_frame_count, imu_last_time_ns
+
     while True:
         try:
             data, addr = sock_recv_355.recvfrom(1024)  # 最多收1024 bytes
@@ -149,6 +154,31 @@ def get_355():
                 ay = float(parts[2])
                 az = float(parts[3])
                 tem = float(parts[4])
+
+                # ===== frequency calculation =====
+                imu_frame_count += 1
+
+                now_ns = time.perf_counter_ns()
+                elapsed_ns = now_ns - imu_last_time_ns
+
+                # 每 0.5 秒更新一次頻率（避免print過快）
+                if elapsed_ns >= 500_000_000:  # 0.5 sec
+                    elapsed_s = elapsed_ns / 1e9
+
+                    imu_frequency = imu_frame_count / elapsed_s
+
+                    print(
+                        f"[ADXL355] ax:{ax:.6f}, "
+                        f"ay:{ay:.6f}, "
+                        f"az:{az:.6f}, "
+                        f"Temp:{tem:.2f}°C, "
+                        f"IMU Frequency: {imu_frequency:.2f} Hz"
+                    )
+
+                    # reset window
+                    imu_frame_count = 0
+                    imu_last_time_ns = now_ns
+
         except Exception as e:
             pass
 
