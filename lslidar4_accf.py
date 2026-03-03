@@ -51,6 +51,7 @@ start_time_ns = time.perf_counter_ns()
 
 imu_frame_count = 0
 imu_last_time_ns = time.perf_counter_ns()
+imu_frequency = 0
 
 def parse_packet(data):
     blocks = 12
@@ -88,7 +89,7 @@ def receiver_thread(sock):
                 pass
 
 def pointcloud_updater():
-    global start_time_ns, gotnp, i_max_points, frame_count, dframe_count, ax, ay, az, tem, printclock, board2_temp
+    global start_time_ns, gotnp, i_max_points, frame_count, dframe_count, ax, ay, az, tem, printclock, board2_temp, imu_frequency
 
     last_time_ns = time.perf_counter_ns()  # 加入這行：記錄上一次的時間
 
@@ -118,10 +119,10 @@ def pointcloud_updater():
 
             for vert_angle, azimuth, distance, intensity in data_list:
                 # 印出 LiDAR 資料以及接收到的加速度和溫度數據
-                # print(f"{current_time}, {elapsed_s:.3f}s, {vert_angle}, {azimuth:.2f}, {distance:.2f}, {ax}, {ay}, {az}, {tem}°C, Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
+                # print(f"{current_time}, {elapsed_s:.3f}s, {vert_angle}, {azimuth:.2f}, {distance:.2f}, {ax}, {ay}, {az}, {tem}°C, Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz, {imu_frequency:.2f} Hz")
                 if elapsed_s_total > printclock:
                     printclock = printclock + 0.5
-                    # print(f"{current_time}, {elapsed_s_total:.3f}s, {vert_angle}, {azimuth:.2f}, {distance:.2f}, {board2_temp:.2f}°C, {ax}, {ay}, {az}, {tem}°C, Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz")
+                    print(f"{current_time}, {elapsed_s_total:.3f}s, {vert_angle}, {azimuth:.2f}, {distance:.2f}, {board2_temp:.2f}°C, {ax}, {ay}, {az}, {tem}°C, Points:{len(data_list)}, {frequency:.2f} kHz, {dfrequency:.2f} Hz, {imu_frequency:.2f} Hz")
 
             data_list.clear()
             intensity_list.clear()
@@ -139,7 +140,7 @@ def monitor():
 
 def get_355():
     global ax, ay, az, tem
-    global imu_frame_count, imu_last_time_ns
+    global imu_frame_count, imu_last_time_ns, imu_frequency
 
     while True:
         try:
@@ -167,13 +168,13 @@ def get_355():
 
                     imu_frequency = imu_frame_count / elapsed_s
 
-                    print(
-                        f"[ADXL355] ax:{ax:.6f}, "
-                        f"ay:{ay:.6f}, "
-                        f"az:{az:.6f}, "
-                        f"Temp:{tem:.2f}°C, "
-                        f"IMU Frequency: {imu_frequency:.2f} Hz"
-                    )
+                    # print(
+                    #     f"[ADXL355] ax:{ax:.6f}, "
+                    #     f"ay:{ay:.6f}, "
+                    #     f"az:{az:.6f}, "
+                    #     f"Temp:{tem:.2f}°C, "
+                    #     f"IMU Frequency: {imu_frequency:.2f} Hz"
+                    # )
 
                     # reset window
                     imu_frame_count = 0
