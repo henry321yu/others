@@ -1,36 +1,307 @@
-import socket
+# ========= 使用者可自訂 =========
+LIDAR_BUFFER_SECONDS = 40 #20
+IMU_SAVE_INTERVAL = 600
+IMU_LOG_FOLDER = "lidar_log"
+T7 = 20 #10
+LIDAR_PERIODIC_INTERVAL = 1800 #300
+
+import cv2
 import time
+import socket
+import os
+import platform
+import threading
+import smbus2
+from datetime import datetime
+import RPi.GPIO as GPIO
+from collections import deque
 
-LIDAR_IP = ""
-LIDAR_PORT = 2368
+# ========= Relay 設定 =========
+RELAY_PIN = 17
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(RELAY_PIN, GPIO.OUT)
+GPIO.output(RELAY_PIN, GPIO.HIGH)
 
-# 多個遠端 PC 的 IP 與 port 組成的列表
+# ========= ADXL355 設定 =========
+TEMP2, XDATA3, YDATA3, ZDATA3 = 0x06, 0x08, 0x0B, 0x0E
+RESET, POWER_CTL, RANGE, SELF_TEST = 0x2F, 0x2D, 0x2C, 0x2E
+bus = smbus2.SMBus(1)
+ADXL355_ADDR = 0x1D
+
+def setup_adxl355():
+    bus.write_byte_data(ADXL355_ADDR, RESET, 0x52)
+    time.sleep(0.1)
+    bus.write_byte_data(ADXL355_ADDR, POWER_CTL, 0x00)
+    bus.write_byte_data(ADXL355_ADDR, RANGE, 0x01)
+    bus.write_byte_data(ADXL355_ADDR, SELF_TEST, 0x00)
+    time.sleep(0.1)
+
+def read_adxl355():
+    data = bus.read_i2c_block_data(ADXL355_ADDR, TEMP2, 11)
+    ax = ((data[2] << 12) | (data[3] << 4) | (data[4] >> 4)) & 0xFFFFF
+    ay = ((data[5] << 12) | (data[6] << 4) | (data[7] >> 4)) & 0xFFFFF
+    az = ((data[8] << 12) | (data[9] << 4) | (data[10] >> 4)) & 0xFFFFF
+    ax = ax - 0x100000 if ax > 0x80000 else ax
+    ay = ay - 0x100000 if ay > 0x80000 else ay
+    az = az - 0x100000 if az > 0x80000 else az
+    temp_raw = (data[0] << 8) | data[1]
+    temp = ((1852 - temp_raw) / 9.05) + 27.2
+    return ax / 0x3E800, ay / 0x3E800, az / 0x3E800, temp
+
+# ========= 網路與設備清單 =========
 REMOTE_PC_LIST = [
-    ('26.208.29.50', 2368),
-    ('26.214.58.255', 2368),
-    ('26.174.179.211', 2368),
-    ('26.7.59.242', 2368),
-    # 加入更多遠端 PC...
+    # ('10.241.0.114', 0), # my office
+    # ('10.241.215.99', 0),  # dell
+    # ('10.241.180.148', 0), # my pc
+    # ('10.241.199.211', 0), # fly office
+    ('10.241.183.64', 0), # ipc
+    # ('10.241.66.133', 0), # broken
+    # ('10.241.178.17', 0), # my phone
+    # ('10.241.135.1', 0), # my new office
 ]
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind((LIDAR_IP, LIDAR_PORT))
+ADXL_PORT = 2370
+IMAGE_PORT = 2385
+PIXEL_PORT = 2386
+LIDAR1_PORT = 2368
+LIDAR2_PORT = 2369
+RELAY_PORT = 2371
 
-packet_count = 0
-total_bytes_sent = 0
-start_time = time.time()
+sock_adxl = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock_img = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock_pixel = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock_lidar1 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock_lidar2 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock_lidar1.bind(('', LIDAR1_PORT))
+sock_lidar2.bind(('', LIDAR2_PORT))
 
-while True:
-    data, addr = sock.recvfrom(1500)
-    
-    for remote_ip, remote_port in REMOTE_PC_LIST:
-        sent_bytes = sock.sendto(data, (remote_ip, remote_port))
-        total_bytes_sent += sent_bytes  # 每次傳送成功回傳的 byte 數
+# ========= 狀態變數 =========
+online_status = {ip: True for ip, _ in REMOTE_PC_LIST}
+lidar_buffer = deque()
+buffer_lock = threading.Lock()
+last_trigger_time = 0
+trigger_active = False
+avg20 = avg30 = avg40 = avg50 = 100
+last_avg20 = last_avg30 = None
+trigger_pending = False
 
-    packet_count += 1
+adxl_sent = img_sent = pixel_sent = lidar1_sent = lidar2_sent = 0
+imu_log = []
+imu_log_lock = threading.Lock()
 
-    # 每秒更新一次顯示
-    if time.time() - start_time > 1:
-        total_mb = total_bytes_sent / (1024 * 1024)
-        print(f"封包數：{packet_count}  |  傳送：{total_mb:.2f} MB", end='\n')
-        start_time = time.time()
+def ping(ip):
+    param = "-n" if platform.system().lower() == "windows" else "-c"
+    return os.system(f"ping {param} 1 {ip} > /dev/null 2>&1") == 0
+
+def ping_checker():
+    while True:
+        for ip, _ in REMOTE_PC_LIST:
+            online_status[ip] = ping(ip)
+        time.sleep(5)
+
+def save_imu_log_periodically():
+    while True:
+        time.sleep(IMU_SAVE_INTERVAL)
+        now = datetime.now()
+        filename = now.strftime("imu_%Y%m%d_%H%M%S.csv")
+        os.makedirs(IMU_LOG_FOLDER, exist_ok=True)
+        filepath = os.path.join(IMU_LOG_FOLDER, filename)
+        with imu_log_lock:
+            if imu_log:
+                with open(filepath, "w") as f:
+                    f.write("timestamp,ax,ay,az,temp\n")
+                    f.writelines(imu_log)
+                print(f"💾 已儲存 {len(imu_log)} 筆 IMU 資料到 {filepath}")
+                imu_log.clear()
+
+def send_adxl355():
+    global adxl_sent
+    last_az = None
+
+    PREFIX = "ADXL355,"
+
+    while True:
+        ax, ay, az, temp = read_adxl355()
+
+        if az == last_az:
+            continue
+        last_az = az
+
+        message = PREFIX + "%.6f,%.6f,%.6f,%.2f" % (ax, ay, az, temp)
+
+        for ip, _ in REMOTE_PC_LIST:
+            if online_status[ip]:
+                sock_adxl.sendto(message.encode(), (ip, ADXL_PORT))
+                adxl_sent += 1
+        time.sleep(0.0005)
+
+def send_camera():
+    global img_sent, pixel_sent, avg20, avg30, avg40, avg50
+    cap = None
+    frame_count = 0
+    interval = 0.5
+    while True:
+        if cap is None or not cap.isOpened():
+            cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+            time.sleep(2)
+            continue
+        ret, frame = cap.read()
+        if not ret:
+            cap.release()
+            cap = None
+            continue
+        ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        cv2.putText(frame, ts, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+        resized = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
+        gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
+        if gray.shape[0] > 50 and gray.shape[1] > 100:
+            avg20 = int(gray[188, 110:305].mean()) #日 近側 roi
+            avg30 = int(gray[136, 120:290].mean()) #日 遠側 roi_1
+            avg40 = int(gray[146, 122:310].mean()) #夜 近側 roi_2
+            avg50 = int(gray[101, 100:300].mean()) #夜 遠側 roi_3
+        else:
+            avg20 = avg30 = avg40 = avg50 = 0
+        pixel_msg = f"{ts},{avg20},{avg30},{avg40},{avg50}"
+        for ip, _ in REMOTE_PC_LIST:
+            if online_status[ip]:
+                sock_pixel.sendto(pixel_msg.encode(), (ip, PIXEL_PORT))
+                pixel_sent += 1
+        if frame_count % 2 == 0:
+            success, jpeg = cv2.imencode('.jpg', resized, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+            if success and len(jpeg) < 60000:
+                for ip, _ in REMOTE_PC_LIST:
+                    if online_status[ip]:
+                        sock_img.sendto(jpeg.tobytes(), (ip, IMAGE_PORT))
+                        img_sent += 1
+        frame_count += 1
+        time.sleep(interval)
+
+def save_lidar_buffer(prefix="event"):
+    now = datetime.now()
+    filename = now.strftime(f"{prefix}_lidar1_%Y%m%d_%H%M%S.bin")
+    os.makedirs("lidar_log", exist_ok=True)
+    filepath = os.path.join("lidar_log", filename)
+    print(f"💾 正在儲存檔案: {filepath}")
+    with open(filepath, "wb") as f:
+        with buffer_lock:
+            for _, pkt in lidar_buffer:
+                f.write(pkt)
+    print(f"✅ 已儲存 {len(lidar_buffer)} 筆資料")
+
+def periodic_lidar_saver():
+    while True:
+        time.sleep(LIDAR_PERIODIC_INTERVAL)
+        if trigger_active:
+            print("⏳ 定時儲存取消，因事件觸發中")
+            continue
+        print("🕒 定時儲存觸發")
+        save_lidar_buffer(prefix="periodic")
+
+def lidar1():
+    global lidar1_sent, trigger_active, last_trigger_time, last_avg20, last_avg30, trigger_pending
+    sock_lidar1.settimeout(30)  # 設定接收 timeout 為 30 秒
+    while True:
+        try:
+            data, _ = sock_lidar1.recvfrom(1500)
+            timestamp = time.time()
+            with buffer_lock:
+                lidar_buffer.append((timestamp, data))
+                while lidar_buffer and (timestamp - lidar_buffer[0][0]) > LIDAR_BUFFER_SECONDS:
+                    lidar_buffer.popleft()
+            for ip, _ in REMOTE_PC_LIST:
+                if online_status[ip]:
+                    sock_lidar1.sendto(data, (ip, LIDAR1_PORT))
+                    lidar1_sent += 1
+            try:
+                current_avg20 = avg20 # 日間
+                current_avg30 = avg30 # 日間
+                if last_avg20 is not None and last_avg30 is not None and not trigger_pending:
+                 #   if (current_avg20 - last_avg20 > 50) : # 日間
+                 #   if (current_avg20 - last_avg20 > 50) or ((last_avg20 < 40)and(current_avg30 - last_avg30 > 50)): # 日夜間  # 本來這樣 暫時取消
+                    if (current_avg20 > 999999): # 日夜間 強制不執行
+                        print(current_avg20)
+                        print(last_avg20)
+                        def delayed_trigger():
+                            global trigger_active, last_trigger_time, trigger_pending
+                            time.sleep(T7)
+                            now = time.time()
+                            if now - last_trigger_time > 15:
+                                print(f"🚨 avg20/avg30 急降：{last_avg20}/{last_avg30} → {current_avg20}/{current_avg30}，T7 秒後觸發")
+                                trigger_active = True
+                                last_trigger_time = now
+                                threading.Thread(target=save_lidar_buffer, daemon=True).start()
+                            trigger_pending = False
+                        trigger_pending = True
+                        threading.Thread(target=delayed_trigger, daemon=True).start()
+                last_avg20 = current_avg20
+                last_avg30 = current_avg30
+            except Exception as e:
+                print(f"[ERROR] avg trigger 判斷錯誤: {e}")
+            if avg20 >= 0:
+                trigger_active = False
+        except socket.timeout:
+            print("[WARNING] 30秒未收到 LiDAR 封包，執行 relay_control_self()")
+            relay_control_self()
+        except Exception as e:
+            print(f"[ERROR] lidar1 接收錯誤: {e}")
+
+def lidar2():
+    global lidar2_sent
+    while True:
+        data, _ = sock_lidar2.recvfrom(1500)
+        for ip, _ in REMOTE_PC_LIST:
+            if online_status[ip]:
+                sock_lidar2.sendto(data, (ip, LIDAR2_PORT))
+                lidar2_sent += 1
+
+def print_status():
+    while True:
+        os.system('cls' if platform.system().lower() == 'windows' else 'clear')
+        print(f"  avg20 = {avg20} | 觸發中: {'是' if trigger_active else '否'}")
+        print(f"  ADXL355: {adxl_sent} | 圖像: {img_sent} | 像素: {pixel_sent}")
+        print(f"  LiDAR1: {lidar1_sent} | LiDAR2: {lidar2_sent}")
+        for ip, _ in REMOTE_PC_LIST:
+            status = "Online" if online_status[ip] else "Offline"
+            print(f"  {ip} : {status}")
+        time.sleep(10)
+
+def relay_control_listener():
+    relay_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    relay_sock.bind(('', RELAY_PORT))
+    while True:
+        data, addr = relay_sock.recvfrom(1024)
+        command = data.decode().strip().upper()
+        if command == "ON":
+            GPIO.output(RELAY_PIN, GPIO.HIGH)
+        elif command == "OFF":
+            GPIO.output(RELAY_PIN, GPIO.LOW)
+
+def relay_control_self():    
+    GPIO.output(RELAY_PIN, GPIO.LOW)
+    time.sleep(5)
+    GPIO.output(RELAY_PIN, GPIO.HIGH)
+    time.sleep(1)
+
+if __name__ == "__main__":
+    time.sleep(10)
+    setup_adxl355()
+    threading.Thread(target=ping_checker, daemon=True).start()
+    threading.Thread(target=send_adxl355, daemon=True).start()
+    threading.Thread(target=save_imu_log_periodically, daemon=True).start()
+    threading.Thread(target=send_camera, daemon=True).start()
+    threading.Thread(target=lidar1, daemon=True).start()
+    threading.Thread(target=lidar2, daemon=True).start()
+    threading.Thread(target=print_status, daemon=True).start()
+    threading.Thread(target=relay_control_listener, daemon=True).start()
+    threading.Thread(target=periodic_lidar_saver, daemon=True).start()
+    print("🟢 系統啟動中... Ctrl+C 可中斷")
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        sock_adxl.close()
+        sock_img.close()
+        sock_pixel.close()
+        sock_lidar1.close()
+        sock_lidar2.close()
+        print("🔴 手動中斷")
