@@ -38,7 +38,7 @@ void setup()
   delay(100);
   HC12.print("AT+B115200");
   delay(100);
-  HC12.print("AT+C057"); //127 for imu //117 for mag sensor gps //112 for mag sensor //107 for gps//097 for rtk // 087 for rasp power// 067 for seismograph// 057 for sar lidar
+  HC12.print("AT+C097"); //127 for imu //117 for mag sensor gps //112 for mag sensor //107 for gps//097 for rtk // 087 for rasp power// 067 for seismograph// 057 for sar lidar
   delay(100);
   HC12.print("AT+P8");
   delay(100);
@@ -56,7 +56,7 @@ void setup()
 //  delay(100);
 //  HC12.print("AT+B9600");
 //  delay(100);
-//  HC12.print("AT+C077"); //127 for imu //117 for mag sensor //107 for gps//097 for rtk // 087 for rasp power // 077 for mag power
+//  HC12.print("AT+C097"); //127 for imu //117 for mag sensor //107 for gps//097 for rtk // 087 for rasp power // 077 for mag power
 //  delay(100);
 //  HC12.print("AT+P8");
 //  delay(100);
