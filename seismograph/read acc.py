@@ -4,7 +4,9 @@ from datetime import datetime
 
 # 讀取資料
 # dataname = "temp_250821_99.txt"
-dataname = "temp_250822_84.txt"
+# dataname = "temp_250822_84.txt"perm_260304_0.txt
+dataname = "perm_260304_0.txt"
+
 file_path = r"C:\Users\sgrc - 325\Desktop\seismograph data\\" + dataname
 df = pd.read_csv(file_path, header=None, names=["timee","time", "ax", "ay", "az", "magnitude", "atemp", "events", "status", "f", "file"])
 markersizee = 0.1
