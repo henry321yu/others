@@ -7,9 +7,10 @@
 #include <SoftwareSerial.h> //HC12(mcu's rx、hc-12's tx,   mcu's tx、hc-12's rx) 
 #include "register.h"
 
-#define SAMPLE_HZ 100
+#define SAMPLE_HZ 200
 #define SAMPLE_INTERVAL_MS (1000 / SAMPLE_HZ)
-#define THRESHOLD_G 0.01
+//#define THRESHOLD_G 0.01
+#define THRESHOLD_G 999999
 #define SD_CS 10
 #define MAX_STORAGE_MEGABYTES 1860  // byte = mb*2^20  (100hz 38.75mb/hr )
 #define PRE_TRIGGER_SECONDS 40
@@ -161,8 +162,8 @@ void loop() {
 //  String data = String(nowmillis * 0.001, 3) + "," + timeStamp() + "," + acc_String_data + "," + String(events) + "," + statuss + "," + String(freq, 2) + "," + nowfile;
   String data = String(nowmillis * 0.001, 3) + "," + timeStamp() + "," + acc_String_data + "," + String(events) + "," + statuss + "," + String(freq, 2);
 
-  //  Serial.println(data);
-  HC12.println(data + "," + nowfile);
+//  Serial.println(data);
+//  HC12.println(data + "," + nowfile);
 
   if (!triggered) {
     // 儲存到 circular buffer
@@ -499,10 +500,10 @@ void timer_v2() {
 
     if (abs(freq - setF) > 1) {
       if (setF > freq) {
-        delayy -= (setF - freq) * 100;
+        delayy -= (setF - freq) * 10;
       }
       if (setF < freq) {
-        delayy += (freq - setF) * 100;
+        delayy += (freq - setF) * 10;
       }
       if (delayy > 10000) {
         delayy = 10000;
