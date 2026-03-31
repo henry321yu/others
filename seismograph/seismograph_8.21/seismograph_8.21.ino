@@ -171,7 +171,7 @@ void loop() {
 
   if (magnitude > 0.3) { //小型觸發燈
     beep_active = true;
-    beep_off_time = millis() + 200;  // 保持 200ms
+    beep_off_time = millis() + 100;  // 保持 200ms
   }
   if (beep_active) {
     if (millis() <= beep_off_time) {
