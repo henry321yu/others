@@ -67,9 +67,9 @@ class SeismicViewerApp:
         frame = tk.Frame(self.right)
         frame.pack()
 
-        tk.Button(frame,text="Z axis",command=lambda:self.open_single_axis('z')).pack(side=tk.LEFT,padx=5)
         tk.Button(frame,text="X axis",command=lambda:self.open_single_axis('x')).pack(side=tk.LEFT,padx=5)
         tk.Button(frame,text="Y axis",command=lambda:self.open_single_axis('y')).pack(side=tk.LEFT,padx=5)
+        tk.Button(frame,text="Z axis",command=lambda:self.open_single_axis('z')).pack(side=tk.LEFT,padx=5)
 
         self.load_files()
 
@@ -109,11 +109,10 @@ class SeismicViewerApp:
 
         self.file_listbox.delete(0,tk.END)
 
-        csv_files = glob.glob(os.path.join(self.data_dir,"*.csv"))
         txt_files = glob.glob(os.path.join(self.data_dir,"perm_*.txt"))
         txt_files += glob.glob(os.path.join(self.data_dir,"temp_*.txt"))
 
-        self.files = sorted(csv_files + txt_files)
+        self.files = sorted(txt_files)
 
         if not self.files:
             self.file_listbox.insert(tk.END,"No files")
@@ -147,22 +146,7 @@ class SeismicViewerApp:
         ext=os.path.splitext(filename)[1].lower()
 
         # -------- old instrument --------
-        if ext==".csv":
-
-            df=pd.read_csv(
-                filename,
-                comment="#",
-                sep=r"[,\s]+",
-                engine="python",
-                header=None,
-                names=['rel_time','datetime','z','x','y','r0','r1','r2'],
-                on_bad_lines='skip'
-            )
-
-            df['datetime']=pd.to_datetime(df['datetime'],errors='coerce')
-
-        # -------- new instrument --------
-        else:
+        if ext==".txt":
 
             df=pd.read_csv(
                 filename,
@@ -318,7 +302,7 @@ class SeismicViewerApp:
 
         time_str = dt.strftime("%H:%M:%S.%f")[:-3] if pd.notna(dt) else ""
 
-        cols=['v','z','x','y']
+        cols=['v','x','y','z']
 
         for i,ax in enumerate(self.axs):
 
