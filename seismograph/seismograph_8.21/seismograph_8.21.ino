@@ -12,7 +12,7 @@
 //#define THRESHOLD_G 0.01
 #define THRESHOLD_G 999999
 #define SD_CS 10
-#define MAX_STORAGE_MEGABYTES 1860  // byte = mb*2^20  (100hz 38.75mb/hr )
+#define MAX_STORAGE_MEGABYTES 12000 //1860  // byte = mb*2^20  (100hz 38.75mb/hr )
 #define PRE_TRIGGER_SECONDS 40
 #define BUFFER_SIZE (SAMPLE_HZ * PRE_TRIGGER_SECONDS * 100 / SAMPLE_HZ)
 #define SETT 1
@@ -75,7 +75,7 @@ void setup() {
 
   Serial.println("Initializing...");
 
-    Serial.println("" __FILE__ " " __DATE__ " " __TIME__);
+  Serial.println("" __FILE__ " " __DATE__ " " __TIME__);
   setSyncProvider(getTeensy3Time);
   if (timeStatus() != timeSet) {
     Serial.println("RTC time not set!");
@@ -163,11 +163,11 @@ void loop() {
   acc_data();
   float magnitude = sqrt((ax - int_ax) * (ax - int_ax) + (ay - int_ay) * (ay - int_ay) + (az - int_az) * (az - int_az));
   String acc_String_data = String(ax, 5) + "," + String(ay, 5) + "," + String(az, 5) + "," + String(magnitude, 5) + "," + String(atemp, 3);
-//  String data = String(nowmillis * 0.001, 3) + "," + timeStamp() + "," + acc_String_data + "," + String(events) + "," + statuss + "," + String(freq, 2) + "," + nowfile;
+  //  String data = String(nowmillis * 0.001, 3) + "," + timeStamp() + "," + acc_String_data + "," + String(events) + "," + statuss + "," + String(freq, 2) + "," + nowfile;
   String data = String(nowmillis * 0.001, 3) + "," + timeStamp() + "," + acc_String_data + "," + String(events) + "," + statuss + "," + String(freq, 2);
 
-//  Serial.println(data);
-//  HC12.println(data + "," + nowfile);
+  //  Serial.println(data);
+  //  HC12.println(data + "," + nowfile);
 
   if (magnitude > 0.3) { //小型觸發燈
     beep_active = true;
@@ -181,7 +181,7 @@ void loop() {
       beep_active = false;
     }
   }
-  
+
   if (!triggered) {
     // 儲存到 circular buffer
     preTriggerBuffer[bufferIndex] = data;
@@ -330,7 +330,7 @@ String nextLogFileName() {
     entry.close();
   }
 
-  return base + "_" + String(maxIndex + 1) + ".txt";
+  return base + "_" + twoDigit(maxIndex + 1) + ".txt";
 }
 
 String nextLogFileName_perm() {
@@ -360,7 +360,7 @@ String nextLogFileName_perm() {
     entry.close();
   }
 
-  return base + "_" + String(maxIndex + 1) + ".txt";
+  return base + "_" + twoDigit(maxIndex + 1) + ".txt";
 }
 
 
