@@ -257,9 +257,9 @@ class SeismicViewerApp:
             self.annotations.append(txt)
             self.cursor_dots.append(dot)
 
-        pga=df['v'].abs().max()
+        peak=df['v'].abs().max()
 
-        self.axs[0].set_title(f"{name}   Peak: {pga:.3f} g")
+        self.axs[0].set_title(f"{name}   Peak: {peak:.3f} g")
 
         self.axs[-1].set_xlabel("Time (sec)")
 
