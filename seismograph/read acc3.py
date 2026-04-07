@@ -370,6 +370,7 @@ class SeismicViewerApp:
 
         win=tk.Toplevel(self.root)
 
+        win.title(axis)
         win.geometry("900x600")
 
         fig,ax=plt.subplots()
@@ -384,6 +385,8 @@ class SeismicViewerApp:
 
         ax.plot(t,v)
 
+        peak=v.abs().max()
+        ax.set_title(f"axis: {axis}   Peak: {peak:.3f} g")
         ax.set_xlabel("Time")
         ax.set_ylabel("g")
         ax.grid(True)
