@@ -280,6 +280,11 @@ class SeismicViewerApp:
         self.axs[-1].set_xlabel("Time (sec)")
 
         self.fig.tight_layout()
+        xmin = df['rel_time'].min()
+        xmax = df['rel_time'].max()
+
+        for ax in self.axs:
+            ax.set_xlim(xmin, xmax)
 
         self.canvas.draw()
 
@@ -398,6 +403,10 @@ class SeismicViewerApp:
         ax.set_xlabel("Time")
         ax.set_ylabel("gal")
         ax.grid(True)
+        
+        xmin = t.min()
+        xmax = t.max()
+        ax.set_xlim(xmin, xmax)
 
         # ===== 加入游標 + 縮放 =====
 
