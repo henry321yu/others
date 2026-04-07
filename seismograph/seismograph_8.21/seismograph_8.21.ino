@@ -284,6 +284,11 @@ void loop() {
 String twoDigit(int num) {
   return (num < 10 ? "0" : "") + String(num);
 }
+String threeDigit(int num) {
+  if (num < 10) return "00" + String(num);
+  if (num < 100) return "0" + String(num);
+  return String(num);
+}
 
 String timeStamp() {
   time_t t = now();  // 使用 RTC 時間確保跨日正確
@@ -330,7 +335,7 @@ String nextLogFileName() {
     entry.close();
   }
 
-  return base + "_" + twoDigit(maxIndex + 1) + ".txt";
+  return base + "_" + threeDigit(maxIndex + 1) + ".txt";
 }
 
 String nextLogFileName_perm() {
@@ -360,7 +365,7 @@ String nextLogFileName_perm() {
     entry.close();
   }
 
-  return base + "_" + twoDigit(maxIndex + 1) + ".txt";
+  return base + "_" + threeDigit(maxIndex + 1) + ".txt";
 }
 
 
