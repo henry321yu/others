@@ -70,6 +70,7 @@ class SeismicViewerApp:
         tk.Button(frame,text="X axis",command=lambda:self.open_single_axis('x')).pack(side=tk.LEFT,padx=5)
         tk.Button(frame,text="Y axis",command=lambda:self.open_single_axis('y')).pack(side=tk.LEFT,padx=5)
         tk.Button(frame,text="Z axis",command=lambda:self.open_single_axis('z')).pack(side=tk.LEFT,padx=5)
+        tk.Button(frame,text="Total Bias",command=lambda:self.open_single_axis('bias')).pack(side=tk.LEFT,padx=5)
 
         self.load_files()
 
@@ -171,6 +172,8 @@ class SeismicViewerApp:
             df['x']*=scale
             df['y']*=scale
             df['z']*=scale
+
+            df['bias']=pd.to_numeric(df['bias'],errors='coerce')  # 使用bia資料
 
         for c in ['rel_time','x','y','z']:
             df[c]=pd.to_numeric(df[c],errors='coerce')
@@ -437,7 +440,7 @@ class SeismicViewerApp:
                 return
 
             center=event.xdata
-            scale=1.1
+            scale=1.3
 
             factor=1/scale if event.step>0 else scale
 
