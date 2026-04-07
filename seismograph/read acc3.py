@@ -155,9 +155,11 @@ class SeismicViewerApp:
                 sep=r"[,\s]+",
                 engine="python",
                 header=None,
-                names=['epoch','z','x','y','r0','r1','r2'],
+                names=['rel_time','datetime','z','x','y','r0','r1','r2'],
                 on_bad_lines='skip'
             )
+
+            df['datetime']=pd.to_datetime(df['datetime'],errors='coerce')
 
         # -------- new instrument --------
         else:
@@ -175,29 +177,25 @@ class SeismicViewerApp:
 
             df['datetime']=pd.to_datetime(df['datetime'],errors='coerce')
 
-            df['epoch']=df['datetime'].astype('int64')/1e9
+            df['rel_time']=pd.to_numeric(df['cpu'],errors='coerce')
 
             df['x']=pd.to_numeric(df['ax'],errors='coerce')
             df['y']=pd.to_numeric(df['ay'],errors='coerce')
             df['z']=pd.to_numeric(df['az'],errors='coerce')
 
-            # g → gal
             scale=980.665
             df['x']*=scale
             df['y']*=scale
             df['z']*=scale
 
-        for c in ['epoch','x','y','z']:
+        for c in ['rel_time','x','y','z']:
             df[c]=pd.to_numeric(df[c],errors='coerce')
 
-        df.dropna(subset=['epoch','x','y','z'],inplace=True)
+        df.dropna(subset=['rel_time','x','y','z'],inplace=True)
         df.reset_index(drop=True,inplace=True)
 
         if len(df)==0:
             return None
-
-        t0=df['epoch'].iloc[0]
-        df['rel_time']=df['epoch']-t0
 
         df['v']=np.sqrt(df['x']**2+df['y']**2+df['z']**2)
 
@@ -311,9 +309,9 @@ class SeismicViewerApp:
         idx=(np.abs(self.df['rel_time']-x)).argmin()
 
         t=self.df['rel_time'].iloc[idx]
-        epoch=self.df['epoch'].iloc[idx]
+        dt=self.df['datetime'].iloc[idx]
 
-        time_str=datetime.datetime.fromtimestamp(epoch).strftime("%H:%M:%S.%f")[:-3]
+        time_str = dt.strftime("%H:%M:%S.%f")[:-3] if pd.notna(dt) else ""
 
         cols=['v','z','x','y']
 
@@ -400,6 +398,70 @@ class SeismicViewerApp:
         ax.set_xlabel("Time")
         ax.set_ylabel("gal")
         ax.grid(True)
+
+        # ===== 加入游標 + 縮放 =====
+
+        line=ax.axvline(0,color='black',linestyle=':')
+        line.set_visible(False)
+
+        dot,=ax.plot([],[],'o',color='black')
+        dot.set_visible(False)
+
+        txt=ax.text(0.02,0.9,"",
+                    transform=ax.transAxes,
+                    bbox=dict(boxstyle="round",fc="white",alpha=0.5))
+        txt.set_visible(False)
+
+        def on_move(event):
+
+            if event.xdata is None:
+                line.set_visible(False)
+                dot.set_visible(False)
+                txt.set_visible(False)
+                canvas.draw_idle()
+                return
+
+            x=event.xdata
+            idx=(np.abs(self.df['rel_time']-x)).argmin()
+
+            t=self.df['rel_time'].iloc[idx]
+            val=self.df[axis].iloc[idx]
+            dt=self.df['datetime'].iloc[idx]
+
+            time_str = dt.strftime("%H:%M:%S.%f")[:-3] if pd.notna(dt) else ""
+
+            line.set_xdata([t])
+            line.set_visible(True)
+
+            dot.set_data([t],[val])
+            dot.set_visible(True)
+
+            txt.set_text(f"{t:.2f}s {time_str}\n{val:.2f} gal")
+            txt.set_visible(True)
+
+            canvas.draw_idle()
+
+        def on_scroll(event):
+
+            if event.xdata is None:
+                return
+
+            center=event.xdata
+            scale=1.1
+
+            factor=1/scale if event.step>0 else scale
+
+            xmin,xmax=ax.get_xlim()
+
+            new_width=(xmax-xmin)*factor
+            new_xmin=center-(center-xmin)*factor
+
+            ax.set_xlim(new_xmin,new_xmin+new_width)
+
+            canvas.draw_idle()
+
+        canvas.mpl_connect("motion_notify_event",on_move)
+        canvas.mpl_connect("scroll_event",on_scroll)
 
         canvas.draw()
 
