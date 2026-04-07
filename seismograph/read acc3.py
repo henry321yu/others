@@ -183,7 +183,7 @@ class SeismicViewerApp:
             df['y']=pd.to_numeric(df['ay'],errors='coerce')
             df['z']=pd.to_numeric(df['az'],errors='coerce')
 
-            scale=980.665
+            scale=1
             df['x']*=scale
             df['y']*=scale
             df['z']*=scale
@@ -245,15 +245,15 @@ class SeismicViewerApp:
         self.annotations=[]
         self.cursor_dots=[]
 
-        cols=['v','z','x','y']
+        cols=['v','x','y','z']
         colors=['blue','red','green','purple']
-        labels=['Vector','Z','X','Y']
+        labels=['Vector','X','Y','Z']
 
         for i,ax in enumerate(self.axs):
 
             ax.plot(df['rel_time'],df[cols[i]],color=colors[i],lw=1)
 
-            ax.set_ylabel("gal")
+            ax.set_ylabel(labels[i])
             ax.grid(True)
 
             line=ax.axvline(0,color='black',linestyle=':')
@@ -275,7 +275,7 @@ class SeismicViewerApp:
 
         pga=df['v'].abs().max()
 
-        self.axs[0].set_title(f"{name}   Max PGA: {pga:.3f} gal")
+        self.axs[0].set_title(f"{name}   Peak: {pga:.3f} g")
 
         self.axs[-1].set_xlabel("Time (sec)")
 
@@ -331,7 +331,7 @@ class SeismicViewerApp:
             self.cursor_dots[i].set_visible(True)
 
             self.annotations[i].set_text(
-                f"{t:.3f}s {time_str}\n{val:.3f} gal"
+                f"{t:.3f}s {time_str}\n{val:.3f} g"
             )
 
             self.annotations[i].set_visible(True)
@@ -357,10 +357,7 @@ class SeismicViewerApp:
 
         scale=1.1
 
-        if event.step>0:
-            factor=1/scale
-        else:
-            factor=scale
+        factor=1/scale if event.step>0 else scale
 
         for ax in self.axs:
 
@@ -401,7 +398,7 @@ class SeismicViewerApp:
         ax.plot(t,v)
 
         ax.set_xlabel("Time")
-        ax.set_ylabel("gal")
+        ax.set_ylabel("g")
         ax.grid(True)
         
         xmin = t.min()
@@ -445,7 +442,7 @@ class SeismicViewerApp:
             dot.set_data([t],[val])
             dot.set_visible(True)
 
-            txt.set_text(f"{t:.2f}s {time_str}\n{val:.2f} gal")
+            txt.set_text(f"{t:.3f}s {time_str}\n{val:.3f} g")
             txt.set_visible(True)
 
             canvas.draw_idle()
