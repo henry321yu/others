@@ -260,7 +260,7 @@ class SeismicViewerApp:
             line.set_visible(False)
 
             txt=ax.text(
-                0.02,0.9,"",
+                0.01,0.7,"",
                 transform=ax.transAxes,
                 bbox=dict(boxstyle="round",fc="white",alpha=0.5)
             )
@@ -275,7 +275,7 @@ class SeismicViewerApp:
 
         pga=df['v'].abs().max()
 
-        self.axs[0].set_title(f"{name}   PGA {pga:.1f} gal")
+        self.axs[0].set_title(f"{name}   Max PGA: {pga:.3f} gal")
 
         self.axs[-1].set_xlabel("Time (sec)")
 
@@ -331,7 +331,7 @@ class SeismicViewerApp:
             self.cursor_dots[i].set_visible(True)
 
             self.annotations[i].set_text(
-                f"{t:.2f}s {time_str}\n{val:.2f} gal"
+                f"{t:.3f}s {time_str}\n{val:.3f} gal"
             )
 
             self.annotations[i].set_visible(True)
