@@ -13,7 +13,7 @@
 #define SD_CS 10
 #define MAX_STORAGE_MEGABYTES 1860  // byte = mb*2^20  (100hz 38.75mb/hr )
 #define PRE_TRIGGER_SECONDS 20
-#define BUFFER_SIZE (SAMPLE_HZ * PRE_TRIGGER_SECONDS * 100 / SAMPLE_HZ)
+#define BUFFER_SIZE (SAMPLE_HZ * PRE_TRIGGER_SECONDS)
 #define SETT 1
 //#define SETT 0.1 //for testing
 
@@ -158,11 +158,11 @@ void loop() {
   acc_data();
   float magnitude = sqrt((ax - int_ax) * (ax - int_ax) + (ay - int_ay) * (ay - int_ay) + (az - int_az) * (az - int_az));
   String acc_String_data = String(ax, 5) + "," + String(ay, 5) + "," + String(az, 5) + "," + String(magnitude, 5) + "," + String(atemp, 3);
-  //  String data = String(nowmillis * 0.001, 3) + "," + timeStamp() + "," + acc_String_data + "," + String(events) + "," + statuss + "," + String(freq, 2) + "," + nowfile;
+//  String data = String(nowmillis * 0.001, 3) + "," + timeStamp() + "," + acc_String_data + "," + String(events) + "," + statuss + "," + String(freq, 2) + "," + nowfile;
   String data = String(nowmillis * 0.001, 3) + "," + timeStamp() + "," + acc_String_data + "," + String(events) + "," + statuss + "," + String(freq, 2);
 
-  //  Serial.println(data);
-  //  HC12.println(data + "," + nowfile);
+//  Serial.println(data);
+//  HC12.println(data + "," + nowfile);
 
   if (!triggered) {
     // 儲存到 circular buffer
@@ -214,31 +214,44 @@ void loop() {
       triggerEndTime = nowmillis + 2UL * 60 * 1000 * SETT;  // ➜ 再加 2 分鐘
       Serial.printf("End perm file at %ds...\n", triggerEndTime / 1000);
     }
-
     if (!pf) {
       pf = SD.open(currentPermFile.c_str(), FILE_WRITE);
       if (!pf) {
         Serial.println("⚠ 無法寫入 perm 檔案：" + currentPermFile);
       }
     }
+    // 第一次觸發後先儲存過去 1 分鐘資料
+    if (!preTriggerSaved) {
+      if (pf) {
+        for (int i = 0; i < BUFFER_SIZE; i++) {
+          int index = (bufferIndex + i) % BUFFER_SIZE;
+          if (preTriggerBuffer[index].length() > 0)
+            pf.println(preTriggerBuffer[index]);
+        }
+        preTriggerSaved = true;
+        Serial.println("✅ PreDataSaved.");
+        Serial.println("Saving next 2 min data...");
+      }
+    }
 
+    // 觸發期間持續寫入
     if (nowmillis <= triggerEndTime) {
+      if (!pf) {
+        pf = SD.open(currentPermFile.c_str(), FILE_WRITE);
+        if (!pf) {
+          Serial.println("⚠ 無法寫入 perm 檔案：" + currentPermFile);
+        }
+      }
       if (pf) {
         pf.println(data);
       }
     }
 
+    // 觸發結束
     if (nowmillis >= triggerEndTime) {
       triggered = false;
       digitalWrite(beeper, LOW);
-      if (pf) {
-        pf.flush();
-        pf.close();
-      }
       Serial.println("✅ Trigger recording completed.");
-      Serial.println("🔧 Rebuilding file with prebuffer...");
-
-      rebuildFileWithPrebuffer();
       switchTempLogFile();
     }
   }
@@ -257,26 +270,12 @@ String twoDigit(int num) {
 }
 
 String timeStamp() {
-  time_t t = now();
-
-  // ⭐ 當 RTC 秒變化時，記錄 millis 對齊點
-  if (t != last_rtc_second) {
-    last_rtc_second = t;
-    millis_at_last_second = millis();
-  }
-
-  // ⭐ 用 delta 算 ms（不直接 %1000）
-  int ms = millis() - millis_at_last_second;
-
-  // 防止 overflow 或異常
-  if (ms < 0) ms = 0;
-  if (ms > 999) ms = 999;
-
+  time_t t = now();  // 使用 RTC 時間確保跨日正確
+  int ms = ((unsigned long)nowmillis) % 1000;  // 修正餘數計算
   char buf[32];
   sprintf(buf, "%04d-%02d-%02d %02d:%02d:%02d.%03d",
           year(t), month(t), day(t),
           hour(t), minute(t), second(t), ms);
-
   return String(buf);
 }
 
@@ -530,38 +529,4 @@ void listSDContents() {
     Serial.println(" bytes");
     entry.close();
   }
-}
-void rebuildFileWithPrebuffer() {
-  String newFileName = "tmp_" + currentPermFile;
-
-  File newFile = SD.open(newFileName.c_str(), FILE_WRITE);
-  if (!newFile) {
-    Serial.println("❌ 無法建立新檔案");
-    return;
-  }
-
-  // 1️⃣ 寫入 pre-trigger buffer
-  for (int i = 0; i < BUFFER_SIZE; i++) {
-    int index = (bufferIndex + i) % BUFFER_SIZE;
-    if (preTriggerBuffer[index].length() > 0) {
-      newFile.println(preTriggerBuffer[index]);
-    }
-  }
-
-  // 2️⃣ 接上原本 perm 檔
-  File oldFile = SD.open(currentPermFile.c_str(), FILE_READ);
-  if (oldFile) {
-    while (oldFile.available()) {
-      newFile.write(oldFile.read());
-    }
-    oldFile.close();
-  }
-
-  newFile.close();
-
-  // 3️⃣ 替換檔案（保持 perm_xxx.txt）
-  SD.remove(currentPermFile.c_str());
-  SD.rename(newFileName.c_str(), currentPermFile.c_str());
-
-  Serial.println("✅ Prebuffer appended to file head.");
 }
