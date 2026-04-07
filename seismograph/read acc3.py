@@ -260,8 +260,7 @@ class SeismicViewerApp:
             self.annotations.append(txt)
             self.cursor_dots.append(dot)
 
-        peak=df['v'].abs().max()
-
+        peak = df['v'].loc[df['v'].abs().idxmax()]
         self.axs[0].set_title(f"{name}   Peak: {peak:.3f} g")
 
         self.axs[-1].set_xlabel("Time (sec)")
@@ -383,9 +382,9 @@ class SeismicViewerApp:
         t=self.df['rel_time']
         v=self.df[axis]
 
-        ax.plot(t,v)
+        ax.plot(t,v,lw=1)
 
-        peak=v.abs().max()
+        peak = v.loc[v.abs().idxmax()]
         ax.set_title(f"axis: {axis}   Peak: {peak:.3f} g")
         ax.set_xlabel("Time")
         ax.set_ylabel("g")
