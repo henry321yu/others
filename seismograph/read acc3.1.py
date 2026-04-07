@@ -172,6 +172,8 @@ class SeismicViewerApp:
             df['y']*=scale
             df['z']*=scale
 
+            df['bia']=pd.to_numeric(df['bias'],errors='coerce')  # 使用bia資料
+
         for c in ['rel_time','x','y','z']:
             df[c]=pd.to_numeric(df[c],errors='coerce')
 
@@ -229,9 +231,9 @@ class SeismicViewerApp:
         self.annotations=[]
         self.cursor_dots=[]
 
-        cols=['v','x','y','z']
+        cols=['bia','x','y','z']
         colors=['blue','red','green','purple']
-        labels=['Vector','X','Y','Z']
+        labels=['Bia','X','Y','Z']
 
         for i,ax in enumerate(self.axs):
 
@@ -257,9 +259,9 @@ class SeismicViewerApp:
             self.annotations.append(txt)
             self.cursor_dots.append(dot)
 
-        pga=df['v'].abs().max()
+        peak=df['bia'].abs().max()
 
-        self.axs[0].set_title(f"{name}   Peak: {pga:.3f} g")
+        self.axs[0].set_title(f"{name}   Peak: {peak:.3f} g")
 
         self.axs[-1].set_xlabel("Time (sec)")
 
@@ -302,7 +304,7 @@ class SeismicViewerApp:
 
         time_str = dt.strftime("%H:%M:%S.%f")[:-3] if pd.notna(dt) else ""
 
-        cols=['v','x','y','z']
+        cols=['bia','x','y','z']
 
         for i,ax in enumerate(self.axs):
 
