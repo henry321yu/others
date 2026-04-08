@@ -1,5 +1,6 @@
 import serial
 import os
+import time
 
 PORT = 'COM12'
 BAUD = 921600
@@ -89,6 +90,7 @@ ser.write(b"CONFIRM\n")
 current_file = None
 remaining_bytes = 0
 current_filename = None
+file_start_time = 0
 
 while True:
     line = read_line()
@@ -96,23 +98,61 @@ while True:
     if line.startswith("FILE:"):
         current_filename = line.replace("FILE:", "")
         filepath = os.path.join(OUTPUT_DIR, current_filename)
-        current_file = open(filepath, "wb")
-        print("Receiving:", current_filename)
+
+        # 檢查是否 skip
+        skip = False
+        expected_size = None
+
+        # 從已知 list 找 size
+        for name, size in file_list:
+            if name == current_filename:
+                expected_size = size
+                if os.path.exists(filepath) and os.path.getsize(filepath) == size:
+                    skip = True
+                break
+
+        if skip:
+            print(f"Skip: {current_filename} ({format_size(expected_size)})")
+            current_file = None
+            remaining_bytes = 0
+        else:
+            current_file = open(filepath, "wb")
+            file_start_time = time.time()
+            print(f"Receiving: {current_filename} ({format_size(expected_size) if expected_size else ''})")
 
     elif line.startswith("SIZE:"):
         remaining_bytes = int(line.replace("SIZE:", ""))
+
+        total_received = 0
 
         while remaining_bytes > 0:
             chunk = ser.read(min(BUFFER_SIZE, remaining_bytes))
             if not chunk:
                 continue
 
-            current_file.write(chunk)
-            remaining_bytes -= len(chunk)
+            if current_file:
+                current_file.write(chunk)
 
-        current_file.close()
+            remaining_bytes -= len(chunk)
+            total_received += len(chunk)
+
+            # 顯示速度（每秒更新一次）
+            elapsed = time.time() - file_start_time
+            if elapsed > 0:
+                speed = (total_received / (1024 )) / elapsed
+                # print(f"\rSpeed: {speed:.2f} KB/s", end="")
+
+        if current_file:
+            current_file.close()
+
+            elapsed = time.time() - file_start_time
+            size_mb = total_received / (1024 * 1024)
+            speed = size_mb / elapsed if elapsed > 0 else 0
+
+            print(f"Saved: {current_filename} ({format_size(total_received)}) @ {speed:.2f} MB/s")
+
         current_file = None
-        print("Saved:", current_filename)
+        remaining_bytes = 0
 
     elif line == "DONE":
         print("\nTransfer complete")
