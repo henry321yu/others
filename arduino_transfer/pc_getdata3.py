@@ -144,8 +144,8 @@ while True:
             if current_file and file_start_time:
                 elapsed = time.time() - file_start_time
                 if elapsed > 0:
-                    speed = (total_received / (1024 * 1024)) / elapsed
-                    print(f"\rSpeed: {speed:.2f} MB/s", end="")
+                    speed = total_received / elapsed
+                    print(f"\rReceived: {format_size(total_received)}  Speed: {format_size(speed)}/s", end="")
 
         if current_file:
             current_file.close()
@@ -153,11 +153,11 @@ while True:
             elapsed = time.time() - file_start_time
             speed = (total_received / (1024 * 1024)) / elapsed if elapsed > 0 else 0
 
-            # print(f"\nSaved: {current_filename} ({format_size(total_received)}) @ {speed:.2f} MB/s")
             print(f"\nSaved: {current_filename} ({format_size(total_received)})")
 
         ser.write(b"ACK\n")
 
     elif line == "DONE":
         print("\nTransfer complete")
+        time.sleep(2)
         break
