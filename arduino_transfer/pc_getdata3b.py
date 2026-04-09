@@ -168,7 +168,8 @@ while True:
                 elapsed = time.time() - file_start_time
                 if elapsed > 0:
                     speed = total_received / elapsed
-                    print(f"\rReceived: {format_size(total_received)}  Speed: {format_size(speed)}/s", end="")
+                    line = f"Received: {format_size(total_received)}  Speed: {format_size(speed)}/s"
+                    print("\r" + line.ljust(80), end="")
 
         if current_file:
             current_file.close()
