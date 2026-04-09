@@ -153,16 +153,25 @@ while True:
         remaining_bytes = int(line.split(":")[1])
         total_received = 0
 
+        last_data_time = time.time()
         while remaining_bytes > 0:
             chunk = ser.read(min(BUFFER_SIZE, remaining_bytes))
-            if not chunk:
-                continue
+            if chunk:
+                last_data_time = time.time()
 
-            if current_file:
-                current_file.write(chunk)
+                if current_file:
+                    current_file.write(chunk)
 
-            remaining_bytes -= len(chunk)
-            total_received += len(chunk)
+                remaining_bytes -= len(chunk)
+                total_received += len(chunk)
+
+            else:
+                # ⚠️ 超過 timeout → 視為傳輸結束
+                if time.time() - last_data_time > 2:
+                    print("\n[WARN] Timeout waiting for remaining data")
+                    if remaining_bytes != 0:
+                        print(f"[WARN] Missing {remaining_bytes} bytes")
+                    break
 
             if current_file and file_start_time:
                 elapsed = time.time() - file_start_time
@@ -171,15 +180,18 @@ while True:
                     line = f"Received: {format_size(total_received)}  Speed: {format_size(speed)}/s"
                     print("\r" + line.ljust(80), end="")
 
+
         if current_file:
             current_file.close()
 
             elapsed = time.time() - file_start_time
             speed = (total_received / (1024 * 1024)) / elapsed if elapsed > 0 else 0
 
-            print(f"\nSaved: {current_filename} ({format_size(total_received)})")
+            print('\r' + ' ' * (len(line)) + '\r', end='')
+            print(f"Saved: {current_filename} ({format_size(total_received)})")
 
         ser.write(b"ACK\n")
+        ser.reset_input_buffer()
 
     elif line == "DONE":
         print("\nTransfer complete")
