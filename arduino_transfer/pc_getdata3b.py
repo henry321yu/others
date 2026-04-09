@@ -66,11 +66,34 @@ while True:
         print(f"Total size: {format_size(total_size)}\n")
 
     elif line.startswith("FILE:"):
-        name_size = line.replace("FILE:", "")
-        name, size = name_size.split(",")
-        size = int(size)
+        name_size = line[len("FILE:"):].strip()
 
-        name = name.strip().split("/")[-1]  # ✅ normalize
+        # ===== 基本格式檢查 =====
+        if "," not in name_size:
+            print(f"[WARN] Corrupted FILE line (no comma): {repr(line)}")
+            continue
+
+        parts = name_size.split(",", 1)
+
+        if len(parts) != 2:
+            print(f"[WARN] Corrupted FILE line (split error): {repr(line)}")
+            continue
+
+        name, size_str = parts
+
+        name = name.strip().split("/")[-1]
+
+        # ===== size 轉換保護 =====
+        try:
+            size = int(size_str.strip())
+        except ValueError:
+            print(f"[WARN] Invalid size in FILE line: {repr(line)}")
+            continue
+
+        # ===== 過濾奇怪檔名（可選但建議）=====
+        if not name or any(ord(c) < 32 for c in name):
+            print(f"[WARN] Invalid filename: {repr(name)}")
+            continue
 
         file_list.append((name, size))
         print(f"{name} ({format_size(size)})")
