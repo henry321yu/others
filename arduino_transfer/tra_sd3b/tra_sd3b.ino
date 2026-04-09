@@ -168,8 +168,8 @@ void loop() {
       Serial.write(buffer, n);
     }
 
-//    Serial.println();
-//    Serial.println("END_FILE");
+    Serial.println();
+    Serial.println("END_FILE");
 
     // Wait ACK
     if (!waitForResponse("ACK")) {
