@@ -11,6 +11,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 ser = serial.Serial(PORT, BAUD, timeout=1)
 
 BUFFER_SIZE = 4096
+SIZE_THRESHOLD = 1 * 1024 * 1024  # 1MB
 
 
 def format_size(size_bytes):
@@ -108,6 +109,7 @@ ser.write(b"CONFIRM\n")
 current_file = None
 file_start_time = None
 total_received = 0
+had_timeout = False
 
 while True:
     line = read_line()
@@ -125,7 +127,8 @@ while True:
         for name, size in file_list:
             if name == current_filename:
                 expected_size = size
-                if os.path.exists(filepath) and os.path.getsize(filepath) == size:
+                if size >= SIZE_THRESHOLD or (os.path.exists(filepath) and os.path.getsize(filepath) == size):
+                # if os.path.exists(filepath) and os.path.getsize(filepath) == size:
                     skip = True
                 break
 
@@ -171,6 +174,7 @@ while True:
                     print("\n[WARN] Timeout waiting for remaining data")
                     if remaining_bytes != 0:
                         print(f"[WARN] Missing {remaining_bytes} bytes")
+                        had_timeout = True
                     break
 
             if current_file and file_start_time:
@@ -195,5 +199,25 @@ while True:
 
     elif line == "DONE":
         print("\nTransfer complete")
-        time.sleep(2)
-        break
+
+        if had_timeout:
+            print("[INFO] Timeout occurred in this session. Continuing for verification...")
+            had_timeout = False
+
+            # 重啟整個流程（重新 HELLO + START）
+            ser.write(b"HELLO\n")
+
+            while True:
+                line = read_line()
+                if line == "READY":
+                    print("Teensy ready again")
+
+                    ser.write(b"START\n")
+                    break
+
+            # 清空 buffer 避免殘留
+            continue
+        else:
+            print("[INFO] No timeout detected. Exiting cleanly.")
+            time.sleep(2)
+            break
