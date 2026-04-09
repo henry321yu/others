@@ -61,6 +61,9 @@ SdCard* m_card = nullptr;
 //------------------------------------------------------------------------------
 #define sdError(msg) {cout << F("error: ") << F(msg) << endl; sdErrorHalt();}
 //------------------------------------------------------------------------------
+
+const int led = 13;
+
 void sdErrorHalt() {
   if (!m_card) {
     cout << F("Invalid SD_CONFIG") << endl;
@@ -155,8 +158,7 @@ void printConfig(SdioConfig config) {
 //------------------------------------------------------------------------------
 void setup() {
   Serial.begin(9600);
-
-  const int led = 13;
+  
   pinMode(led, OUTPUT);
 
   cout << F("\nWaiting for Serial connection stable for 5 seconds...\n");
@@ -171,10 +173,11 @@ void setup() {
     // 如果 Serial 中斷，重新計時
     if (Serial) {
       // LED 閃爍
-      digitalWrite(led, (millis() / 100) % 2);
+      digitalWrite(led, (millis() / 50) % 2);
+      cout << F("ABOUT TO ERASE AND FORMAT THE SD CARD ....\n");
     }
     else {
-      start = millis();
+      start = millis();      
     }
     digitalWrite(led, (millis() / 1000) % 2);
   }
@@ -245,4 +248,5 @@ void setup() {
   formatCard();
 }
 void loop() {
+  digitalWrite(led, LOW);
 }
