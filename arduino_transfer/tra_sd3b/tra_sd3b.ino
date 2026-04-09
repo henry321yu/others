@@ -52,7 +52,6 @@ void loop() {
     if (cmd == "HELLO") {
       Serial.println("READY");
       startTransfer = false;
-      return;
     }
 
     if (cmd == "START") {
@@ -170,9 +169,6 @@ void loop() {
       Serial.write(buffer, n);
       Serial.flush();
     }
-
-//    Serial.println();
-//    Serial.println("END_FILE");
 
     // Wait ACK
     if (!waitForResponse("ACK")) {
