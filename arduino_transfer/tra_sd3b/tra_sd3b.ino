@@ -61,8 +61,8 @@ void loop() {
   }
 
   if (!startTransfer) {
+    delay(3000);
     Serial.println("READY");
-    delay(1000);
     return;
   }
 
@@ -139,6 +139,7 @@ void loop() {
     Serial.print(filename);
     Serial.print(",");
     Serial.println(fileSize);
+    Serial.flush();
 
     String response = "";
     unsigned long start = millis();
@@ -162,22 +163,24 @@ void loop() {
     // ===== Send file =====
     Serial.print("SIZE:");
     Serial.println(fileSize);
+    Serial.flush();
 
     while (entry.available()) {
       int n = entry.read(buffer, BUFFER_SIZE);
       Serial.write(buffer, n);
+      Serial.flush();
     }
 
-    Serial.println();
-    Serial.println("END_FILE");
+//    Serial.println();
+//    Serial.println("END_FILE");
 
     // Wait ACK
     if (!waitForResponse("ACK")) {
+      delay(3000);
       Serial.println("READY");
       startTransfer = false;
       return;
     }
-
     entry.close();
   }
 
