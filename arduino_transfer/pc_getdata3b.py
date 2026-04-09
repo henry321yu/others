@@ -11,7 +11,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 ser = serial.Serial(PORT, BAUD, timeout=1)
 
 BUFFER_SIZE = 4096
-SIZE_THRESHOLD = 1 * 1024 * 1024  # 1MB
+SIZE_THRESHOLD = 4 * 1024 **3  # 1MB
 
 
 def format_size(size_bytes):
@@ -150,8 +150,8 @@ while True:
         for name, size in file_list:
             if name == current_filename:
                 expected_size = size
-                # if size < SIZE_THRESHOLD or (os.path.exists(filepath) and os.path.getsize(filepath) == size):
-                if os.path.exists(filepath) and os.path.getsize(filepath) == size:
+                if size >= SIZE_THRESHOLD or (os.path.exists(filepath) and os.path.getsize(filepath) == size):
+                # if os.path.exists(filepath) and os.path.getsize(filepath) == size:
                     skip = True
                 break
 
@@ -242,5 +242,5 @@ while True:
             continue
         else:
             print("[INFO] No timeout detected. Exiting cleanly.")
-            time.sleep(2)
+            time.sleep(5)
             break
