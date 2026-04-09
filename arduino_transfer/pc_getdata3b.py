@@ -27,6 +27,8 @@ def format_size(size_bytes):
     else:
         return f"{size_bytes/1024**3:.2f} GB"
 
+def clean_text(s):
+    return ''.join(ch for ch in s if ord(ch) >= 32).strip()
 
 def read_line():
     line = b""
@@ -36,8 +38,19 @@ def read_line():
             break
         if c:
             line += c
-    return line.decode(errors='ignore').strip()
+    return clean_text(line.decode(errors='ignore'))
 
+def is_valid_filename(name):
+    try:
+        name.encode('ascii')  # 或 utf-8
+    except:
+        return False
+
+    # 過濾不可見字元
+    if any(ord(c) < 32 for c in name):
+        return False
+
+    return True
 
 # ===== HELLO (reconnect safe) =====
 ser.write(b"HELLO\n")
@@ -118,6 +131,16 @@ while True:
         raw_name = line.replace("FILE:", "")
         current_filename = raw_name.split(",")[0].strip().split("/")[-1]
 
+        if (
+            not is_valid_filename(current_filename) or
+            current_filename == "" or
+            len(current_filename) > 255 or
+            not current_filename.endswith(".TXT")
+        ):
+            print(f"[AUTO SKIP] {repr(current_filename)}")
+            ser.write(b"SKIP\n")
+            continue
+
         filepath = os.path.join(OUTPUT_DIR, current_filename)
 
         expected_size = None
@@ -127,8 +150,8 @@ while True:
         for name, size in file_list:
             if name == current_filename:
                 expected_size = size
-                if size >= SIZE_THRESHOLD or (os.path.exists(filepath) and os.path.getsize(filepath) == size):
-                # if os.path.exists(filepath) and os.path.getsize(filepath) == size:
+                # if size < SIZE_THRESHOLD or (os.path.exists(filepath) and os.path.getsize(filepath) == size):
+                if os.path.exists(filepath) and os.path.getsize(filepath) == size:
                     skip = True
                 break
 

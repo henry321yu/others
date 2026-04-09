@@ -52,6 +52,7 @@ void loop() {
     if (cmd == "HELLO") {
       Serial.println("READY");
       startTransfer = false;
+      return;
     }
 
     if (cmd == "START") {
@@ -102,8 +103,16 @@ void loop() {
     if (!f) break;
 
     if (!f.isDirectory()) {
+      char filename[256];
+
+      if (!safeCopyFilename(f, filename, sizeof(filename))) {
+        // skip corrupted entry silently
+        f.close();
+        continue;
+      }
+
       Serial.print("FILE:");
-      Serial.print(f.name());
+      Serial.print(filename);
       Serial.print(",");
       Serial.println(f.size());
     }
@@ -130,8 +139,31 @@ void loop() {
       continue;
     }
 
-    const char* filename = entry.name();
+    char filename[256];  // 足夠 buffer
+
+    if (!safeCopyFilename(entry, filename, sizeof(filename))) {
+      entry.close();
+      continue;
+    }
+
     uint32_t fileSize = entry.size();
+
+    if (!isValidFilename(filename)) {
+      if (strlen(filename) == 0 || strlen(filename) > 255) {
+        Serial.println("SKIP");
+        entry.close();
+        continue;
+      }
+      Serial.print("FILE:");
+      Serial.print(filename);
+      Serial.print(",");
+      Serial.println(fileSize);
+
+      Serial.println("SKIP");
+
+      entry.close();
+      continue;
+    }
 
     // ===== Ask PC if skip =====
     Serial.print("FILE:");
@@ -182,4 +214,39 @@ void loop() {
 
   Serial.println("DONE");
   startTransfer = false;
+}
+
+bool isValidFilename(const char* name) {
+  if (name == nullptr) return false;
+
+  for (int i = 0; name[i] != '\0'; i++) {
+    char c = name[i];
+
+    // 只允許可列印 ASCII
+    if (c < 32 || c > 126) {
+      return false;
+    }
+  }
+  return true;
+}
+bool safeCopyFilename(File &f, char* out, size_t outSize) {
+  const char* name = f.name();
+  if (!name) return false;
+
+  size_t len = strlen(name);
+  if (len == 0 || len >= outSize) return false;
+
+  // copy
+  strncpy(out, name, outSize - 1);
+  out[outSize - 1] = '\0';
+
+  // ASCII check
+  for (size_t i = 0; i < len; i++) {
+    char c = out[i];
+    if (c < 32 || c > 126) {
+      return false;
+    }
+  }
+
+  return true;
 }
