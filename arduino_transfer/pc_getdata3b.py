@@ -134,8 +134,10 @@ while True:
         if (
             not is_valid_filename(current_filename) or
             current_filename == "" or
-            len(current_filename) > 255 or
-            not current_filename.endswith(".TXT")
+            # len(current_filename) > 255 or
+            # not current_filename.endswith(".TXT")
+            len(current_filename) > 255
+            # not current_filename.endswith(".TXT")
         ):
             print(f"[AUTO SKIP] {repr(current_filename)}")
             ser.write(b"SKIP\n")
