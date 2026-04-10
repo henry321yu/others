@@ -11,7 +11,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 ser = serial.Serial(PORT, BAUD, timeout=1)
 
 BUFFER_SIZE = 4096
-SIZE_THRESHOLD = 4 * 1024 **3  # 1MB
+SIZE_THRESHOLD = 4 * 1024 **3  # 4GB
 
 
 def format_size(size_bytes):
@@ -27,8 +27,10 @@ def format_size(size_bytes):
     else:
         return f"{size_bytes/1024**3:.2f} GB"
 
+
 def clean_text(s):
     return ''.join(ch for ch in s if ord(ch) >= 32).strip()
+
 
 def read_line():
     line = b""
@@ -40,19 +42,64 @@ def read_line():
             line += c
     return clean_text(line.decode(errors='ignore'))
 
+
 def is_valid_filename(name):
     try:
-        name.encode('ascii')  # 或 utf-8
+        name.encode('ascii')
     except:
         return False
 
-    # 過濾不可見字元
     if any(ord(c) < 32 for c in name):
         return False
 
     return True
 
-# ===== HELLO (reconnect safe) =====
+
+# ✅ NEW：重新讀 LIST（關鍵修正）
+def read_file_list():
+    file_list = []
+
+    while True:
+        line = read_line()
+
+        if line.startswith("FILE_COUNT:"):
+            print(f"\nTotal files: {line.split(':')[1]}")
+
+        elif line.startswith("TOTAL_SIZE:"):
+            total_size = int(line.split(":")[1])
+            print(f"Total size: {format_size(total_size)}\n")
+
+        elif line.startswith("FILE:"):
+            name_size = line[len("FILE:"):].strip()
+
+            if "," not in name_size:
+                continue
+
+            name, size_str = name_size.split(",", 1)
+
+            name = name.strip().split("/")[-1]
+
+            try:
+                size = int(size_str.strip())
+            except:
+                continue
+
+            if not name or any(ord(c) < 32 for c in name):
+                continue
+
+            file_list.append((name, size))
+            print(f"{name} ({format_size(size)})")
+
+        elif line == "END_LIST":
+            print("\nList received\n")
+            break
+
+    return file_list
+
+
+# ===== HELLO =====
+ser.reset_input_buffer()
+ser.reset_output_buffer()
 ser.write(b"HELLO\n")
 
 print("Waiting READY...")
@@ -66,55 +113,7 @@ while True:
 # ===== START =====
 ser.write(b"START\n")
 
-file_list = []
-
-# ===== Read list =====
-while True:
-    line = read_line()
-
-    if line.startswith("FILE_COUNT:"):
-        print(f"\nTotal files: {line.split(':')[1]}")
-
-    elif line.startswith("TOTAL_SIZE:"):
-        total_size = int(line.split(":")[1])
-        print(f"Total size: {format_size(total_size)}\n")
-
-    elif line.startswith("FILE:"):
-        name_size = line[len("FILE:"):].strip()
-
-        # ===== 基本格式檢查 =====
-        if "," not in name_size:
-            print(f"[WARN] Corrupted FILE line (no comma): {repr(line)}")
-            continue
-
-        parts = name_size.split(",", 1)
-
-        if len(parts) != 2:
-            print(f"[WARN] Corrupted FILE line (split error): {repr(line)}")
-            continue
-
-        name, size_str = parts
-
-        name = name.strip().split("/")[-1]
-
-        # ===== size 轉換保護 =====
-        try:
-            size = int(size_str.strip())
-        except ValueError:
-            print(f"[WARN] Invalid size in FILE line: {repr(line)}")
-            continue
-
-        # ===== 過濾奇怪檔名（可選但建議）=====
-        if not name or any(ord(c) < 32 for c in name):
-            print(f"[WARN] Invalid filename: {repr(name)}")
-            continue
-
-        file_list.append((name, size))
-        print(f"{name} ({format_size(size)})")
-
-    elif line == "END_LIST":
-        print("\nList received\n")
-        break
+file_list = read_file_list()
 
 # ===== CONFIRM =====
 ser.write(b"CONFIRM\n")
@@ -134,10 +133,7 @@ while True:
         if (
             not is_valid_filename(current_filename) or
             current_filename == "" or
-            # len(current_filename) > 255 or
-            # not current_filename.endswith(".TXT")
             len(current_filename) > 255
-            # not current_filename.endswith(".TXT")
         ):
             print(f"[AUTO SKIP] {repr(current_filename)}")
             ser.write(b"SKIP\n")
@@ -148,16 +144,13 @@ while True:
         expected_size = None
         skip = False
 
-        # ===== match file =====
         for name, size in file_list:
             if name == current_filename:
                 expected_size = size
                 if size >= SIZE_THRESHOLD or (os.path.exists(filepath) and os.path.getsize(filepath) == size):
-                # if os.path.exists(filepath) and os.path.getsize(filepath) == size:
                     skip = True
                 break
 
-        # ===== fallback if not found =====
         if expected_size is None:
             print(f"Warning: unknown file {current_filename}")
             ser.write(b"OK\n")
@@ -177,24 +170,32 @@ while True:
                 total_received = 0
                 print(f"Receiving: {current_filename} ({format_size(expected_size)})")
 
+    if current_file is not None and current_file.closed:
+        current_file = None
+        
     elif line.startswith("SIZE:"):
         remaining_bytes = int(line.split(":")[1])
         total_received = 0
 
         last_data_time = time.time()
+
         while remaining_bytes > 0:
             chunk = ser.read(min(BUFFER_SIZE, remaining_bytes))
+
             if chunk:
                 last_data_time = time.time()
 
-                if current_file:
-                    current_file.write(chunk)
+                if current_file is not None:
+                    try:
+                        current_file.write(chunk)
+                    except ValueError:
+                        print("[ERROR] Attempt to write to closed file (ignored)")
+                        current_file = None
 
                 remaining_bytes -= len(chunk)
                 total_received += len(chunk)
 
             else:
-                # ⚠️ 超過 timeout → 視為傳輸結束
                 if time.time() - last_data_time > 2:
                     print("\n[WARN] Timeout waiting for remaining data")
                     if remaining_bytes != 0:
@@ -206,17 +207,14 @@ while True:
                 elapsed = time.time() - file_start_time
                 if elapsed > 0:
                     speed = total_received / elapsed
-                    line = f"Received: {format_size(total_received)}  Speed: {format_size(speed)}/s"
-                    print("\r" + line.ljust(80), end="")
-
+                    line2 = f"Received: {format_size(total_received)}  Speed: {format_size(speed)}/s"
+                    # print("\r" + line2.ljust(80), end="")
 
         if current_file:
             current_file.close()
+            current_file = None
 
-            elapsed = time.time() - file_start_time
-            speed = (total_received / (1024 * 1024)) / elapsed if elapsed > 0 else 0
-
-            print('\r' + ' ' * (len(line)) + '\r', end='')
+            # print('\r' + ' ' * 80 + '\r', end='')
             print(f"Saved: {current_filename} ({format_size(total_received)})")
 
         ser.write(b"ACK\n")
@@ -226,23 +224,30 @@ while True:
         print("\nTransfer complete")
 
         if had_timeout:
-            print("[INFO] Timeout occurred in this session. Continuing for verification...")
+            print("[INFO] Timeout occurred. Restarting session...\n")
             had_timeout = False
 
-            # 重啟整個流程（重新 HELLO + START）
+            # ✅ 關鍵修正：完整重跑流程
+            ser.reset_input_buffer()
+            ser.reset_output_buffer()
+
             ser.write(b"HELLO\n")
 
             while True:
                 line = read_line()
                 if line == "READY":
                     print("Teensy ready again")
-
                     ser.write(b"START\n")
                     break
 
-            # 清空 buffer 避免殘留
+            # ✅ 重新讀 LIST（關鍵）
+            file_list = read_file_list()
+
+            # ✅ 再 CONFIRM
+            ser.write(b"CONFIRM\n")
+
             continue
         else:
             print("[INFO] No timeout detected. Exiting cleanly.")
-            time.sleep(5)
+            time.sleep(3)
             break
