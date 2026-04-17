@@ -5,6 +5,7 @@ import paramiko
 from datetime import datetime
 from stat import S_ISDIR
 import sys
+import re
 
 # =====================================================
 #                     基本設定
@@ -85,8 +86,8 @@ def get_config():
 
     raw_skip_exts = cfg.get("SFTP", "skip_exts", fallback="")
     skip_exts = set(
-        e.strip().lower()
-        for e in raw_skip_exts.split(",")
+        (e if e.startswith('.') else f'.{e}').lower()
+        for e in re.split(r"[,\s]+", raw_skip_exts)
         if e.strip()
     )
 
