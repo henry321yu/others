@@ -5,6 +5,7 @@ import paramiko
 from datetime import datetime
 from stat import S_ISDIR
 import sys
+import re
 
 # =====================================================
 #                     基本設定
@@ -85,8 +86,8 @@ def get_config():
 
     raw_skip_exts = cfg.get("SFTP", "skip_exts", fallback="")
     skip_exts = set(
-        e.strip().lower()
-        for e in raw_skip_exts.split(",")
+        (e if e.startswith('.') else f'.{e}').lower()
+        for e in re.split(r"[,\s]+", raw_skip_exts)
         if e.strip()
     )
 
@@ -537,7 +538,24 @@ def main_loop(host, port, user, password, remote_dir, local_dir, sync_subdirs, m
 # =====================================================
 if __name__ == "__main__":
     host, port, user, passwd, remote_dir, local_dir, sync_subdirs, mode, runs, skip_exts, cache_enabled = get_config()
-    os.makedirs(local_dir, exist_ok=True)
+    
+    try:
+        log(f"[Init] 嘗試建立本機目錄：{local_dir}")
+        os.makedirs(local_dir, exist_ok=True)
+        log("[Init] 本機目錄確認完成")
+    except Exception as e:
+        log("[Fatal] 建立本機目錄失敗")
+        log(f"[Fatal] local_dir = {local_dir}")
+        log(f"[Fatal] Exception = {repr(e)}")
+
+        # Windows 常見原因提示
+        if os.name == "nt":
+            drive = os.path.splitdrive(local_dir)[0]
+            if drive and not os.path.exists(drive + "\\"):
+                log(f"[Hint] 磁碟不存在：{drive}\\")
+
+        log("[Exit] 程式未強制關閉，請修正後重新執行")
+        input("按 Enter 結束程式...")
 
     try:
         main_loop(host, port, user, passwd, remote_dir, local_dir, sync_subdirs, mode, runs, skip_exts, cache_enabled)
