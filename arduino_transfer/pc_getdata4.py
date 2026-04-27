@@ -208,13 +208,13 @@ while True:
                 if elapsed > 0:
                     speed = total_received / elapsed
                     line2 = f"Received: {format_size(total_received)}  Speed: {format_size(speed)}/s"
-                    # print("\r" + line2.ljust(80), end="")
+                    print("\r" + line2.ljust(80), end="")
 
         if current_file:
             current_file.close()
             current_file = None
 
-            # print('\r' + ' ' * 80 + '\r', end='')
+            print('\r' + ' ' * 80 + '\r', end='')
             print(f"Saved: {current_filename} ({format_size(total_received)})")
 
         ser.write(b"ACK\n")

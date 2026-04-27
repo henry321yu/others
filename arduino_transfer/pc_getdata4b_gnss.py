@@ -7,6 +7,7 @@ BAUD = 921600
 
 # OUTPUT_DIR = r"C:\Users\sgrc - 325\Desktop\seismograph data\arduino_transfer\3b"
 OUTPUT_DIR = r"C:\Users\sgrc - 325\Desktop\seismograph data\tran_sd"
+OUTPUT_DIR = r"D:\gps file\gps data"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 ser = serial.Serial(PORT, BAUD, timeout=1)
