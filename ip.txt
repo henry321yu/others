@@ -72,3 +72,11 @@ passowrd: 123
 ip: 26.131.52.20 or
 user: eosphd
 passowrd: P@ssw0rd@Ncku
+
+MY LAN HUB:
+my offfice
+192.168.159.10
+HEY-PC
+192.168.159.11
+RTDAS
+192.168.159.12
