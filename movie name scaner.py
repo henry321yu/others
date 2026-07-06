@@ -17,11 +17,8 @@ VIDEO_EXT = {
     ".m2ts",".ts",".mpg",".mpeg",".flv"
 }
 
-#=========================
-# 自定義 Excel 欄寬
-#=========================
 EXCEL_COLUMN_WIDTHS = {
-    "原始名稱": 55,
+    "原始名稱": 65,
     "英文名稱": 35,
     "年份": 10,
     "台灣名稱": 25,
@@ -29,103 +26,143 @@ EXCEL_COLUMN_WIDTHS = {
     "導演英文": 22
 }
 
-#=========================
-# 清理片名
-#=========================
-
+# 擴充了常見的壓製組與版本字眼 (包含您列表中的常見群組)
 REMOVE_WORDS = [
-    "1080p","720p","2160p","480p",
-    "BluRay","Blu-Ray","WEBRip","WEB-DL",
-    "HDRip","BRRip","DVDRip","Remux",
-    "H264","H265","x264","x265",
-    "HEVC","AVC",
-    "AAC","AC3","DTS","DDP","Atmos",
-    "TRUEHD","HDMA",
-    "10bit","8bit",
-    "HDR","DV",
-    "ITA","ENG","JPN","CHS","CHT",
-    "MULTI","SUB","SUBS",
+    "1080p","720p","2160p","480p","4k","8k",
+    "BluRay","Blu-Ray","WEBRip","WEB-DL","BDRip","DVDrip",
+    "HDRip","BRRip","DVDRip","Remux","AMZN",
+    "H264","H265","x264","x265","HEVC","AVC",
+    "AAC","AC3","DTS","DDP","DDP5","Atmos","Opus",
+    "TRUEHD","HDMA","6CH", "7 1", "5 1",
+    "10bit","8bit","SDR","HDR","DV",
+    "ITA","ENG","JPN","CHS","CHT","GER","CHINESE","JAPANESE",
+    "MULTI","SUB","SUBS","Dual","Audio",
+    "Dir","Cut","Extended","Remastered","Unrated","Alternate",
+    "PROPER","IMAX",
+    "YTS","MX","LT","AG","AM", "RARBG", "EVO", "HazMatt", "HDiY",
+    "TGx", "GalaxyRG265", "FGT", "PSA", "aXXo", "WADU", "Grym",
+    "BTNET", "CnSCG", "EDGE2020", "SWAXXON", "MIRCrew", "Licdom",
+    "HighCode", "DEFiNiTE", "YG", "iSCG", "heTOrico", "SWTYBLZ",
+    "jeddak", "CMCT", "3Li", "Garshasp", "SUJAIDR", "PANAM"
 ]
 
-def clean_name(name):
-    name = os.path.splitext(name)[0]
-    name = name.replace(".", " ").replace("_", " ")
+#=========================
+# 掃描 (修復資料夾與檔案的切割問題)
+#=========================
 
-    chinese_junk = r"(免費電影線上看|線上看|超清免費在線觀看|高清正片|優酷雲|劇迷|高清追劇首選|中文字幕|简体中字|粵|英語).*"
-    name = re.sub(chinese_junk, "", name, flags=re.I)
+items = []
+if os.path.exists(ROOT):
+    for obj in os.scandir(ROOT):
+        if obj.is_file():
+            base, ext = os.path.splitext(obj.name)
+            if ext.lower() in VIDEO_EXT:
+                # 檔案：保留原始檔名顯示，但傳入無副檔名的 base 進行清理
+                items.append((obj.name, base))
+        elif obj.is_dir():
+            # 資料夾：直接傳入全名，不要用 splitext 切割
+            items.append((obj.name, obj.name))
 
+print("="*60)
+print(f"掃描到 {len(items)} 個項目")
+print("="*60)
+
+#=========================
+# 清理片名 (核心邏輯重構)
+#=========================
+def clean_name(clean_target):
+    # 1. 先抓年份 (從字串末端往前找最合理的年份)
+    # 條件：確保年份前後是邊界或特殊符號，避免抓到解析度等其他數字
     year = None
-    matches = list(re.finditer(r"(?:[\s\(\[\-\_])(19\d{2}|20\d{2})(?:[\s\)\]\-\_]|$)", name))
+    matches = list(re.finditer(r"(?:^|[.\s\(\[_-])(19\d{2}|20\d{2})(?:[.\s\)\]_-]|$)", clean_target))
+    
+    title_before_year = clean_target
     if matches:
         last_match = matches[-1]
         year = last_match.group(1)
         idx = last_match.start()
-        if idx > 0: 
-            name = name[:idx]
-    
-    for word in REMOVE_WORDS:
-        name = re.sub(r"\b" + re.escape(word) + r"\b", " ", name, flags=re.I)
+        # 如果年份前面有分隔符號，從該符號處截斷
+        if idx > 0:
+            title_before_year = clean_target[:idx]
 
-    name = re.sub(r"\[.*?\]|\(.*?\)", " ", name)
-    name = re.sub(r"[^\w\s\u4e00-\u9fa5]", " ", name)
-    name = re.sub(r"\s+", " ", name).strip()
+    # 2. 清理函式
+    def purify(text):
+        t = text
+        # 將點和底線替換為空白
+        t = t.replace(".", " ").replace("_", " ")
+        # 移除括號內容
+        t = re.sub(r"\[.*?\]|\(.*?\)", " ", t)
+        
+        # 移除中文影音站常見的後綴垃圾字眼 (改良正則，只要遇到這些字眼，後面的全砍)
+        chinese_junk = r"(?:1080p|720p|4k|超清|高清|免費)?(?:在線|線上看|正片|優酷|劇迷|首選|中文字幕|簡體中字|繁中|簡中|粵語|英語).*"
+        t = re.sub(chinese_junk, "", t, flags=re.I)
+        
+        # 移除壓製組、畫質等關鍵字
+        for word in REMOVE_WORDS:
+            t = re.sub(r"\b" + re.escape(word) + r"\b", " ", t, flags=re.I)
+            
+        # 移除非英數字與非中文字元
+        t = re.sub(r"[^\w\s\u4e00-\u9fa5]", " ", t)
+        # 壓縮多餘空白
+        return re.sub(r"\s+", " ", t).strip()
 
-    return name, year
+    # title_without_year 是主要搜尋依據 (例如: Taxi)
+    title_without_year = purify(title_before_year)
+    # full_title 用來對付片名本身包含年份的情況 (例如: Blade Runner 2049)
+    full_title = purify(clean_target)
 
-#=========================
-# 掃描
-#=========================
-
-items = []
-
-if os.path.exists(ROOT):
-    for obj in os.scandir(ROOT):
-        if obj.is_file():
-            ext = os.path.splitext(obj.name)[1].lower()
-            if ext in VIDEO_EXT:
-                items.append(obj.name)
-        elif obj.is_dir():
-            items.append(obj.name)
-
-print("="*60)
-print("掃描到：")
-print("="*60)
-
-for x in items:
-    print(x)
-print()
+    return title_without_year, year, full_title
 
 #=========================
-# TMDB API 操作
+# TMDB API 操作 (多重策略)
 #=========================
 
-def search_movie(title, year):
+def search_movie(title_without_year, year, full_title):
     url = "https://api.themoviedb.org/3/search/movie"
-    params = {
-        "api_key": API_KEY,
-        "query": title,
-        "language": "en-US"
-    }
-    if year:
-        params["year"] = year
 
-    r = requests.get(url, params=params)
-    if r.status_code != 200:
+    def do_search(q, y=None):
+        if not q: return None
+        params = {
+            "api_key": API_KEY,
+            "query": q,
+            "language": "zh-TW",
+            "page": 1
+        }
+        if y:
+            params["primary_release_year"] = y
+        
+        try:
+            r = requests.get(url, params=params, timeout=10)
+            if r.status_code == 200:
+                js = r.json()
+                if js.get("results"):
+                    return js["results"][0]["id"]
+        except requests.RequestException:
+            pass
         return None
 
-    js = r.json()
-    if js.get("results") == []:
-        return None
+    # 策略 A：去除年份的片名 + 精確年份 (對付多數常規電影)
+    if year and title_without_year:
+        m_id = do_search(title_without_year, year)
+        if m_id: return m_id
 
-    return js["results"][0]["id"]
+    # 策略 B：完整片名，不限定年份 (對付 Blade Runner 2049)
+    if full_title:
+        m_id = do_search(full_title)
+        if m_id: return m_id
 
-# 關鍵更新：取得電影詳情時一併取得演職員表 (append_to_response=credits)
+    # 策略 C：放寬條件，僅搜片名無年份 (對付資料夾標錯年份的狀況)
+    if title_without_year:
+        m_id = do_search(title_without_year)
+        if m_id: return m_id
+
+    return None
+
 def get_movie_details(movie_id):
     url = f"https://api.themoviedb.org/3/movie/{movie_id}"
     params = {
         "api_key": API_KEY,
         "language": "zh-TW",
-        "append_to_response": "credits" # 讓 API 同時回傳演員與劇組資料
+        "append_to_response": "credits"
     }
 
     r = requests.get(url, params=params)
@@ -133,29 +170,20 @@ def get_movie_details(movie_id):
         return None
 
     js = r.json()
-    
-    # 解析導演資料
     directors_tw = []
     directors_en = []
-    
-    credits = js.get("credits", {})
-    crew = credits.get("crew", [])
+    crew = js.get("credits", {}).get("crew", [])
     
     for member in crew:
         if member.get("job") == "Director":
-            # TMDB 在 zh-TW 語系下，name 通常會是中文翻譯，original_name 則是原本的英文拼音
             directors_tw.append(member.get("name", ""))
             directors_en.append(member.get("original_name", ""))
             
-    # 一部電影可能有多位導演，我們用逗號將他們連接起來
-    dir_tw = ", ".join(directors_tw) if directors_tw else ""
-    dir_en = ", ".join(directors_en) if directors_en else ""
-
     return {
         "tw": js.get("title", ""),
         "original": js.get("original_title", ""),
-        "director_tw": dir_tw,
-        "director_en": dir_en
+        "director_tw": ", ".join(directors_tw),
+        "director_en": ", ".join(directors_en)
     }
 
 #=========================
@@ -163,24 +191,26 @@ def get_movie_details(movie_id):
 #=========================
 
 results = []
-
 print()
 print("="*60)
 print("開始搜尋電影")
 print("="*60)
 
-for raw in items:
-    title, year = clean_name(raw)
+for raw_name, clean_target in items:
+    title_without_year, year, full_title = clean_name(clean_target)
 
     print()
-    print("原始：", raw)
-    print("解析：", title)
+    print("原始：", raw_name)
+    
+    # 呈現清理後的字串供除錯參考
+    display_title = title_without_year if title_without_year else full_title
+    print("解析：", display_title, f"(年份: {year})" if year else "")
 
-    movie_id = search_movie(title, year)
+    movie_id = search_movie(title_without_year, year, full_title)
 
     if movie_id is None:
         print("找不到")
-        results.append([raw, title, year, "", "", ""])
+        results.append([raw_name, display_title, year, "", "", ""])
         continue
 
     info = get_movie_details(movie_id)
@@ -190,7 +220,7 @@ for raw in items:
     print("導演(英)：", info["director_en"])
 
     results.append([
-        raw,
+        raw_name,
         info["original"],
         year,
         info["tw"],
@@ -204,39 +234,32 @@ for raw in items:
 
 excel_name = "movie_list.xlsx"
 
-# 建立活頁簿
 wb = openpyxl.Workbook()
 ws = wb.active
 ws.title = "電影清單"
 
-# 標頭增加導演欄位
 headers = ["原始名稱", "英文名稱", "年份", "台灣名稱", "導演中文", "導演英文"]
 ws.append(headers)
 
-# 寫入資料
 for row in results:
     ws.append(row)
 
-# 定義美化樣式
-header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid") # 深藍色標頭
+header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
 header_font = Font(name="微軟正黑體", size=11, bold=True, color="FFFFFF")
-alt_fill = PatternFill(start_color="F2F6F9", end_color="F2F6F9", fill_type="solid")    # 交替橫條紋淺色
+alt_fill = PatternFill(start_color="F2F6F9", end_color="F2F6F9", fill_type="solid")    
 data_font = Font(name="微軟正黑體", size=10)
 thin_border = Side(style='thin', color='D9D9D9')
 cell_border = Border(left=thin_border, right=thin_border, top=thin_border, bottom=thin_border)
 
-# 1. 處理標題列 與 設定欄寬
 for col_idx, header in enumerate(headers, 1):
     cell = ws.cell(row=1, column=col_idx)
     cell.fill = header_fill
     cell.font = header_font
     cell.alignment = Alignment(horizontal="center", vertical="center")
     
-    # 根據最上方定義的字典設定寬度
     col_letter = get_column_letter(col_idx)
     ws.column_dimensions[col_letter].width = EXCEL_COLUMN_WIDTHS.get(header, 20)
 
-# 2. 處理資料列 (框線、字型、置中、斑馬紋色)
 for row_idx in range(2, ws.max_row + 1):
     is_even = (row_idx % 2 == 0)
     for col_idx in range(1, len(headers) + 1):
@@ -244,22 +267,18 @@ for row_idx in range(2, ws.max_row + 1):
         cell.font = data_font
         cell.border = cell_border
         
-        # 偶數列填上淺灰色交替背景
         if is_even:
             cell.fill = alt_fill
             
-        # 讓年份置中，名稱與導演靠左
         header_name = headers[col_idx - 1]
         if header_name in ["年份"]:
             cell.alignment = Alignment(horizontal="center", vertical="center")
         else:
             cell.alignment = Alignment(horizontal="left", vertical="center")
 
-# 3. 凍結首列與啟用篩選功能
 ws.freeze_panes = "A2"
 ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{ws.max_row}"
 
-# 儲存
 wb.save(excel_name)
 
 print()
