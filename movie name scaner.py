@@ -63,20 +63,19 @@ print("="*60)
 print(f"掃描到 {len(items)} 個項目：")
 print("="*60)
 
-# 將掃描到的項目印出
 for raw_name, _ in items:
     print(raw_name)
 print()
 
 #=========================
-# 清理片名 (終極強化版)
+# 清理片名
 #=========================
 def clean_name(clean_target):
     
-    # 0. 抹除日期格式 (如 2022-12-14 或 2022.12.14)，避免干擾年份判斷
+    # 0. 抹除日期格式 (如 2022-12-14)，避免干擾年份判斷
     clean_target = re.sub(r"\b(19|20)\d{2}[-./_]\d{1,2}[-./_]\d{1,2}\b", " ", clean_target)
 
-    # 1. 抓年份 (加入 '[' 做為邊界，解決 Gladiator.2000[DVD] 問題)
+    # 1. 抓年份
     year = None
     matches = list(re.finditer(r"(?:^|[.\s\(\[_-])(19\d{2}|20\d{2})(?:[.\s\)\]\[_-]|$)", clean_target))
     
@@ -91,13 +90,10 @@ def clean_name(clean_target):
     # 2. 清理函式
     def purify(text):
         t = text
-        # 將逗號、點、底線替換為空白 (解決多譯名分隔)
         t = re.sub(r"[,\.，、_]", " ", t)
-        
-        # 移除括號內容
         t = re.sub(r"\[.*?\]|\(.*?\)|【.*?】", " ", t)
         
-        # 一刀切模式：遇到這些字眼，直接截斷後面的所有字串
+        # 一刀切模式
         junk_chop = r"(1080p|720p|2160p|4k|8k|超清|高清|免費|在線|線上看|正片|優酷|劇迷|首選|中文字幕|字幕|簡體|繁中|簡中|粵語|英語|國語|雙語|迅雷|下載)"
         t = re.split(junk_chop, t, flags=re.I)[0]
         
@@ -113,13 +109,14 @@ def clean_name(clean_target):
     return title_without_year, year, full_title
 
 #=========================
-# TMDB API 操作 (五重保險策略)
+# TMDB API 操作 (智慧型多重驗證機制)
 #=========================
 
 def search_movie(title_without_year, year, full_title):
     url = "https://api.themoviedb.org/3/search/movie"
+    STOP_WORDS = {'the', 'and', 'of', 'a', 'an', 'or', 'in', 'to', 'for', 'with', 'on', 'at', 'by', 's'}
 
-    def do_search(q, y=None):
+    def do_search(q, y=None, orig_q=None):
         if not q: return None
         params = {
             "api_key": API_KEY,
@@ -134,36 +131,80 @@ def search_movie(title_without_year, year, full_title):
             if r.status_code == 200:
                 js = r.json()
                 if js.get("results"):
-                    return js["results"][0]["id"]
+                    results_list = js.get("results")
+                    
+                    # 第一輪：尋找「完全精準匹配」的片名 (解決 玩命關頭 抓到 玩命關頭X 的問題)
+                    for movie in results_list:
+                        t_name = movie.get("title", "").lower().strip()
+                        o_name = movie.get("original_title", "").lower().strip()
+                        if q.lower().strip() in [t_name, o_name]:
+                            return movie["id"]
+                    
+                    # 第二輪：長中文截斷落後特徵比對 (解決 大話西遊之大聖娶親 找不到的問題)
+                    if orig_q and orig_q != q:
+                        for movie in results_list:
+                            full_text = (movie.get("title", "") + " " + movie.get("overview", "")).lower()
+                            remaining = orig_q.replace(q, "").strip()
+                            if remaining and remaining in full_text:
+                                return movie["id"]
+                            if len(orig_q) > 4 and orig_q[4:] in full_text:
+                                return movie["id"]
+
+                    # 第三輪：條件式英文交叉驗證 (攔截真正的假結果，但不傷及中日文亞洲電影)
+                    for movie in results_list:
+                        title = movie.get("title", "").lower()
+                        orig_title = movie.get("original_title", "").lower()
+                        
+                        q_words = set(w for w in re.findall(r'\b[a-z0-9]{2,}\b', q.lower()) if w not in STOP_WORDS)
+                        
+                        # 如果查詢字串包含至少2個有效英文單字，才啟動驗證
+                        if len(q_words) >= 2:
+                            m_text = (title + " " + orig_title).lower()
+                            m_words = set(re.findall(r'\b[a-z0-9]{2,}\b', m_text))
+                            
+                            # 【核心修正】只有當 TMDB 回傳的結果中「也包含英文單字」時，才進行交叉比對！
+                            # 如果 TMDB 回傳純中文(如 功夫、終極追殺令)，直接放行，不判定為錯誤！
+                            if len(m_words) >= 2:
+                                if not (q_words & m_words):
+                                    continue # 英文完全對不上，判定為硬湊的假條目，跳過
+                        
+                        return movie["id"] # 安全通過，回傳 ID
         except: pass
         return None
 
     # 策略 A：去除年份的片名 + 精確年份
     if year and title_without_year:
-        m_id = do_search(title_without_year, year)
+        m_id = do_search(title_without_year, year, title_without_year)
         if m_id: return m_id
 
     # 策略 B：完整片名，不限定年份
     if full_title:
-        m_id = do_search(full_title)
+        m_id = do_search(full_title, orig_q=full_title)
         if m_id: return m_id
 
     # 策略 C：放寬條件，僅搜片名無年份
     if title_without_year:
-        m_id = do_search(title_without_year)
+        m_id = do_search(title_without_year, orig_q=title_without_year)
         if m_id: return m_id
 
     # 策略 D：首集去數字容錯 (解決 Silent Hill 1 問題)
     if title_without_year and title_without_year.endswith(" 1"):
         stripped_title = title_without_year[:-2].strip()
-        m_id = do_search(stripped_title, year) or do_search(stripped_title)
+        m_id = do_search(stripped_title, year, title_without_year) or do_search(stripped_title, orig_q=title_without_year)
         if m_id: return m_id
 
-    # 策略 E：中文多譯名容錯 (解決 "速度與激情 玩命關頭")
+    # 策略 E：中文多譯名或長片名智慧拆解容錯
     if title_without_year and re.search(r"[\u4e00-\u9fa5]", title_without_year):
-        first_part = title_without_year.split()[0] # 只取第一個空格前的字
-        if first_part:
-            m_id = do_search(first_part, year) or do_search(first_part)
+        parts = title_without_year.split()
+        if len(parts) > 1:
+            first_part = parts[0]
+            m_id = do_search(first_part, year, title_without_year) or do_search(first_part, orig_q=title_without_year)
+            if m_id: return m_id
+        
+        # 如果是連在一起的長中文（如 大話西遊之大聖娶親），自動切出前4個字嘗試
+        if len(title_without_year) > 4:
+            short_china = title_without_year[:4]
+            m_id = do_search(short_china, year, title_without_year) or do_search(short_china, orig_q=title_without_year)
             if m_id: return m_id
 
     return None
