@@ -73,6 +73,7 @@ print()
 def clean_name(clean_target):
     # 0. 抹除日期格式 (如 2022-12-14)，避免干擾年份判斷
     clean_target = re.sub(r"\b(19|20)\d{2}[-./_]\d{1,2}[-./_]\d{1,2}\b", " ", clean_target)
+    
     # 1. 抓年份
     year = None
     matches = list(re.finditer(r"(?:^|[.\s\(\[_-])(19\d{2}|20\d{2})(?:[.\s\)\]\[_-]|$)", clean_target))
@@ -84,6 +85,7 @@ def clean_name(clean_target):
         idx = last_match.start()
         if idx > 0:
             title_before_year = clean_target[:idx]
+            
     # 2. 清理函式
     def purify(text):
         t = text
@@ -202,7 +204,7 @@ def search_movie(title_without_year, year, full_title):
             if m_id: return m_id
 
     # ==============================================================
-    # 策略 F：【終極保底豁免權】(完全符合你的要求：移到最後面！)
+    # 策略 F：【終極保底豁免權】
     # ==============================================================
     # 如果前面 A~E 的嚴格驗證通通找不到 (例如 italian race)，
     # 我們就在最後關閉 strict，無條件抓取 TMDB 回傳的第一個結果！
@@ -214,28 +216,59 @@ def search_movie(title_without_year, year, full_title):
 
 def get_movie_details(movie_id):
     url = f"https://api.themoviedb.org/3/movie/{movie_id}"
-    params = {
-        "api_key": API_KEY,
-        "language": "zh-TW",
-        "append_to_response": "credits"
-    }
-
-    r = requests.get(url, params=params)
-    if r.status_code != 200: return None
-    js = r.json()
     
-    directors_tw, directors_en = [], []
-    for member in js.get("credits", {}).get("crew", []):
-        if member.get("job") == "Director":
-            directors_tw.append(member.get("name", ""))
-            directors_en.append(member.get("original_name", ""))
+    try:
+        # 1. 抓取中文版資料 (取得台灣片名與中文導演名)
+        r_tw = requests.get(url, params={"api_key": API_KEY, "language": "zh-TW", "append_to_response": "credits"}, timeout=10)
+        
+        # 2. 抓取英文版資料 (取得真正的英文片名與英文導演名)
+        r_en = requests.get(url, params={"api_key": API_KEY, "language": "en-US", "append_to_response": "credits"}, timeout=10)
+        
+        # [新增] 3. 抓取簡體中文資料 (作為 zh-TW 導演沒翻譯時的備胎)
+        r_cn = requests.get(url, params={"api_key": API_KEY, "language": "zh-CN", "append_to_response": "credits"}, timeout=10)
+        
+        if r_tw.status_code != 200 or r_en.status_code != 200: 
+            return None
             
-    return {
-        "tw": js.get("title", ""),
-        "original": js.get("original_title", ""),
-        "director_tw": ", ".join(directors_tw),
-        "director_en": ", ".join(directors_en)
-    }
+        js_tw = r_tw.json()
+        js_en = r_en.json()
+        js_cn = r_cn.json() if r_cn.status_code == 200 else {}
+        
+        directors_tw, directors_en, directors_cn = [], [], []
+        
+        # 處理中文導演名 (台灣版)
+        for member in js_tw.get("credits", {}).get("crew", []):
+            if member.get("job") == "Director":
+                directors_tw.append(member.get("name", ""))
+                
+        # 處理中文導演名 (大陸版 - 用作備用)
+        for member in js_cn.get("credits", {}).get("crew", []):
+            if member.get("job") == "Director":
+                directors_cn.append(member.get("name", ""))
+                
+        # 處理英文導演名 (純英文)
+        for member in js_en.get("credits", {}).get("crew", []):
+            if member.get("job") == "Director":
+                directors_en.append(member.get("name", ""))
+                
+        # 【核心修復】驗證中文導演名是否真的是中文
+        final_dir_tw_list = []
+        for idx, d_tw in enumerate(directors_tw):
+            # 如果台灣翻譯的名字裡「沒有任何中文字元」(代表 TMDB 偷懶給了英文)
+            # 且簡體中文有翻譯，我們就直接借用簡體中文的翻譯！
+            if not re.search(r"[\u4e00-\u9fa5]", d_tw) and idx < len(directors_cn) and re.search(r"[\u4e00-\u9fa5]", directors_cn[idx]):
+                final_dir_tw_list.append(directors_cn[idx])
+            else:
+                final_dir_tw_list.append(d_tw)
+                
+        return {
+            "tw": js_tw.get("title", ""),
+            "original": js_en.get("title", ""), # 強制使用純英文片名
+            "director_tw": ", ".join(final_dir_tw_list),
+            "director_en": ", ".join(directors_en)
+        }
+    except:
+        return None
 
 #=========================
 # 搜尋資料與 Excel 匯出
