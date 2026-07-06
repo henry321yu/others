@@ -10,7 +10,9 @@ from openpyxl.utils import get_column_letter
 # 設定
 #=========================
 
-ROOT = r"G:\old_HDD\film"
+# ROOT = r"G:\old_HDD\film"
+ROOT = os.path.dirname(os.path.abspath(__file__))
+
 API_KEY = "af246bcc8feca07801bb5c59cd22694a"
 
 VIDEO_EXT = {
