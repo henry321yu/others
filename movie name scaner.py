@@ -2,7 +2,7 @@ import os
 import re
 import requests
 import openpyxl
-import zhconv  # 【新增】用來將大陸簡體字轉換為台灣繁體字
+import zhconv  # 用來將大陸簡體字轉換為台灣繁體字
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
@@ -115,7 +115,7 @@ def search_movie(title_without_year, year, full_title):
     url = "https://api.themoviedb.org/3/search/movie"
     STOP_WORDS = {'the', 'and', 'of', 'a', 'an', 'or', 'in', 'to', 'for', 'with', 'on', 'at', 'by', 's'}
 
-    # 【新增】加入 strict 參數，預設為 True (開啟嚴格驗證)
+    # 加入 strict 參數，預設為 True (開啟嚴格驗證)
     def do_search(q, y=None, orig_q=None, strict=True):
         if not q: return None
         params = {
@@ -157,7 +157,7 @@ def search_movie(title_without_year, year, full_title):
                         
                         q_words = set(w for w in re.findall(r'\b[a-z0-9]{2,}\b', q.lower()) if w not in STOP_WORDS)
                         
-                        # 【核心變更】如果 strict=True 才執行防偽交叉驗證
+                        # 核心變更：如果 strict=True 才執行防偽交叉驗證
                         if strict and len(q_words) >= 2:
                             m_text = (title + " " + orig_title).lower()
                             m_words = set(re.findall(r'\b[a-z0-9]{2,}\b', m_text))
@@ -252,23 +252,28 @@ def get_movie_details(movie_id):
             if member.get("job") == "Director":
                 directors_en.append(member.get("name", ""))
                 
-        # 【核心修復】驗證中文導演名是否真的是中文，並加上簡繁轉換！
+        # 驗證中文導演名是否真的是中文，並加上簡繁轉換！
         final_dir_tw_list = []
         for idx, d_tw in enumerate(directors_tw):
             # 如果台灣翻譯的名字裡「沒有任何中文字元」(代表 TMDB 偷懶給了英文)
             # 且簡體中文有翻譯，我們就直接借用簡體中文的翻譯！
             if not re.search(r"[\u4e00-\u9fa5]", d_tw) and idx < len(directors_cn) and re.search(r"[\u4e00-\u9fa5]", directors_cn[idx]):
-                # 【新增】使用 zhconv 將大陸簡體名字翻譯成台灣繁體！
+                # 使用 zhconv 將大陸簡體名字翻譯成台灣繁體！
                 traditional_name = zhconv.convert(directors_cn[idx], 'zh-tw')
                 final_dir_tw_list.append(traditional_name)
             else:
                 final_dir_tw_list.append(d_tw)
                 
+        # 【新增】抓取 TMDB 官方發行年份
+        release_date = js_en.get("release_date", "") or js_tw.get("release_date", "")
+        official_year = release_date[:4] if release_date else ""
+                
         return {
             "tw": js_tw.get("title", ""),
             "original": js_en.get("title", ""), # 強制使用純英文片名
             "director_tw": ", ".join(final_dir_tw_list),
-            "director_en": ", ".join(directors_en)
+            "director_en": ", ".join(directors_en),
+            "year": official_year # 回傳官方年份
         }
     except:
         return None
@@ -299,13 +304,18 @@ for raw_name, clean_target in items:
         continue
 
     info = get_movie_details(movie_id)
+    
+    # 【新增】如果沒有抓到年份，或是官方年份比原本的可靠，直接採用官方年份！
+    final_year = info.get("year") if info.get("year") else year
+    
+    print("官方年份：", final_year)
     print("英文：", info["original"])
     print("台灣：", info["tw"])
     print("導演(中)：", info["director_tw"])
     print("導演(英)：", info["director_en"])
 
     results.append([
-        raw_name, info["original"], year, info["tw"], 
+        raw_name, info["original"], final_year, info["tw"], 
         info["director_tw"], info["director_en"]
     ])
 
