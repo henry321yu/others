@@ -18,15 +18,15 @@ VIDEO_EXT = {
 }
 
 #=========================
-# 這裡是你自定義 Excel 欄寬的地方
-# 可以隨時調整下方的數字 (代表字元寬度)
+# 自定義 Excel 欄寬
 #=========================
 EXCEL_COLUMN_WIDTHS = {
     "原始名稱": 55,
     "英文名稱": 35,
     "年份": 10,
     "台灣名稱": 25,
-    # "TMDB_ID": 15
+    "導演中文": 22,
+    "導演英文": 22
 }
 
 #=========================
@@ -78,7 +78,6 @@ def clean_name(name):
 
 items = []
 
-# 為了防止執行出錯，如果找不到資料夾先跳過
 if os.path.exists(ROOT):
     for obj in os.scandir(ROOT):
         if obj.is_file():
@@ -97,49 +96,70 @@ for x in items:
 print()
 
 #=========================
-# TMDB
+# TMDB API 操作
 #=========================
 
 def search_movie(title, year):
     url = "https://api.themoviedb.org/3/search/movie"
     params = {
-        "api_key":API_KEY,
-        "query":title,
-        "language":"en-US"
+        "api_key": API_KEY,
+        "query": title,
+        "language": "en-US"
     }
     if year:
-        params["year"]=year
+        params["year"] = year
 
-    r = requests.get(url,params=params)
-    if r.status_code!=200:
+    r = requests.get(url, params=params)
+    if r.status_code != 200:
         return None
 
     js = r.json()
-    if js.get("results")==[]:
+    if js.get("results") == []:
         return None
 
     return js["results"][0]["id"]
 
-def get_tw_title(movie_id):
-    url=f"https://api.themoviedb.org/3/movie/{movie_id}"
-    params={
-        "api_key":API_KEY,
-        "language":"zh-TW"
+# 關鍵更新：取得電影詳情時一併取得演職員表 (append_to_response=credits)
+def get_movie_details(movie_id):
+    url = f"https://api.themoviedb.org/3/movie/{movie_id}"
+    params = {
+        "api_key": API_KEY,
+        "language": "zh-TW",
+        "append_to_response": "credits" # 讓 API 同時回傳演員與劇組資料
     }
 
-    r=requests.get(url,params=params)
-    if r.status_code!=200:
+    r = requests.get(url, params=params)
+    if r.status_code != 200:
         return None
 
-    js=r.json()
+    js = r.json()
+    
+    # 解析導演資料
+    directors_tw = []
+    directors_en = []
+    
+    credits = js.get("credits", {})
+    crew = credits.get("crew", [])
+    
+    for member in crew:
+        if member.get("job") == "Director":
+            # TMDB 在 zh-TW 語系下，name 通常會是中文翻譯，original_name 則是原本的英文拼音
+            directors_tw.append(member.get("name", ""))
+            directors_en.append(member.get("original_name", ""))
+            
+    # 一部電影可能有多位導演，我們用逗號將他們連接起來
+    dir_tw = ", ".join(directors_tw) if directors_tw else ""
+    dir_en = ", ".join(directors_en) if directors_en else ""
+
     return {
-        "tw":js.get("title",""),
-        "original":js.get("original_title",""),
-        "release":js.get("release_date","")
+        "tw": js.get("title", ""),
+        "original": js.get("original_title", ""),
+        "director_tw": dir_tw,
+        "director_en": dir_en
     }
 
 #=========================
-# 搜尋
+# 搜尋資料
 #=========================
 
 results = []
@@ -160,19 +180,22 @@ for raw in items:
 
     if movie_id is None:
         print("找不到")
-        results.append([raw, title, year, "", ""])
+        results.append([raw, title, year, "", "", ""])
         continue
 
-    info = get_tw_title(movie_id)
+    info = get_movie_details(movie_id)
     print("英文：", info["original"])
     print("台灣：", info["tw"])
+    print("導演(中)：", info["director_tw"])
+    print("導演(英)：", info["director_en"])
 
     results.append([
         raw,
         info["original"],
         year,
         info["tw"],
-        movie_id
+        info["director_tw"],
+        info["director_en"]
     ])
 
 #=========================
@@ -186,7 +209,8 @@ wb = openpyxl.Workbook()
 ws = wb.active
 ws.title = "電影清單"
 
-headers = ["原始名稱", "英文名稱", "年份", "台灣名稱", "TMDB_ID"]
+# 標頭增加導演欄位
+headers = ["原始名稱", "英文名稱", "年份", "台灣名稱", "導演中文", "導演英文"]
 ws.append(headers)
 
 # 寫入資料
@@ -224,9 +248,9 @@ for row_idx in range(2, ws.max_row + 1):
         if is_even:
             cell.fill = alt_fill
             
-        # 讓年份與ID置中，名稱靠左
+        # 讓年份置中，名稱與導演靠左
         header_name = headers[col_idx - 1]
-        if header_name in ["年份", "TMDB_ID"]:
+        if header_name in ["年份"]:
             cell.alignment = Alignment(horizontal="center", vertical="center")
         else:
             cell.alignment = Alignment(horizontal="left", vertical="center")
