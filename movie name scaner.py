@@ -158,7 +158,8 @@ def search_movie(title_without_year, year, full_title):
                         q_words = set(w for w in re.findall(r'\b[a-z0-9]{2,}\b', q.lower()) if w not in STOP_WORDS)
                         
                         # 如果查詢字串包含至少2個有效英文單字，才啟動驗證
-                        if len(q_words) >= 2:
+                        # 【關鍵豁免權】：只有在查詢字串包含英文，且該電影是「英語電影」時，才啟動嚴格防偽驗證
+                        if len(q_words) >= 2 and orig_lang == 'en':
                             m_text = (title + " " + orig_title).lower()
                             m_words = set(re.findall(r'\b[a-z0-9]{2,}\b', m_text))
                             
