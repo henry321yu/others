@@ -2,6 +2,7 @@ import os
 import re
 import requests
 import openpyxl
+import zhconv  # 【新增】用來將大陸簡體字轉換為台灣繁體字
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
@@ -224,7 +225,7 @@ def get_movie_details(movie_id):
         # 2. 抓取英文版資料 (取得真正的英文片名與英文導演名)
         r_en = requests.get(url, params={"api_key": API_KEY, "language": "en-US", "append_to_response": "credits"}, timeout=10)
         
-        # [新增] 3. 抓取簡體中文資料 (作為 zh-TW 導演沒翻譯時的備胎)
+        # 3. 抓取簡體中文資料 (作為 zh-TW 導演沒翻譯時的備胎)
         r_cn = requests.get(url, params={"api_key": API_KEY, "language": "zh-CN", "append_to_response": "credits"}, timeout=10)
         
         if r_tw.status_code != 200 or r_en.status_code != 200: 
@@ -251,13 +252,15 @@ def get_movie_details(movie_id):
             if member.get("job") == "Director":
                 directors_en.append(member.get("name", ""))
                 
-        # 【核心修復】驗證中文導演名是否真的是中文
+        # 【核心修復】驗證中文導演名是否真的是中文，並加上簡繁轉換！
         final_dir_tw_list = []
         for idx, d_tw in enumerate(directors_tw):
             # 如果台灣翻譯的名字裡「沒有任何中文字元」(代表 TMDB 偷懶給了英文)
             # 且簡體中文有翻譯，我們就直接借用簡體中文的翻譯！
             if not re.search(r"[\u4e00-\u9fa5]", d_tw) and idx < len(directors_cn) and re.search(r"[\u4e00-\u9fa5]", directors_cn[idx]):
-                final_dir_tw_list.append(directors_cn[idx])
+                # 【新增】使用 zhconv 將大陸簡體名字翻譯成台灣繁體！
+                traditional_name = zhconv.convert(directors_cn[idx], 'zh-tw')
+                final_dir_tw_list.append(traditional_name)
             else:
                 final_dir_tw_list.append(d_tw)
                 
