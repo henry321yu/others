@@ -60,15 +60,20 @@ if os.path.exists(ROOT):
             items.append((obj.name, obj.name))
 
 print("="*60)
-print(f"掃描到 {len(items)} 個項目")
+print(f"掃描到 {len(items)} 個項目：")
 print("="*60)
+
+# 將掃描到的項目印出
+for raw_name, _ in items:
+    print(raw_name)
+print()
 
 #=========================
 # 清理片名 (終極強化版)
 #=========================
 def clean_name(clean_target):
     
-    # [新增] 0. 抹除日期格式 (如 2022-12-14 或 2022.12.14)，避免干擾年份判斷
+    # 0. 抹除日期格式 (如 2022-12-14 或 2022.12.14)，避免干擾年份判斷
     clean_target = re.sub(r"\b(19|20)\d{2}[-./_]\d{1,2}[-./_]\d{1,2}\b", " ", clean_target)
 
     # 1. 抓年份 (加入 '[' 做為邊界，解決 Gladiator.2000[DVD] 問題)
@@ -92,7 +97,7 @@ def clean_name(clean_target):
         # 移除括號內容
         t = re.sub(r"\[.*?\]|\(.*?\)|【.*?】", " ", t)
         
-        # [新增] 一刀切模式：遇到這些字眼，直接截斷後面的所有字串
+        # 一刀切模式：遇到這些字眼，直接截斷後面的所有字串
         junk_chop = r"(1080p|720p|2160p|4k|8k|超清|高清|免費|在線|線上看|正片|優酷|劇迷|首選|中文字幕|字幕|簡體|繁中|簡中|粵語|英語|國語|雙語|迅雷|下載)"
         t = re.split(junk_chop, t, flags=re.I)[0]
         
