@@ -91,6 +91,7 @@ ls -lt /home/raslan/Desktop/lidar_log
 
 時間到自動重開機 (凌晨2點0分)
 sudo nano /etc/crontab
+在最後一行加入
 0 2 * * * root reboot
 
 查詢開機時間
