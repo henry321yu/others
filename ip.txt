@@ -37,6 +37,7 @@ receiver_ip = 10.241.0.114
 #rasp raslan@10.241.156.153
 #rasp2 admin@10.241.194.18
 #rasp3 admin@10.241.136.93
+#raspt admin@10.241.20.154
 
 
 HEY-PC
