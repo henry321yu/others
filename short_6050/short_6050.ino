@@ -9,6 +9,7 @@ int ID;
 void setup() {
   Serial.begin(115200); // Initialize serial output via USB
   Wire.begin();
+  Wire.setClock(400000);   // 將 I2C 時脈設為 400 kHz
   
   //wakes up the MPU-6050
   writeRegister(MPU_addr, 0x6B, 0x80);// reset
@@ -26,7 +27,7 @@ void loop() {
   logdata = accdata + ", " + gyrdata;
   
   Serial.println(logdata);
-
+  delay(7);
 }
 
 void imu6050_data() {
@@ -37,7 +38,7 @@ void imu6050_data() {
   x[0] = values[0] << 8 | values[1];
   y[0] = values[2] << 8 | values[3];
   z[0] = values[4] << 8 | values[5];
-  ta[10] = values[6] << 8 | values[7];
+  ta[0] = values[6] << 8 | values[7];
   gx[0] = values[8] << 8 | values[9];
   gy[0] = values[10] << 8 | values[11];
   gz[0] = values[12] << 8 | values[13];
@@ -66,7 +67,7 @@ void imu6050_data() {
   gy[0] = gy[0] / 131;
   gz[0] = gz[0] / 131;
 
-  ta[0] = (ta[10] / 340) - 160.87 + 3.63;
+  ta[0] = (ta[0] / 340) - 160.87 + 3.63;
 }
 void writeRegister(int ID, int reg, int data)
 {
