@@ -8,10 +8,10 @@ import time
 
 # 1. UDP 一對多廣播名單 (用於發送 LiDAR、影像、ADXL 等感測資料給遠端 PC)
 REMOTE_PC_LIST = [
-    # ('10.241.215.99', 0),  # dell
-    # ('10.241.199.211', 0), # fly office
+    ('10.241.215.99', 0),  # dell
+    ('10.241.199.211', 0), # fly office
     ('26.55.45.86', 0),      # my new office (Radmin IP)
-    # ('26.253.227.19', 0),  # my pc RADMIN
+    ('26.253.227.19', 0),  # my pc RADMIN
 ]
 
 # 2. UDP 廣播監聽 Port (收到這些 Port 的封包，會群發給 REMOTE_PC_LIST)
