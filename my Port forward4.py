@@ -19,8 +19,11 @@ UDP_BROADCAST_PORTS = [2370, 2385, 2386, 2368, 2369]
 
 # 3. TCP 一對一轉發規則 (用於 SSH 或其他需建立連線的服務)
 TCP_RULES = [
+    # server
     {"local_port": 6969, "target_host": "10.241.20.154", "target_port": 6969},
     {"local_port": 6970, "target_host": "10.241.194.18", "target_port": 6969},
+
+    # SSH
     {"local_port": 2222, "target_host": "10.241.194.18", "target_port": 22},
     {"local_port": 2223, "target_host": "10.241.20.154", "target_port": 22},
     {"local_port": 2224, "target_host": "10.241.156.153", "target_port": 22},
@@ -85,7 +88,10 @@ def forward_udp_broadcast(listen_port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind(('0.0.0.0', listen_port))
-    print(f"[*] UDP 廣播監聽 Port {listen_port} --> 廣播至 {len(REMOTE_PC_LIST)} 台設備")
+    
+    # 計算本地檢視用的 Port (例如 2368 -> 12368)
+    local_view_port = listen_port + 10000 
+    print(f"[*] UDP 廣播監聽 Port {listen_port} --> 廣播至遠端，並開放本機 Port {local_view_port} 供讀取")
 
     packet_count = 0
     total_bytes_sent = 0
@@ -94,15 +100,25 @@ def forward_udp_broadcast(listen_port):
     while True:
         try:
             data, addr = sock.recvfrom(65536)
+            # 防呆機制：過濾掉自己發給自己的封包，避免無限迴圈
+            if addr[0] == '127.0.0.1':
+                continue
         except Exception as e:
             continue
 
+        # 1. 轉發給遠端 Radmin 電腦
         for ip, _ in REMOTE_PC_LIST:
             try:
                 sent_bytes = sock.sendto(data, (ip, listen_port))
                 total_bytes_sent += sent_bytes
             except Exception:
                 pass
+                
+        # 2. 轉發給 IPC 本機 (加上偏移量，避免 Port 衝突)
+        try:
+            sock.sendto(data, ('127.0.0.1', local_view_port))
+        except Exception:
+            pass
 
         packet_count += 1
 
