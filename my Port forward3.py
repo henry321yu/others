@@ -73,13 +73,14 @@ def main():
     # ==========================================
     forwarding_rules = [
         # 規則 1: 原本的樹莓派
-        {"local_port": 6970, "target_host": "10.241.194.18", "target_port": 6969},
+        {"local_port": 6969, "target_host": "10.241.20.154", "target_port": 6969},
         
         # 規則 2: 另一台設備或另一個 Port (範例)
-        # {"local_port": 8080, "target_host": "10.241.194.19", "target_port": 80},
+        {"local_port": 6970, "target_host": "10.241.194.18", "target_port": 6969},
         
         # 規則 3: 同一台樹莓派的不同 Port (範例：SSH)
-        # {"local_port": 2222, "target_host": "10.241.194.18", "target_port": 22},
+        {"local_port": 2222, "target_host": "10.241.194.18", "target_port": 22},
+        {"local_port": 2223, "target_host": "10.241.20.154", "target_port": 22},
     ]
 
     print("[*] 正在啟動多重 Port Forwarding 服務...\n")
