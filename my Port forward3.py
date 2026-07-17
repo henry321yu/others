@@ -72,24 +72,14 @@ def main():
     # 在這裡設定所有的轉發規則 (可自由新增)
     # ==========================================
     forwarding_rules = [
-        # 規則 1: 原本的樹莓派
+        # Server
         {"local_port": 6969, "target_host": "10.241.20.154", "target_port": 6969},
-        
-        # 規則 2: 另一台設備或另一個 Port (範例)
         {"local_port": 6970, "target_host": "10.241.194.18", "target_port": 6969},
         
-        # 規則 3: 同一台樹莓派的不同 Port (範例：SSH)
+        # SSH
         {"local_port": 2222, "target_host": "10.241.194.18", "target_port": 22},
         {"local_port": 2223, "target_host": "10.241.20.154", "target_port": 22},
-
-        #Lidar
         {"local_port": 2224, "target_host": "10.241.156.153", "target_port": 22},
-        {"local_port": 2370, "target_host": "10.241.156.153", "target_port": 2370},
-        {"local_port": 2385, "target_host": "10.241.156.153", "target_port": 2385},
-        {"local_port": 2386, "target_host": "10.241.156.153", "target_port": 2386},
-        {"local_port": 2368, "target_host": "10.241.156.153", "target_port": 2368},
-        {"local_port": 2369, "target_host": "10.241.156.153", "target_port": 2369},
-        {"local_port": 2371, "target_host": "10.241.156.153", "target_port": 2371},
     ]
     print("[*] 正在啟動多重 Port Forwarding 服務...\n")
     
