@@ -77,9 +77,9 @@ def main():
         {"local_port": 6970, "target_host": "10.241.194.18", "target_port": 6969},
         
         # SSH
-        {"local_port": 2222, "target_host": "10.241.194.18", "target_port": 22},
-        {"local_port": 2223, "target_host": "10.241.20.154", "target_port": 22},
-        {"local_port": 2224, "target_host": "10.241.156.153", "target_port": 22},
+        {"local_port": 2269, "target_host": "10.241.20.154", "target_port": 22},
+        {"local_port": 2270, "target_host": "10.241.194.18", "target_port": 22},
+        {"local_port": 2271, "target_host": "10.241.156.153", "target_port": 22},
     ]
     print("[*] 正在啟動多重 Port Forwarding 服務...\n")
     
