@@ -72,18 +72,15 @@ def main():
     # 在這裡設定所有的轉發規則 (可自由新增)
     # ==========================================
     forwarding_rules = [
-        # Server
-        {"local_port": 6969, "target_host": "10.241.20.154", "target_port": 6969},
-        {"local_port": 6970, "target_host": "10.241.194.18", "target_port": 6969},
+        # Windows KMS
+        {"local_port": 1688, "target_host": "140.116.205.75", "target_port": 1688},
         
-        # SSH
-        {"local_port": 2269, "target_host": "10.241.20.154", "target_port": 22},
-        {"local_port": 2270, "target_host": "10.241.194.18", "target_port": 22},
-        {"local_port": 2271, "target_host": "10.241.156.153", "target_port": 22},
+        # SolidWorks (主 Port)
+        {"local_port": 25734, "target_host": "140.116.249.45", "target_port": 25734},
     ]
     print("[*] 正在啟動多重 Port Forwarding 服務...\n")
     
-    # 存放伺服器執行緒的清單
+    print("[*] 正在啟動 Port Forwarding 服務...\n")
     server_threads = []
     
     # 為每一組規則啟動一個獨立的監聽執行緒
