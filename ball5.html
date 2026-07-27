@@ -52,18 +52,18 @@
       修改這一區即可調整整個模擬；數值以畫布的 CSS 像素與秒為單位。
     */
     const CONFIG = {
-      BALL_RADIUS: 11,                  // 球半徑
+      BALL_RADIUS: 8,                 // 球半徑
       GRAVITY: 500,                    // 向下重力（px/s²）
       START_VERTICAL_SPEED: -430,      // 開始時的向上速度（負值向上）
-      START_HORIZONTAL_SPEED: 165,      // 開始時的水平速度
+      START_HORIZONTAL_SPEED: 165,     // 開始時的水平速度
       BOUNCINESS: 0.77,                // 0~1；圓環碰撞後保留的法向速度
-      SURFACE_FRICTION: 0.7,            // 0~1；碰撞時切向速度／旋轉交換程度
+      SURFACE_FRICTION: 0.7,           // 0~1；碰撞時切向速度／旋轉交換程度
       BALL_AIR_DRAG: 0.012,            // 空氣阻力，避免速度無限制累積
 
       FIRST_RING_RADIUS: 118,          // 最內圈半徑
       RING_SPACING: 32,                // 各圈等距間隔
       VISIBLE_RING_COUNT: 13,          // 同時保留的圓環數量（通過後自動補上）
-      RING_STROKE: 4,                  // 圓環線寬
+      RING_STROKE: 2.2,                  // 圓環線寬
       
       GAP_ROTATION_SPEED_MIN: 0.1,     // 最小轉速
       GAP_ROTATION_SPEED_MAX: 0.85,    // 最大轉速
@@ -71,7 +71,7 @@
       GAP_WIDTH_MIN_RATIO: 1.0,        // 最小缺口倍率
       GAP_WIDTH_MAX_RATIO: 3.2,        // 最大缺口倍率
 
-      BOOST_CHANCE: 0.07,              // 加速觸發機率 (0.07 = 7%)
+      BOOST_CHANCE: 0.05,              // 加速觸發機率 (0.07 = 7%)
       BOOSTED_BOUNCES: 1,              // 每次啟動後加速幾次彈跳
       BOOST_MULTIPLIER: 2,             // 加速彈跳倍率
       MAX_SPEED: 1050,                 // 速度安全上限
@@ -87,7 +87,7 @@
 
       // 體積煙霧粒子系統參數
       PARTICLE_COUNT: 700,             // 煙霧粒子數量
-      SMOKE_MAX_LIFE: 6,             // 煙霧存活最大秒數
+      SMOKE_MAX_LIFE: 6,               // 煙霧存活最大秒數
       WAKE_RADIUS: 70,                 // 球體影響煙霧的流體半徑 (風壓範圍)
       WAKE_FORCE: 420,                 // 球體帶動煙霧的推力
       UPDRAFT_FORCE: 37,               // 熱氣流向上飄散的基礎加速度
@@ -109,7 +109,7 @@
       CLICK_SMOKE_BURST_MAX: 80,       // 最大向外擴散速度
 
       // 球體噴煙參數
-      BALL_BOOST_DURATION: 0.1,       // 噴煙持續時間 (秒)
+      BALL_BOOST_DURATION: 0.1,        // 噴煙持續時間 (秒)
       BALL_BOOST_SMOKE_COUNT: 30,      // 【微增】確保扇形夠飽滿
       BALL_BOOST_SMOKE_SPEED: 310,     // 【調高】為了突顯中心噴射的扇形效果
       BALL_BOOST_SMOKE_SPREAD: 1.5,    // 【微寬】散佈角度 (弧度) 讓兩側區別明顯
