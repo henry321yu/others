@@ -15,6 +15,15 @@
       letter-spacing: .08em; text-align: right; user-select: none; pointer-events: none;
     }
     .hud strong { display: block; margin-top: 4px; font-size: 34px; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+    
+    /* 【新增】最高紀錄的樣式 */
+    .hud .best {
+      margin-top: 6px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.45);
+      letter-spacing: 0.05em;
+    }
+
     .hint {
       position: fixed; left: 24px; bottom: 22px; z-index: 1;
       color: rgba(255,255,255,.38); font: 13px/1.4 ui-sans-serif, system-ui, "Microsoft JhengHei", sans-serif;
@@ -33,13 +42,20 @@
     @media (max-width: 560px) {
       .hud { top: 17px; right: 18px; font-size: 12px; }
       .hud strong { font-size: 28px; }
+      .hud .best { font-size: 11px; margin-top: 4px; }
       .hint { left: 18px; bottom: 16px; font-size: 11px; }
     }
   </style>
 </head>
 <body>
   <canvas id="scene" aria-label="Bouncing sim"></canvas>
-  <div class="hud">Circles<strong id="score">0</strong></div>
+  
+  <!-- 【修改】HUD 介面加入最高分顯示 -->
+  <div class="hud">
+    Circles<strong id="score">0</strong>
+    <div class="best">Best <span id="high-score">0</span></div>
+  </div>
+  
   <div class="hint">
     <span id="pause-btn" class="btn-pause">Pause</span> · Tap to intract · R reset
   </div>
@@ -112,6 +128,11 @@
     const context = canvas.getContext("2d");
     const scoreElement = document.getElementById("score");
     const pauseBtn = document.getElementById("pause-btn");
+    
+    // 【新增】獲取最高紀錄的 DOM 元素與讀取本地紀錄
+    const highScoreElement = document.getElementById("high-score");
+    let highScore = parseInt(localStorage.getItem("bouncingBallHighScore")) || 0;
+    highScoreElement.textContent = String(highScore);
 
     let width = 0;
     let height = 0;
@@ -120,7 +141,6 @@
     let lastTime = performance.now();
     let paused = false;
     
-    // 【新增】遊戲狀態與計時器
     let gameState = "playing"; // "playing", "gameover"
     let gameOverTimer = 0;
 
@@ -174,24 +194,16 @@
       return ((seeded - Math.floor(seeded)) * Math.PI * 2) - Math.PI;
     }
 
-    // 【修改】控制缺口急遽縮小（閉合）的時機與曲線
+    // 控制缺口急遽縮小（閉合）的時機與曲線
     function getGapHalfAngle(ring) {
-      // 1. 調整時機：圓環半徑小於這個數值時，缺口才開始往 CLOSE_RATIO 縮小
-      // （設定為 80 代表圓環還很大時，缺口都會保持最大，靠近中心才開始縮）
       const SHRINK_START_RADIUS = 125; 
-
-      // 2. 計算進度 (大於 80 時 progress 為 1，小於 80 時逐漸變為 0)
       const progress = clamp(
         (ring.radius - CONFIG.RING_MIN_RADIUS) / (SHRINK_START_RADIUS - CONFIG.RING_MIN_RADIUS), 
         0, 1
       );
       
-      // 3. 調整曲線：使用開根號 (0.5次方) 讓 progress 衰減得慢一點
-      // 這樣可以確保缺口在最後一刻（半徑非常小的時候）才急速「夾死」球體
       const easeProgress = Math.pow(progress, 0.5);
-      
       const currentGapRatio = CONFIG.GAP_WIDTH_CLOSE_RATIO + (ring.maxGapWidthRatio - CONFIG.GAP_WIDTH_CLOSE_RATIO) * easeProgress;
-
       const physicalGapWidth = (CONFIG.BALL_RADIUS * 2) * currentGapRatio;
       const halfGap = physicalGapWidth / 2;
       return Math.asin(clamp(halfGap / ring.radius, 0, 0.95));
@@ -256,35 +268,27 @@
       return rings.find((ring) => !ring.broken);
     }
 
-    // 【修改】嚴格檢查球體是否能通過缺口
+    // 嚴格檢查球體是否能通過缺口
     function inGap(ring, angle) {
       const gapHalfAngle = getGapHalfAngle(ring);
-      
-      // 計算球體本身的半徑佔用了多少角度
-      // 0.99 避免浮點數或剛好重疊時的 NaN 錯誤
       const ballHalfAngle = Math.asin(clamp(CONFIG.BALL_RADIUS / ring.radius, 0, 0.99));
       
-      // 如果缺口的實體寬度連球都塞不下，絕對無法通過
       if (gapHalfAngle <= ballHalfAngle) return false;
       
-      // 球心必須要在「缺口總角減去球體佔用角度」的範圍內，才不會撞到缺口的邊緣
       const allowedHalfAngle = gapHalfAngle - ballHalfAngle;
-      
       return Math.abs(angleDistance(angle, ring.gapAngle)) <= allowedHalfAngle;
     }
 
-    // 【新增】觸發遊戲結束，球化為煙霧
+    // 觸發遊戲結束，球化為煙霧
     function triggerGameOver() {
       gameState = "gameover";
       gameOverTimer = 5.0; // 5秒倒數
       
       const bvx = ball.vx;
       const bvy = ball.vy;
-      // 讓球的實體不再移動，避免繼續帶動煙霧氣流
       ball.vx = 0; 
       ball.vy = 0;
 
-      // 生成球化為煙的特效 (150顆高亮白煙)
       for (let i = 0; i < 150; i++) {
         const theta = Math.random() * 2 * Math.PI;
         const r = CONFIG.BALL_RADIUS * Math.sqrt(Math.random());
@@ -298,7 +302,7 @@
         particles.push({
           x: px,
           y: py,
-          vx: vx + bvx * 0.25, // 繼承原本球體的速度慣性
+          vx: vx + bvx * 0.25, 
           vy: vy + bvy * 0.25,
           life: 0,
           maxLife: CONFIG.SMOKE_MAX_LIFE * (0.3 + Math.random() * 0.5),
@@ -364,6 +368,19 @@
       ring.broken = true;
       passCount += 1;
       scoreElement.textContent = String(passCount);
+      
+      // 【新增】檢查並更新最高紀錄
+      if (passCount > highScore) {
+        highScore = passCount;
+        highScoreElement.textContent = String(highScore);
+        
+        // 嘗試寫入 LocalStorage
+        try {
+          localStorage.setItem("bouncingBallHighScore", String(highScore));
+        } catch (e) {
+          console.warn("無法儲存最高紀錄", e);
+        }
+      }
 
       const lastRadius = rings[rings.length - 1].radius;
       rings.push(createRing(lastRadius + CONFIG.RING_SPACING));
