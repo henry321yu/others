@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Bouncing Ball</title>
+  <title>Bouncing Ball - Sand Particles</title>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
@@ -52,7 +52,7 @@
     */
     const CONFIG = {
       BALL_RADIUS: 8,                 // 球半徑
-      GRAVITY: 500,                    // 向下重力（px/s²）
+      GRAVITY: 500,                   // 向下重力（px/s²）
       START_VERTICAL_SPEED: -430,      // 開始時的向上速度（負值向上）
       START_HORIZONTAL_SPEED: 165,     // 開始時的水平速度
       BOUNCINESS: 0.77,                // 0~1；圓環碰撞後保留的法向速度
@@ -62,7 +62,7 @@
       FIRST_RING_RADIUS: 118,          // 最內圈半徑
       RING_SPACING: 32,                // 各圈等距間隔
       VISIBLE_RING_COUNT: 13,          // 同時保留的圓環數量（通過後自動補上）
-      RING_STROKE: 2.2,                  // 圓環線寬
+      RING_STROKE: 2.2,                // 圓環線寬
       
       GAP_ROTATION_SPEED_MIN: 0.1,     // 最小轉速
       GAP_ROTATION_SPEED_MAX: 0.85,    // 最大轉速
@@ -84,19 +84,26 @@
       RING_SHAKE_STIFFNESS: 1500,      // 震動彈簧剛性 (越高頻率越快、越快回彈)
       RING_SHAKE_DAMPING: 25,          // 震動阻尼 (越高越快停止震動)
 
-      // 體積煙霧粒子系統參數
-      PARTICLE_COUNT: 700,             // 煙霧粒子數量
+      // 【新增】碎裂沙子顆粒系統參數 (取代原本的破裂煙霧)
+      SAND_COUNT: 1000,                 // 破碎產生的沙粒數量
+      SAND_GRAVITY: 350,               // 沙粒掉落的重力
+      SAND_BOUNCE: 0.35,               // 沙粒碰撞圓環的彈性 (低彈性如沙)
+      SAND_FRICTION: 0.85,             // 沙粒在圓環上滑動的摩擦保留率
+      SAND_SIZE_MIN: 0.3,              // 沙粒最小半徑
+      SAND_SIZE_MAX: 0.8,              // 沙粒最大半徑
+
+      // 體積煙霧粒子系統參數 (保留給球體摩擦與點擊)
       SMOKE_MAX_LIFE: 6,               // 煙霧存活最大秒數
       WAKE_RADIUS: 70,                 // 球體影響煙霧的流體半徑 (風壓範圍)
       WAKE_FORCE: 420,                 // 球體帶動煙霧的推力
       UPDRAFT_FORCE: 37,               // 熱氣流向上飄散的基礎加速度
 
       // 環境自然風參數
-      WIND_FORCE_MIN: 10,             
-      WIND_FORCE_MAX: 85,             
-      WIND_CHANGE_INTERVAL: 3.5,      
+      WIND_FORCE_MIN: 10,              
+      WIND_FORCE_MAX: 85,              
+      WIND_CHANGE_INTERVAL: 3.5,       
       WIND_SPACING_MULTIPLIER: 0.08,   // 風力影響圓環間距的倍率
-      WIND_BEND_MULTIPLIER: 0.003,   // 【新增】風力影響隧道 X/Y 彎曲偏移的倍率
+      WIND_BEND_MULTIPLIER: 0.003,     // 風力影響隧道 X/Y 彎曲偏移的倍率
 
       // 絕對距離視覺漸變參數
       FADE_START_RADIUS: 120,          // 半徑小於此值：完全實體、最亮
@@ -111,10 +118,10 @@
 
       // 球體噴煙參數
       BALL_BOOST_DURATION: 0.1,        // 噴煙持續時間 (秒)
-      BALL_BOOST_SMOKE_COUNT: 30,      // 【微增】確保扇形夠飽滿
-      BALL_BOOST_SMOKE_SPEED: 310,     // 【調高】為了突顯中心噴射的扇形效果
-      BALL_BOOST_SMOKE_SPREAD: 1.5,    // 【微寬】散佈角度 (弧度) 讓兩側區別明顯
-    };    
+      BALL_BOOST_SMOKE_COUNT: 30,      // 噴煙數量
+      BALL_BOOST_SMOKE_SPEED: 310,     // 噴射的扇形速度
+      BALL_BOOST_SMOKE_SPREAD: 1.5,    // 散佈角度 (弧度)
+    };  
 
 
     const canvas = document.getElementById("scene");
@@ -197,8 +204,8 @@
         shakeY: 0,
         shakeVx: 0,
         shakeVy: 0,
-        windOffsetX: 0, // 【新增】風力造成的 X 軸飄移
-        windOffsetY: 0  // 【新增】風力造成的 Y 軸飄移
+        windOffsetX: 0, 
+        windOffsetY: 0  
       };
     }
 
@@ -256,36 +263,32 @@
       
       const vTan = ring.radius * ring.rotationSpeed; 
       
-      // 【修改】破碎的特效基底中心必須加上風力飄移量
       const ringCenterX = center.x + ring.windOffsetX + ring.shakeX;
       const ringCenterY = center.y + ring.windOffsetY + ring.shakeY;
 
-      for (let i = 0; i < CONFIG.PARTICLE_COUNT; i++) {
+      // 【更新】生成實體沙粒而非煙霧
+      for (let i = 0; i < CONFIG.SAND_COUNT; i++) {
         const angle = startAngle + Math.random() * arcLength;
-        const radiusOffset = (Math.random() - 0.5) * 6;
+        const radiusOffset = (Math.random() - 0.5) * CONFIG.RING_STROKE * 1.5;
         
-        // 使用疊加偏移後的動態中心
         const px = ringCenterX + Math.cos(angle) * (ring.radius + radiusOffset);
         const py = ringCenterY + Math.sin(angle) * (ring.radius + radiusOffset);
 
         const vxTan = -Math.sin(angle) * vTan;
         const vyTan = Math.cos(angle) * vTan;
         
-        const isCore = Math.random() < 0.6;
-        const randomBurst = isCore ? (Math.random() - 0.5) * 5 : (Math.random() - 0.5) * 15; 
+        // 賦予破裂瞬間微小的彈跳與四射感
+        const burst = (Math.random() - 0.5) * 80;
+        const burstX = Math.cos(angle) * burst;
+        const burstY = Math.sin(angle) * burst;
         
         particles.push({
+          type: 'sand', // 標記為沙子
           x: px, y: py,
-          vx: vxTan + Math.cos(angle) * randomBurst,
-          vy: vyTan + Math.sin(angle) * randomBurst,
-          life: 0,
-          maxLife: CONFIG.SMOKE_MAX_LIFE * (0.4 + Math.random() * 0.6),
-          size: isCore ? (Math.random() * 6 + 3) : (Math.random() * 12 + 6),
-          growth: isCore ? 8 : 18, 
-          color: `${r},${g},${b}`,
-          baseAlpha: isCore ? baseAlpha * 0.12 : baseAlpha * 0.05,
-          swirlPhaseX: Math.random() * Math.PI * 2, swirlPhaseY: Math.random() * Math.PI * 2,
-          swirlFreq: 1.5 + Math.random() * 2, swirlAmp: 10 + Math.random() * 20
+          vx: vxTan + burstX,
+          vy: vyTan + burstY,
+          size: CONFIG.SAND_SIZE_MIN + Math.random() * (CONFIG.SAND_SIZE_MAX - CONFIG.SAND_SIZE_MIN),
+          color: `rgba(${r}, ${g}, ${b}, ${baseAlpha * 0.9 + 0.1})` // 繼承原本圓環褪色的視覺
         });
       }
 
@@ -295,7 +298,6 @@
     }
 
     function collideWithRing(ring) {
-      // 【修改】碰撞計算的圓心改為加上風向偏移量
       const ringCenterX = center.x + ring.windOffsetX;
       const ringCenterY = center.y + ring.windOffsetY;
 
@@ -318,7 +320,6 @@
       ring.shakeVx += normalX * radialVelocity * CONFIG.RING_SHAKE_MULTIPLIER;
       ring.shakeVy += normalY * radialVelocity * CONFIG.RING_SHAKE_MULTIPLIER;
 
-      // 【修改】將球體修正回動態偏心邊界內
       ball.x = ringCenterX + normalX * innerBoundary;
       ball.y = ringCenterY + normalY * innerBoundary;
 
@@ -346,32 +347,25 @@
 
       bounceCount += 1;
 
-      // ==========================================
-      // 【新增】碰撞時在球體左右切線邊緣產生煙霧 (各 3 顆)
-      // ==========================================
+      // 碰撞煙霧
       for (let i = 0; i < 2; i++) {
-        // side = 1 為右側, -1 為左側
         const sides = [1, -1]; 
         sides.forEach(side => {
-          // 1. 設定發射點：球心 + (切向量 * 方向 * 半徑)
           const startX = ball.x + tangentX * side * CONFIG.BALL_RADIUS;
           const startY = ball.y + tangentY * side * CONFIG.BALL_RADIUS;
-
-          // 2. 設定速度：沿著切線散開 (tangentSpeed)，並強制往內縮 (-normal) 避免穿過圓環
-          const tangentSpeed = 0.2 + Math.random() * 0.02; // 切線方向噴散速度
-          const inwardSpeed = 0.1 + Math.random() * 0.01;  // 向環中心彈回的速度
-
-          // normal 向量是指向圓環外側，所以這裡用減的 (-normalX) 來確保煙霧往內飛
+          const tangentSpeed = 0.2 + Math.random() * 0.02; 
+          const inwardSpeed = 0.1 + Math.random() * 0.01;  
           const vx = (tangentX * side * tangentSpeed) - (normalX * inwardSpeed);
           const vy = (tangentY * side * tangentSpeed) - (normalY * inwardSpeed);
 
           particles.push({
+            type: 'smoke',
             x: startX, 
             y: startY, 
-            vx: vx + ball.vx * 0.015, // 繼承一點點球反彈後的速度讓視覺更自然
+            vx: vx + ball.vx * 0.015,
             vy: vy + ball.vy * 0.015, 
             life: 0,
-            maxLife: CONFIG.SMOKE_MAX_LIFE * (0.1 + Math.random() * 0.1), // 生命週期較短，呈現瞬間噴出感
+            maxLife: CONFIG.SMOKE_MAX_LIFE * (0.1 + Math.random() * 0.1), 
             size: Math.random() * 4 + 1,
             growth: 8 + Math.random() * 2,
             color: `215, 220, 225`,
@@ -382,11 +376,6 @@
             swirlAmp: 5 + Math.random() * 8
           });
         });
-      }
-      // ==========================================
-
-      if (Math.random() < CONFIG.BOOST_CHANCE) {
-        boostRemaining = CONFIG.BOOSTED_BOUNCES;
       }
 
       const postBounceSpeed = Math.hypot(ball.vx, ball.vy);
@@ -411,7 +400,6 @@
       ball.angle += ball.spin * dt;
       ball.spin *= Math.max(0, 1 - 0.28 * dt);
 
-      // 環境自然風計算
       envWind.timer -= dt;
       if (envWind.timer <= 0) {
         envWind.timer = CONFIG.WIND_CHANGE_INTERVAL + Math.random() * 2;
@@ -456,6 +444,7 @@
           const vx = Math.cos(angle) * partSpeed + ball.vx * 0.12;
           const vy = Math.sin(angle) * partSpeed + ball.vy * 0.12;
           particles.push({
+            type: 'smoke',
             x: px, y: py, vx: vx, vy: vy, life: 0,
             maxLife: CONFIG.SMOKE_MAX_LIFE * (0.3 + Math.random() * 0.3), 
             size: Math.random() * 10 + 5,        
@@ -493,7 +482,6 @@
           }
         }
         
-        // 【新增】根據圓環的半徑大小套用風力偏移，形成越外側越歪斜的 3D 透視折彎感
         item.windOffsetX = envWind.vx * item.radius * CONFIG.WIND_BEND_MULTIPLIER;
         item.windOffsetY = envWind.vy * item.radius * CONFIG.WIND_BEND_MULTIPLIER;
 
@@ -516,53 +504,136 @@
       ripples.forEach(r => r.age += dt);
       ripples = ripples.filter(r => r.age < 0.6);
 
+      // 【更新】分別處理沙粒與煙霧的物理運算
       particles.forEach(p => {
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        p.vx *= (1 - 1.2 * dt); 
-        p.vy *= (1 - 1.2 * dt);
-        p.vy -= CONFIG.UPDRAFT_FORCE * dt;
-        
-        p.vx += envWind.vx * dt;
-        p.vy += envWind.vy * dt;
-
-        p.x += Math.cos(p.life * p.swirlFreq + p.swirlPhaseX) * p.swirlAmp * dt;
-        p.y += Math.sin(p.life * p.swirlFreq + p.swirlPhaseY) * p.swirlAmp * dt;
-
-        const dx = p.x - ball.x;
-        const dy = p.y - ball.y;
-        const dist = Math.hypot(dx, dy);
-        
-        if (dist < CONFIG.WAKE_RADIUS) {
-          const force = Math.pow(1 - dist / CONFIG.WAKE_RADIUS, 1.5);
-          const bSpeed = Math.hypot(ball.vx, ball.vy) || 1;
-          const bDirX = ball.vx / bSpeed;
-          const bDirY = ball.vy / bSpeed;
-          const dot = dx * bDirX + dy * bDirY;
+        if (p.type === 'sand') {
+          // ==============================
+          // 沙粒物理 (重力、碰撞與滑動)
+          // ==============================
+          p.vy += CONFIG.SAND_GRAVITY * dt;
           
-          if (dot < 0) {
-            p.vx += ball.vx * force * 2.8 * dt;
-            p.vy += ball.vy * force * 2.8 * dt;
-            const projX = bDirX * dot; 
-            const projY = bDirY * dot;
-            const toAxisX = projX - dx; 
-            const toAxisY = projY - dy;
-            const toAxisDist = Math.hypot(toAxisX, toAxisY) || 1;
+          // 沙子稍微受環境風力影響
+          p.vx += envWind.vx * dt * 0.3;
+          p.vy += envWind.vy * dt * 0.3;
+
+          // 微弱的空氣阻力
+          p.vx *= (1 - 0.5 * dt);
+          p.vy *= (1 - 0.5 * dt);
+
+          let nextX = p.x + p.vx * dt;
+          let nextY = p.y + p.vy * dt;
+
+          // 與現存圓環進行碰撞運算
+          rings.forEach(ring => {
+            const ringCenterX = center.x + ring.windOffsetX + ring.shakeX;
+            const ringCenterY = center.y + ring.windOffsetY + ring.shakeY;
+            const dx = nextX - ringCenterX;
+            const dy = nextY - ringCenterY;
+            const dist = Math.hypot(dx, dy) || 0.001;
+
+            const thickness = CONFIG.RING_STROKE / 2 + p.size;
             
-            p.vx += (toAxisX / toAxisDist) * CONFIG.WAKE_FORCE * force * 0.9 * dt;
-            p.vy += (toAxisY / toAxisDist) * CONFIG.WAKE_FORCE * force * 0.9 * dt;
-          } else {
-            p.vx += ball.vx * force * 0.5 * dt;
-            p.vy += ball.vy * force * 0.5 * dt;
-            if (dist > 1) {
-              p.vx += (dx / dist) * CONFIG.WAKE_FORCE * force * 1.2 * dt;
-              p.vy += (dy / dist) * CONFIG.WAKE_FORCE * force * 1.2 * dt;
+            // 檢查沙子是否貼近某個圓環
+            if (Math.abs(dist - ring.radius) < thickness) {
+              const angle = Math.atan2(dy, dx);
+              
+              // 若不在缺口內，則會發生碰撞
+              if (!inGap(ring, angle)) {
+                // 將沙粒擠出圓環表面
+                const isInside = dist < ring.radius;
+                const targetDist = isInside ? ring.radius - thickness : ring.radius + thickness;
+                nextX = ringCenterX + (dx / dist) * targetDist;
+                nextY = ringCenterY + (dy / dist) * targetDist;
+
+                // 碰撞面的法向量(向外)
+                const hitNormalX = isInside ? -(dx / dist) : (dx / dist);
+                const hitNormalY = isInside ? -(dy / dist) : (dy / dist);
+                
+                // 檢查是否正往表面撞擊
+                const radialV = p.vx * hitNormalX + p.vy * hitNormalY;
+                if (radialV < 0) { 
+                  const vnX = hitNormalX * radialV;
+                  const vnY = hitNormalY * radialV;
+                  const vtX = p.vx - vnX;
+                  const vtY = p.vy - vnY;
+
+                  // 保留切線摩擦力與反彈衰減
+                  p.vx = vtX * CONFIG.SAND_FRICTION - vnX * CONFIG.SAND_BOUNCE;
+                  p.vy = vtY * CONFIG.SAND_FRICTION - vnY * CONFIG.SAND_BOUNCE;
+
+                  // 添加圓環本身旋轉造成的表面拖曳力
+                  const ringTanSpeed = ring.radius * ring.rotationSpeed;
+                  const ringTanX = -(dy / dist) * ringTanSpeed;
+                  const ringTanY = (dx / dist) * ringTanSpeed;
+
+                  p.vx += ringTanX * 0.035;
+                  p.vy += ringTanY * 0.035;
+                }
+              }
+            }
+          });
+
+          p.x = nextX;
+          p.y = nextY;
+
+        } else {
+          // ==============================
+          // 煙霧物理 (流體、消散、球體風壓)
+          // ==============================
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.vx *= (1 - 1.2 * dt); 
+          p.vy *= (1 - 1.2 * dt);
+          p.vy -= CONFIG.UPDRAFT_FORCE * dt;
+          
+          p.vx += envWind.vx * dt;
+          p.vy += envWind.vy * dt;
+
+          p.x += Math.cos(p.life * p.swirlFreq + p.swirlPhaseX) * p.swirlAmp * dt;
+          p.y += Math.sin(p.life * p.swirlFreq + p.swirlPhaseY) * p.swirlAmp * dt;
+
+          const dx = p.x - ball.x;
+          const dy = p.y - ball.y;
+          const dist = Math.hypot(dx, dy);
+          
+          if (dist < CONFIG.WAKE_RADIUS) {
+            const force = Math.pow(1 - dist / CONFIG.WAKE_RADIUS, 1.5);
+            const bSpeed = Math.hypot(ball.vx, ball.vy) || 1;
+            const bDirX = ball.vx / bSpeed;
+            const bDirY = ball.vy / bSpeed;
+            const dot = dx * bDirX + dy * bDirY;
+            
+            if (dot < 0) {
+              p.vx += ball.vx * force * 2.8 * dt;
+              p.vy += ball.vy * force * 2.8 * dt;
+              const projX = bDirX * dot; 
+              const projY = bDirY * dot;
+              const toAxisX = projX - dx; 
+              const toAxisY = projY - dy;
+              const toAxisDist = Math.hypot(toAxisX, toAxisY) || 1;
+              
+              p.vx += (toAxisX / toAxisDist) * CONFIG.WAKE_FORCE * force * 0.9 * dt;
+              p.vy += (toAxisY / toAxisDist) * CONFIG.WAKE_FORCE * force * 0.9 * dt;
+            } else {
+              p.vx += ball.vx * force * 0.5 * dt;
+              p.vy += ball.vy * force * 0.5 * dt;
+              if (dist > 1) {
+                p.vx += (dx / dist) * CONFIG.WAKE_FORCE * force * 1.2 * dt;
+                p.vy += (dy / dist) * CONFIG.WAKE_FORCE * force * 1.2 * dt;
+              }
             }
           }
+          p.life += dt;
         }
-        p.life += dt;
       });
-      particles = particles.filter(p => p.life < p.maxLife);
+      
+      // 過濾已經死亡或掉出畫面的粒子
+      particles = particles.filter(p => {
+        if (p.type === 'sand') {
+          return p.y < height + 100; // 掉出螢幕底端後移除
+        }
+        return p.life < p.maxLife; // 煙霧壽命
+      });
     }
 
     function drawArc(radius, start, end, r, g, b, alpha, offsetX = 0, offsetY = 0, lineWidth = CONFIG.RING_STROKE) {
@@ -585,27 +656,39 @@
       const b = Math.round(229 + (5 - 229) * easeRatio);
       const baseAlpha = 1 - easeRatio;
       
-      // 【修改】將 windOffsetX 與 shakeX 疊加後傳入繪製函式
       drawArc(ring.radius, start, end, r, g, b, baseAlpha, ring.windOffsetX + ring.shakeX, ring.windOffsetY + ring.shakeY);
     }
 
     function drawParticles() {
+      // 繪製固態沙粒
+      context.globalCompositeOperation = "source-over";
+      particles.forEach(p => {
+        if (p.type === 'sand') {
+          context.fillStyle = p.color;
+          // 使用矩形繪製可大幅度提升數百顆粒的效能
+          context.fillRect(p.x - p.size, p.y - p.size, p.size * 2, p.size * 2);
+        }
+      });
+
+      // 繪製體積煙霧
       context.globalCompositeOperation = "lighter";
       particles.forEach(p => {
-        const lifeRatio = p.life / p.maxLife;
-        const currentSize = p.size + p.growth * lifeRatio;
-        const alphaFade = 1 - Math.pow(lifeRatio, 1.5);
-        const alpha = Math.max(0, alphaFade * p.baseAlpha);
-        
-        if (alpha > 0.005) {
-          const grad = context.createRadialGradient(p.x, p.y, 0, p.x, p.y, currentSize);
-          grad.addColorStop(0, `rgba(${p.color}, ${alpha})`);
-          grad.addColorStop(0.4, `rgba(${p.color}, ${alpha * 0.5})`);
-          grad.addColorStop(1, `rgba(${p.color}, 0)`);
-          context.beginPath();
-          context.arc(p.x, p.y, currentSize, 0, Math.PI * 2);
-          context.fillStyle = grad;
-          context.fill();
+        if (p.type === 'smoke') {
+          const lifeRatio = p.life / p.maxLife;
+          const currentSize = p.size + p.growth * lifeRatio;
+          const alphaFade = 1 - Math.pow(lifeRatio, 1.5);
+          const alpha = Math.max(0, alphaFade * p.baseAlpha);
+          
+          if (alpha > 0.005) {
+            const grad = context.createRadialGradient(p.x, p.y, 0, p.x, p.y, currentSize);
+            grad.addColorStop(0, `rgba(${p.color}, ${alpha})`);
+            grad.addColorStop(0.4, `rgba(${p.color}, ${alpha * 0.5})`);
+            grad.addColorStop(1, `rgba(${p.color}, 0)`);
+            context.beginPath();
+            context.arc(p.x, p.y, currentSize, 0, Math.PI * 2);
+            context.fillStyle = grad;
+            context.fill();
+          }
         }
       });
       context.globalCompositeOperation = "source-over"; 
@@ -702,6 +785,7 @@
         const vy = Math.sin(theta) * burstSpeed;
 
         particles.push({
+          type: 'smoke',
           x: px, y: py, vx: vx, vy: vy, life: 0,
           maxLife: CONFIG.SMOKE_MAX_LIFE * (0.25 + Math.random() * 0.3), 
           size: Math.random() * 10 + 5,      
