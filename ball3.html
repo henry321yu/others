@@ -44,7 +44,7 @@
       GRAVITY: 300,                    // 向下重力（px/s²）
       START_VERTICAL_SPEED: -430,      // 開始時的向上速度（負值向上）
       START_HORIZONTAL_SPEED: 165,     // 開始時的水平速度
-      BOUNCINESS: 0.88,                // 0~1；圓環碰撞後保留的法向速度
+      BOUNCINESS: 0.95,                // 0~1；圓環碰撞後保留的法向速度
       SURFACE_FRICTION: 0.17,          // 0~1；碰撞時切向速度／旋轉交換程度
       BALL_AIR_DRAG: 0.012,            // 空氣阻力，避免速度無限制累積
 
@@ -56,13 +56,13 @@
       GAP_ROTATION_SPEED: 0.22,        // 缺口轉動速度（rad/s），確保最終會迎向球
 
       BOOST_CHANCE: 0.08,              // 加速觸發機率 (0.08 = 8%)
-      BOOSTED_BOUNCES: 3,              // 每次啟動後加速幾次彈跳
+      BOOSTED_BOUNCES: 5,              // 每次啟動後加速幾次彈跳
       BOOST_MULTIPLIER: 10,            // 加速彈跳倍率
       MAX_SPEED: 1050,                 // 速度安全上限
       BREAK_DURATION: 1.15,            // 穿越缺口後，圓環潰散動畫秒數
       
-      RING_SHRINK_SPEED: 15,           // 圓框內縮速度 (px/s)
-      RING_MIN_RADIUS: 45,             // 圓框最小半徑 (需大於球體，以免破圖)
+      RING_SHRINK_SPEED: 5,           // 圓框內縮速度 (px/s)
+      RING_MIN_RADIUS: 12,             // 圓框最小半徑 (需大於球體，以免破圖)
     };
 
     const canvas = document.getElementById("scene");
@@ -239,15 +239,26 @@
       const ring = activeRing();
       if (ring) collideWithRing(ring);
 
+      // 計算本幀「整體」最多能往內縮多少
+      let actualShrink = 0;
+      if (ring) {
+        // 只有在最內圈還大於最小半徑時，才允許整個結構一起往內縮
+        actualShrink = Math.min(
+          CONFIG.RING_SHRINK_SPEED * dt,
+          Math.max(0, ring.radius - CONFIG.RING_MIN_RADIUS)
+        );
+      }
+
       rings.forEach((item) => {
         item.gapAngle += item.gapDirection * CONFIG.GAP_ROTATION_SPEED * dt;
         if (item.broken) {
           item.breakAge += dt;
         } else {
-          // 圓環持續向內縮，直到達到設定的最小半徑
-          item.radius = Math.max(CONFIG.RING_MIN_RADIUS, item.radius - CONFIG.RING_SHRINK_SPEED * dt);
+          // 所有尚未擊碎的圓環，套用相同的內縮距離，完美保持等距
+          item.radius -= actualShrink;
         }
       });
+      
       rings = rings.filter((item) => !item.broken || item.breakAge < CONFIG.BREAK_DURATION);
 
       while (rings.length < CONFIG.VISIBLE_RING_COUNT) {
