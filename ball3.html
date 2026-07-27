@@ -30,7 +30,7 @@
 <body>
   <canvas id="scene" aria-label="白色彈跳球穿越無限缺口圓環的物理模擬"></canvas>
   <div class="hud">已通過圈數<strong id="score">0</strong></div>
-  <div class="hint">點擊畫面暫停　·　R 重設</div>
+  <div class="hint">點擊畫面暫停 · R 重設</div>
 
   <script>
     "use strict";
@@ -51,16 +51,16 @@
       FIRST_RING_RADIUS: 118,          // 最內圈半徑
       RING_SPACING: 37,                // 各圈等距間隔
       VISIBLE_RING_COUNT: 13,          // 同時保留的圓環數量（通過後自動補上）
-      RING_STROKE: 2.5,                // 圓環線寬
+      RING_STROKE: 3,                  // 圓環線寬
       GAP_EXTRA_CLEARANCE: 7,          // 缺口比球直徑額外寬出的單邊餘量
       GAP_ROTATION_SPEED: 0.47,        // 缺口轉動速度（rad/s），確保最終會迎向球
 
-      BOOST_CHANCE: 0.07,              // 加速觸發機率 (0.08 = 8%)
+      BOOST_CHANCE: 0.07,              // 加速觸發機率 (0.07 = 7%)
       BOOSTED_BOUNCES: 1,              // 每次啟動後加速幾次彈跳
-      BOOST_MULTIPLIER: 3,            // 加速彈跳倍率
+      BOOST_MULTIPLIER: 3,             // 加速彈跳倍率
       MAX_SPEED: 1050,                 // 速度安全上限
-      MIN_SPEED: 180,                  // 速度安全下限，防止球靜止 (px/s)
-      BREAK_DURATION: 1.15,            // 穿越缺口後，圓環潰散動畫秒數
+      MIN_SPEED: 300,                  // 速度安全下限，防止球靜止 (px/s)
+      BREAK_DURATION: 1.5,             // 穿越缺口後，圓環潰散動畫秒數
       
       RING_SHRINK_SPEED: 5,            // 圓框內縮速度 (px/s)
       RING_MIN_RADIUS: 12,             // 圓框最小半徑 (需大於球體，以免破圖)
@@ -174,27 +174,6 @@
       rings.push(createRing(lastRadius + CONFIG.RING_SPACING));
     }
 
-    // 新增：同時限制最高與最低速度，確保球不會暴衝也不會靜止
-    function constrainSpeed() {
-      const speed = Math.hypot(ball.vx, ball.vy);
-      if (speed > CONFIG.MAX_SPEED) {
-        const scale = CONFIG.MAX_SPEED / speed;
-        ball.vx *= scale;
-        ball.vy *= scale;
-      } else if (speed < CONFIG.MIN_SPEED) {
-        // 防止 speed 為 0 導致除以零的錯誤
-        if (speed < 0.1) {
-          // 如果幾乎靜止，給予一個向下的基礎速度讓它繼續動
-          ball.vy = CONFIG.MIN_SPEED;
-        } else {
-          // 等比例放大速度向量，維持當前移動方向
-          const scale = CONFIG.MIN_SPEED / speed;
-          ball.vx *= scale;
-          ball.vy *= scale;
-        }
-      }
-    }
-
     function collideWithRing(ring) {
       const dx = ball.x - center.x;
       const dy = ball.y - center.y;
@@ -242,6 +221,21 @@
       if (Math.random() < CONFIG.BOOST_CHANCE) {
         boostRemaining = CONFIG.BOOSTED_BOUNCES;
       }
+
+      // 【物理升級】僅在碰撞彈跳時套用最小速度，確保球能彈起，同時不干擾空中的自然拋物線
+      const postBounceSpeed = Math.hypot(ball.vx, ball.vy);
+      if (postBounceSpeed < CONFIG.MIN_SPEED) {
+        if (postBounceSpeed < 0.1) {
+          // 如果幾乎靜止，給予朝向圓心（內側）的法向速度 (-normal)
+          ball.vx = -normalX * CONFIG.MIN_SPEED;
+          ball.vy = -normalY * CONFIG.MIN_SPEED;
+        } else {
+          // 等比例放大速度向量，維持當前反彈方向
+          const scale = CONFIG.MIN_SPEED / postBounceSpeed;
+          ball.vx *= scale;
+          ball.vy *= scale;
+        }
+      }
     }
 
     function update(dt) {
@@ -256,8 +250,13 @@
       const ring = activeRing();
       if (ring) collideWithRing(ring);
 
-      // 每幀都強制檢查速度，確保球體隨時保持最小動能
-      constrainSpeed();
+      // 每幀僅限制最高速度，避免破圖或暴衝
+      const speed = Math.hypot(ball.vx, ball.vy);
+      if (speed > CONFIG.MAX_SPEED) {
+        const scale = CONFIG.MAX_SPEED / speed;
+        ball.vx *= scale;
+        ball.vy *= scale;
+      }
 
       let actualShrink = 0;
       if (ring) {
@@ -287,26 +286,36 @@
       if (ball.trail.length > 13) ball.trail.shift();
     }
 
-    function drawArc(radius, start, end, alpha, lineWidth = CONFIG.RING_STROKE) {
+    // 擴充繪圖函式，支援直接傳入 rgb 與 alpha，以利精準控制色彩
+    function drawArc(radius, start, end, r, g, b, alpha, lineWidth = CONFIG.RING_STROKE) {
       context.beginPath();
       context.arc(center.x, center.y, radius, start, end);
-      context.strokeStyle = `rgba(222, 226, 229, ${alpha})`;
+      context.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
       context.lineWidth = lineWidth;
       context.lineCap = "round";
       context.stroke();
     }
 
-    function drawRing(ring, index) {
+    function drawRing(ring, index, activeIdx) {
       const gap = gapHalfAngle(ring.radius);
       const start = ring.gapAngle + gap;
       const end = ring.gapAngle - gap + Math.PI * 2;
 
+      // 【視覺升級】計算該環相對於最內圈的位置，由亮白漸深至背景色 #050505 (rgb 5,5,5)
+      const visualIndex = Math.max(0, index - activeIdx);
+      const ratio = clamp(visualIndex / (CONFIG.VISIBLE_RING_COUNT - 1), 0, 1);
+      const easeRatio = Math.pow(ratio, 1.2); // 加上指數曲線，讓前幾圈亮一點
+      const r = Math.round(222 + (5 - 222) * easeRatio);
+      const g = Math.round(226 + (5 - 226) * easeRatio);
+      const b = Math.round(229 + (5 - 229) * easeRatio);
+
       if (!ring.broken) {
-        const fade = clamp(0.81 - index * 0.038, 0.28, 0.81);
-        drawArc(ring.radius, start, end, fade);
+        // 未擊碎的環維持完全不透明，直接靠 RGB 加深至底色
+        drawArc(ring.radius, start, end, r, g, b, 1);
         return;
       }
 
+      // 擊碎動畫仍保留 alpha 透明度衰退
       const progress = clamp(ring.breakAge / CONFIG.BREAK_DURATION, 0, 1);
       const pieces = 7;
       const available = Math.PI * 2 - gap * 2;
@@ -318,7 +327,7 @@
         context.save();
         context.translate(Math.cos(middle) * progress * 9, drift);
         context.rotate((piece - 3) * progress * 0.08);
-        drawArc(ring.radius, pieceStart, pieceEnd, (1 - progress) * 0.56);
+        drawArc(ring.radius, pieceStart, pieceEnd, r, g, b, (1 - progress) * 0.56);
         context.restore();
       }
     }
@@ -363,7 +372,12 @@
       context.clearRect(0, 0, width, height);
       context.fillStyle = "#050505";
       context.fillRect(0, 0, width, height);
-      rings.forEach(drawRing);
+      
+      // 取得當前「最內層」的活躍圓環索引，藉此計算層次漸變
+      const activeIdx = rings.findIndex(r => !r.broken);
+      const safeActiveIdx = activeIdx >= 0 ? activeIdx : 0;
+      rings.forEach((ring, index) => drawRing(ring, index, safeActiveIdx));
+      
       drawBall();
     }
 
