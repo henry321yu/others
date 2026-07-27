@@ -52,12 +52,12 @@
       修改這一區即可調整整個模擬；數值以畫布的 CSS 像素與秒為單位。
     */
     const CONFIG = {
-      BALL_RADIUS: 11,                 // 球半徑
+      BALL_RADIUS: 11,                  // 球半徑
       GRAVITY: 500,                    // 向下重力（px/s²）
       START_VERTICAL_SPEED: -430,      // 開始時的向上速度（負值向上）
-      START_HORIZONTAL_SPEED: 165,     // 開始時的水平速度
+      START_HORIZONTAL_SPEED: 165,      // 開始時的水平速度
       BOUNCINESS: 0.77,                // 0~1；圓環碰撞後保留的法向速度
-      SURFACE_FRICTION: 0.7,           // 0~1；碰撞時切向速度／旋轉交換程度
+      SURFACE_FRICTION: 0.7,            // 0~1；碰撞時切向速度／旋轉交換程度
       BALL_AIR_DRAG: 0.012,            // 空氣阻力，避免速度無限制累積
 
       FIRST_RING_RADIUS: 118,          // 最內圈半徑
@@ -102,9 +102,17 @@
       FADE_END_RADIUS: 422,            // 半徑大於此值：完全透明、融入黑暗
       USER_IMPULSE: 550,               // 點擊畫面施加的排斥力道 (px/s)
 
-      // 點擊煙霧參數
-      CLICK_SMOKE_COUNT: 50,          // 點擊生成的煙霧數量
-      CLICK_SMOKE_RADIUS: 15,          // 點擊煙霧生成填滿的圓形半徑
+      // 點擊煙霧參數 (壓入螢幕向外擴散)
+      CLICK_SMOKE_COUNT: 30,           // 點擊生成的煙霧數量
+      CLICK_SMOKE_RADIUS: 10,          // 點擊煙霧生成的初始半徑
+      CLICK_SMOKE_BURST_MIN: 20,       // 最小向外擴散速度
+      CLICK_SMOKE_BURST_MAX: 80,       // 最大向外擴散速度
+
+      // 球體噴煙參數
+      BALL_BOOST_DURATION: 0.15,       // 噴煙持續時間 (秒)
+      BALL_BOOST_SMOKE_COUNT: 60,      // 【微增】確保扇形夠飽滿
+      BALL_BOOST_SMOKE_SPEED: 310,     // 【調高】為了突顯中心噴射的扇形效果
+      BALL_BOOST_SMOKE_SPREAD: 1.5,    // 【微寬】散佈角度 (弧度) 讓兩側區別明顯
     };
 
     const canvas = document.getElementById("scene");
@@ -128,13 +136,12 @@
     let ripples = []; 
     let particles = []; 
     
-    // 環境風的全域狀態
     let envWind = {
-      vx: 0,           // 當前實際風速X
-      vy: 0,           // 當前實際風速Y
-      targetVx: 0,     // 目標風速X (風向)
-      targetVy: 0,     // 目標風速Y (風向)
-      timer: 0         // 下一次改變風向的倒數計時器
+      vx: 0,
+      vy: 0,
+      targetVx: 0,
+      targetVy: 0,
+      timer: 0
     };
 
     const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -176,11 +183,9 @@
 
     function createRing(radius) {
       const id = nextRingId++;
-      
       const randomSpeed = CONFIG.GAP_ROTATION_SPEED_MIN + Math.random() * (CONFIG.GAP_ROTATION_SPEED_MAX - CONFIG.GAP_ROTATION_SPEED_MIN);
       const direction = Math.random() < 0.5 ? 1 : -1;
       const finalRotationSpeed = randomSpeed * direction;
-
       const gapWidthRatio = CONFIG.GAP_WIDTH_MIN_RATIO + Math.random() * (CONFIG.GAP_WIDTH_MAX_RATIO - CONFIG.GAP_WIDTH_MIN_RATIO);
 
       return {
@@ -214,11 +219,13 @@
         angle: 0,
         spin: 0,
         trail: [],
+        boostSmokeTimer: 0,       
+        boostSmokeAccumulator: 0, 
+        boostDirX: 0,             
+        boostDirY: 0,
       };
       ripples = [];
       particles = [];
-      
-      // 重置自然風狀態
       envWind = { vx: 0, vy: 0, targetVx: 0, targetVy: 0, timer: 0 };
       
       scoreElement.textContent = "0";
@@ -372,6 +379,51 @@
         ball.vy *= scale;
       }
 
+      // 處理球體隨時間持續噴射的煙霧
+      if (ball.boostSmokeTimer > 0) {
+        ball.boostSmokeTimer -= dt;
+        const emissionRate = CONFIG.BALL_BOOST_SMOKE_COUNT / CONFIG.BALL_BOOST_DURATION;
+        ball.boostSmokeAccumulator += emissionRate * dt;
+
+        while (ball.boostSmokeAccumulator >= 1) {
+          ball.boostSmokeAccumulator -= 1;
+          
+          const spawnAngle = Math.atan2(ball.boostDirY, ball.boostDirX);
+          const halfSpread = CONFIG.BALL_BOOST_SMOKE_SPREAD / 2;
+          
+          // 隨機角度偏移
+          const angleOffset = (Math.random() - 0.5) * CONFIG.BALL_BOOST_SMOKE_SPREAD;
+          const angle = spawnAngle + angleOffset;
+
+          const px = ball.x + Math.cos(angle) * CONFIG.BALL_RADIUS * 0.8;
+          const py = ball.y + Math.sin(angle) * CONFIG.BALL_RADIUS * 0.8;
+
+          // 【核心修改：拋物線形狀的速度分佈】
+          // 越靠近中心 (offsetRatio 接近 0)，形狀因子接近 1；越靠近邊緣，形狀因子接近 0
+          const offsetRatio = angleOffset / halfSpread; // 範圍 -1.0 到 1.0
+          const shapeProfile = 1 - Math.pow(offsetRatio, 2); // 產生拋物線曲線 1.0 -> 0.0
+
+          // 中心煙霧給予最大推力，邊緣給予極小推力 (加上微幅隨機性避免太假)
+          const baseSpeed = CONFIG.BALL_BOOST_SMOKE_SPEED * (0.15 + 0.85 * shapeProfile);
+          const partSpeed = baseSpeed * (0.8 + Math.random() * 0.4);
+          
+          // 加上繼承自球體的微小動能 (12%)，讓噴發有滯留感
+          const vx = Math.cos(angle) * partSpeed + ball.vx * 0.12;
+          const vy = Math.sin(angle) * partSpeed + ball.vy * 0.12;
+
+          particles.push({
+            x: px, y: py, vx: vx, vy: vy, life: 0,
+            maxLife: CONFIG.SMOKE_MAX_LIFE * (0.3 + Math.random() * 0.3), 
+            size: Math.random() * 10 + 5,        
+            growth: 15 + Math.random() * 10,   
+            color: `215, 220, 225`,            
+            baseAlpha: 0.15 + Math.random() * 0.1, 
+            swirlPhaseX: Math.random() * Math.PI * 2, swirlPhaseY: Math.random() * Math.PI * 2,
+            swirlFreq: 1.5 + Math.random() * 2, swirlAmp: 10 + Math.random() * 20
+          });
+        }
+      }
+
       let actualShrink = 0;
       if (ring) {
         actualShrink = Math.min(
@@ -404,37 +456,30 @@
       ripples.forEach(r => r.age += dt);
       ripples = ripples.filter(r => r.age < 0.6);
 
-      // 環境自然風的邏輯計算
+      // 環境自然風
       envWind.timer -= dt;
       if (envWind.timer <= 0) {
-        // 重置倒數計時器 (基礎時間加上一些隨機波動)
         envWind.timer = CONFIG.WIND_CHANGE_INTERVAL + Math.random() * 2;
-        // 決定新的隨機風力與風向
         const windForce = CONFIG.WIND_FORCE_MIN + Math.random() * (CONFIG.WIND_FORCE_MAX - CONFIG.WIND_FORCE_MIN);
-        const windAngle = Math.random() * Math.PI * 2; // 0 到 360 度全方位隨機
-        
+        const windAngle = Math.random() * Math.PI * 2;
         envWind.targetVx = Math.cos(windAngle) * windForce;
         envWind.targetVy = Math.sin(windAngle) * windForce;
       }
-      // 利用線性插值(Lerp)讓實際風速緩慢、平滑地過渡到目標風速
       envWind.vx += (envWind.targetVx - envWind.vx) * dt * 0.5;
       envWind.vy += (envWind.targetVy - envWind.vy) * dt * 0.5;
 
-
+      // 流體動力學與煙霧交互邏輯
       particles.forEach(p => {
         p.x += p.vx * dt;
         p.y += p.vy * dt;
         p.vx *= (1 - 1.2 * dt); 
         p.vy *= (1 - 1.2 * dt);
 
-        // 向上熱氣流
         p.vy -= CONFIG.UPDRAFT_FORCE * dt;
         
-        // 受到環境自然風的吹拂推動
         p.vx += envWind.vx * dt;
         p.vy += envWind.vy * dt;
 
-        // 煙霧自身的捲曲擾動
         p.x += Math.cos(p.life * p.swirlFreq + p.swirlPhaseX) * p.swirlAmp * dt;
         p.y += Math.sin(p.life * p.swirlFreq + p.swirlPhaseY) * p.swirlAmp * dt;
 
@@ -444,11 +489,33 @@
         
         if (dist < CONFIG.WAKE_RADIUS) {
           const force = Math.pow(1 - dist / CONFIG.WAKE_RADIUS, 1.5);
-          p.vx += ball.vx * force * 2.5 * dt;
-          p.vy += ball.vy * force * 2.5 * dt;
-          if (dist > 1) {
-            p.vx += (dx / dist) * CONFIG.WAKE_FORCE * force * dt;
-            p.vy += (dy / dist) * CONFIG.WAKE_FORCE * force * dt;
+          
+          const bSpeed = Math.hypot(ball.vx, ball.vy) || 1;
+          const bDirX = ball.vx / bSpeed;
+          const bDirY = ball.vy / bSpeed;
+          
+          const dot = dx * bDirX + dy * bDirY;
+          
+          if (dot < 0) {
+            p.vx += ball.vx * force * 2.8 * dt;
+            p.vy += ball.vy * force * 2.8 * dt;
+            
+            const projX = bDirX * dot; 
+            const projY = bDirY * dot;
+            const toAxisX = projX - dx; 
+            const toAxisY = projY - dy;
+            const toAxisDist = Math.hypot(toAxisX, toAxisY) || 1;
+            
+            p.vx += (toAxisX / toAxisDist) * CONFIG.WAKE_FORCE * force * 0.9 * dt;
+            p.vy += (toAxisY / toAxisDist) * CONFIG.WAKE_FORCE * force * 0.9 * dt;
+          } else {
+            p.vx += ball.vx * force * 0.5 * dt;
+            p.vy += ball.vy * force * 0.5 * dt;
+            
+            if (dist > 1) {
+              p.vx += (dx / dist) * CONFIG.WAKE_FORCE * force * 1.2 * dt;
+              p.vy += (dy / dist) * CONFIG.WAKE_FORCE * force * 1.2 * dt;
+            }
           }
         }
 
@@ -470,29 +537,20 @@
       const gap = getGapHalfAngle(ring);
       const start = ring.gapAngle + gap;
       const end = ring.gapAngle - gap + Math.PI * 2;
-
-      const ratio = clamp(
-        (ring.radius - CONFIG.FADE_START_RADIUS) / (CONFIG.FADE_END_RADIUS - CONFIG.FADE_START_RADIUS), 
-        0, 1
-      );
-      
+      const ratio = clamp((ring.radius - CONFIG.FADE_START_RADIUS) / (CONFIG.FADE_END_RADIUS - CONFIG.FADE_START_RADIUS), 0, 1);
       const easeRatio = Math.pow(ratio, 1.2); 
-      
       const r = Math.round(222 + (5 - 222) * easeRatio);
       const g = Math.round(226 + (5 - 226) * easeRatio);
       const b = Math.round(229 + (5 - 229) * easeRatio);
       const baseAlpha = 1 - easeRatio;
-
       drawArc(ring.radius, start, end, r, g, b, baseAlpha, ring.shakeX, ring.shakeY);
     }
 
     function drawParticles() {
       context.globalCompositeOperation = "lighter";
-      
       particles.forEach(p => {
         const lifeRatio = p.life / p.maxLife;
         const currentSize = p.size + p.growth * lifeRatio;
-        
         const alphaFade = 1 - Math.pow(lifeRatio, 1.5);
         const alpha = Math.max(0, alphaFade * p.baseAlpha);
         
@@ -508,7 +566,6 @@
           context.fill();
         }
       });
-
       context.globalCompositeOperation = "source-over"; 
     }
 
@@ -565,9 +622,7 @@
       context.clearRect(0, 0, width, height);
       context.fillStyle = "#050505";
       context.fillRect(0, 0, width, height);
-      
       rings.forEach((ring) => drawRing(ring));
-      
       drawParticles(); 
       drawRipples();
       drawBall();
@@ -597,37 +652,31 @@
       
       ripples.push({ x: touchX, y: touchY, age: 0 });
 
-      // 【新增】點擊位置生成均勻填滿圓形的煙霧
       for (let i = 0; i < CONFIG.CLICK_SMOKE_COUNT; i++) {
-        // 使用 Math.sqrt 確保粒子在圓面積內均勻分佈
         const r = CONFIG.CLICK_SMOKE_RADIUS * Math.sqrt(Math.random());
         const theta = Math.random() * 2 * Math.PI;
-
         const px = touchX + r * Math.cos(theta);
         const py = touchY + r * Math.sin(theta);
-
-        // 給予些微的初始向外擴散速度
-        const burstSpeed = Math.random() * 8;
+        const burstSpeed = CONFIG.CLICK_SMOKE_BURST_MIN + Math.random() * (CONFIG.CLICK_SMOKE_BURST_MAX - CONFIG.CLICK_SMOKE_BURST_MIN);
+        
         const vx = Math.cos(theta) * burstSpeed;
         const vy = Math.sin(theta) * burstSpeed;
 
         particles.push({
-          x: px,
-          y: py,
-          vx: vx,
-          vy: vy,
-          life: 0,
-          maxLife: CONFIG.SMOKE_MAX_LIFE * (0.25 + Math.random() * 0.3), // 點擊煙霧存活時間稍短
-          size: Math.random() * 10 + 5,      // 煙霧大小
-          growth: 15 + Math.random() * 10,   // 煙霧膨脹速度
-          color: `215, 220, 225`,            // 煙霧顏色 (灰白)
-          baseAlpha: 0.12 + Math.random() * 0.08, // 煙霧初始透明度
-          swirlPhaseX: Math.random() * Math.PI * 2,
-          swirlPhaseY: Math.random() * Math.PI * 2,
-          swirlFreq: 1.5 + Math.random() * 2,
-          swirlAmp: 10 + Math.random() * 20
+          x: px, y: py, vx: vx, vy: vy, life: 0,
+          maxLife: CONFIG.SMOKE_MAX_LIFE * (0.25 + Math.random() * 0.3), 
+          size: Math.random() * 10 + 5,      
+          growth: 15 + Math.random() * 10,   
+          color: `215, 220, 225`,            
+          baseAlpha: 0.12 + Math.random() * 0.08, 
+          swirlPhaseX: Math.random() * Math.PI * 2, swirlPhaseY: Math.random() * Math.PI * 2,
+          swirlFreq: 1.5 + Math.random() * 2, swirlAmp: 10 + Math.random() * 20
         });
       }
+
+      ball.boostDirX = -dx / dist;
+      ball.boostDirY = -dy / dist;
+      ball.boostSmokeTimer = CONFIG.BALL_BOOST_DURATION;
     });
 
     pauseBtn.addEventListener("click", () => {
