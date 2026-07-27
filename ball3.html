@@ -72,12 +72,16 @@
       BOOST_MULTIPLIER: 3,             // 加速彈跳倍率
       MAX_SPEED: 1050,                 // 速度安全上限
       MIN_SPEED: 300,                  // 速度安全下限，防止球靜止 (px/s)
-      BREAK_DURATION: 3,             // 穿越缺口後，圓環潰散動畫秒數
+      BREAK_DURATION: 3,               // 穿越缺口後，圓環潰散動畫秒數
       
       RING_SHRINK_SPEED: 5,            // 圓框內縮速度 (px/s)
       RING_MIN_RADIUS: 12,             // 圓框最小半徑 (需大於球體，以免破圖)
 
-      // 【新增】玩家互動參數
+      // 【新增】絕對距離視覺漸變參數
+      FADE_START_RADIUS: 120,          // 半徑小於此值：完全實體、最亮
+      FADE_END_RADIUS: 562,            // 半徑大於此值：完全透明、融入黑暗（對應生成圈的位置）
+
+      // 玩家互動參數
       USER_IMPULSE: 550,               // 點擊畫面施加的排斥力道 (px/s)
     };
 
@@ -313,26 +317,36 @@
       context.stroke();
     }
 
-    function drawRing(ring, index, activeIdx) {
+    function drawRing(ring, index) {
       const gap = gapHalfAngle(ring.radius);
       const start = ring.gapAngle + gap;
       const end = ring.gapAngle - gap + Math.PI * 2;
 
-      const visualIndex = Math.max(0, index - activeIdx);
-      const ratio = clamp(visualIndex / (CONFIG.VISIBLE_RING_COUNT - 1), 0, 1);
+      // 【核心改動】透過「圓環當前絕對半徑」計算漸變比例
+      const ratio = clamp(
+        (ring.radius - CONFIG.FADE_START_RADIUS) / (CONFIG.FADE_END_RADIUS - CONFIG.FADE_START_RADIUS), 
+        0, 1
+      );
+      
       const easeRatio = Math.pow(ratio, 1.2); 
+      
+      // 越外圍顏色越接近背景色 #050505 (rgb 5,5,5)
       const r = Math.round(222 + (5 - 222) * easeRatio);
       const g = Math.round(226 + (5 - 226) * easeRatio);
       const b = Math.round(229 + (5 - 229) * easeRatio);
+      
+      // 越外圍透明度越低，新生成的圓環 Alpha 趨近 0 (完全隱形)
+      const baseAlpha = 1 - easeRatio;
 
       if (!ring.broken) {
-        drawArc(ring.radius, start, end, r, g, b, 1);
+        drawArc(ring.radius, start, end, r, g, b, baseAlpha);
         return;
       }
 
       const progress = clamp(ring.breakAge / CONFIG.BREAK_DURATION, 0, 1);
       const pieces = 7;
       const available = Math.PI * 2 - gap * 2;
+      
       for (let piece = 0; piece < pieces; piece += 1) {
         const pieceStart = start + (available / pieces) * piece + 0.035;
         const pieceEnd = start + (available / pieces) * (piece + 1) - 0.035;
@@ -341,7 +355,11 @@
         context.save();
         context.translate(Math.cos(middle) * progress * 9, drift);
         context.rotate((piece - 3) * progress * 0.08);
-        drawArc(ring.radius, pieceStart, pieceEnd, r, g, b, (1 - progress) * 0.56);
+        
+        // 碎裂動畫的透明度同時受破壞時間與絕對距離影響
+        const pieceAlpha = clamp((1 - progress) * 0.56 * baseAlpha, 0, 1);
+        drawArc(ring.radius, pieceStart, pieceEnd, r, g, b, pieceAlpha);
+        
         context.restore();
       }
     }
@@ -400,9 +418,8 @@
       context.fillStyle = "#050505";
       context.fillRect(0, 0, width, height);
       
-      const activeIdx = rings.findIndex(r => !r.broken);
-      const safeActiveIdx = activeIdx >= 0 ? activeIdx : 0;
-      rings.forEach((ring, index) => drawRing(ring, index, safeActiveIdx));
+      // 不再需要傳遞 activeIdx，單純對每個環繪圖即可
+      rings.forEach((ring, index) => drawRing(ring, index));
       
       drawRipples();
       drawBall();
@@ -416,7 +433,6 @@
       requestAnimationFrame(frame);
     }
 
-    // 【新增】點擊畫面產生衝擊波推動球體
     canvas.addEventListener("pointerdown", (event) => {
       if (paused) return; // 暫停時不反應
       
@@ -437,7 +453,6 @@
       ripples.push({ x: touchX, y: touchY, age: 0 });
     });
 
-    // 獨立的暫停控制邏輯
     pauseBtn.addEventListener("click", () => {
       paused = !paused;
       lastTime = performance.now(); // 避免恢復時發生大幅跳動
