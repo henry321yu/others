@@ -86,13 +86,13 @@
       RING_SHAKE_DAMPING: 25,          // 震動阻尼 (越高越快停止震動)
 
       // 體積煙霧粒子系統參數
-      PARTICLE_COUNT: 800,            // 煙霧粒子數量
+      PARTICLE_COUNT: 800,             // 煙霧粒子數量
       SMOKE_MAX_LIFE: 7.2,             // 煙霧存活最大秒數
       WAKE_RADIUS: 70,                 // 球體影響煙霧的流體半徑 (風壓範圍)
       WAKE_FORCE: 420,                 // 球體帶動煙霧的推力
       UPDRAFT_FORCE: 37,               // 熱氣流向上飄散的基礎加速度
 
-      // 【新增】環境自然風參數
+      // 環境自然風參數
       WIND_FORCE_MIN: 10,              // 最小自然風力
       WIND_FORCE_MAX: 85,              // 最大自然風力
       WIND_CHANGE_INTERVAL: 3.5,       // 風向與風力改變的基礎時間間隔 (秒)
@@ -101,6 +101,10 @@
       FADE_START_RADIUS: 120,          // 半徑小於此值：完全實體、最亮
       FADE_END_RADIUS: 422,            // 半徑大於此值：完全透明、融入黑暗
       USER_IMPULSE: 550,               // 點擊畫面施加的排斥力道 (px/s)
+
+      // 點擊煙霧參數
+      CLICK_SMOKE_COUNT: 100,          // 點擊生成的煙霧數量
+      CLICK_SMOKE_RADIUS: 25,          // 點擊煙霧生成填滿的圓形半徑
     };
 
     const canvas = document.getElementById("scene");
@@ -124,7 +128,7 @@
     let ripples = []; 
     let particles = []; 
     
-    // 【新增】環境風的全域狀態
+    // 環境風的全域狀態
     let envWind = {
       vx: 0,           // 當前實際風速X
       vy: 0,           // 當前實際風速Y
@@ -400,7 +404,7 @@
       ripples.forEach(r => r.age += dt);
       ripples = ripples.filter(r => r.age < 0.6);
 
-      // 【更新】環境自然風的邏輯計算
+      // 環境自然風的邏輯計算
       envWind.timer -= dt;
       if (envWind.timer <= 0) {
         // 重置倒數計時器 (基礎時間加上一些隨機波動)
@@ -426,7 +430,7 @@
         // 向上熱氣流
         p.vy -= CONFIG.UPDRAFT_FORCE * dt;
         
-        // 【新增】受到環境自然風的吹拂推動
+        // 受到環境自然風的吹拂推動
         p.vx += envWind.vx * dt;
         p.vy += envWind.vy * dt;
 
@@ -592,6 +596,38 @@
       ball.vy += (dy / dist) * CONFIG.USER_IMPULSE;
       
       ripples.push({ x: touchX, y: touchY, age: 0 });
+
+      // 【新增】點擊位置生成均勻填滿圓形的煙霧
+      for (let i = 0; i < CONFIG.CLICK_SMOKE_COUNT; i++) {
+        // 使用 Math.sqrt 確保粒子在圓面積內均勻分佈
+        const r = CONFIG.CLICK_SMOKE_RADIUS * Math.sqrt(Math.random());
+        const theta = Math.random() * 2 * Math.PI;
+
+        const px = touchX + r * Math.cos(theta);
+        const py = touchY + r * Math.sin(theta);
+
+        // 給予些微的初始向外擴散速度
+        const burstSpeed = Math.random() * 8;
+        const vx = Math.cos(theta) * burstSpeed;
+        const vy = Math.sin(theta) * burstSpeed;
+
+        particles.push({
+          x: px,
+          y: py,
+          vx: vx,
+          vy: vy,
+          life: 0,
+          maxLife: CONFIG.SMOKE_MAX_LIFE * (0.25 + Math.random() * 0.3), // 點擊煙霧存活時間稍短
+          size: Math.random() * 10 + 5,      // 煙霧大小
+          growth: 15 + Math.random() * 10,   // 煙霧膨脹速度
+          color: `215, 220, 225`,            // 煙霧顏色 (灰白)
+          baseAlpha: 0.12 + Math.random() * 0.08, // 煙霧初始透明度
+          swirlPhaseX: Math.random() * Math.PI * 2,
+          swirlPhaseY: Math.random() * Math.PI * 2,
+          swirlFreq: 1.5 + Math.random() * 2,
+          swirlAmp: 10 + Math.random() * 20
+        });
+      }
     });
 
     pauseBtn.addEventListener("click", () => {
