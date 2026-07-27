@@ -1,0 +1,742 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bouncing Ball</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #050505; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+    .hud {
+      position: fixed; top: 24px; right: 28px; z-index: 1;
+      color: rgba(255,255,255,.92); font: 500 15px/1.25 ui-sans-serif, system-ui, "Microsoft JhengHei", sans-serif;
+      letter-spacing: .08em; text-align: right; user-select: none; pointer-events: none;
+    }
+    .hud strong { display: block; margin-top: 4px; font-size: 34px; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+    .hint {
+      position: fixed; left: 24px; bottom: 22px; z-index: 1;
+      color: rgba(255,255,255,.38); font: 13px/1.4 ui-sans-serif, system-ui, "Microsoft JhengHei", sans-serif;
+      user-select: none;
+    }
+    .btn-pause {
+      cursor: pointer;
+      pointer-events: auto;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      transition: color 0.2s;
+    }
+    .btn-pause:hover { color: rgba(255,255,255,.8); }
+    
+    @media (max-width: 560px) {
+      .hud { top: 17px; right: 18px; font-size: 12px; }
+      .hud strong { font-size: 28px; }
+      .hint { left: 18px; bottom: 16px; font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="scene" aria-label="Bouncing sim"></canvas>
+  <div class="hud">Circles<strong id="score">0</strong></div>
+  <div class="hint">
+    <span id="pause-btn" class="btn-pause">Pause</span> · Tap to intract · R reset
+  </div>
+
+  <script>
+    "use strict";
+
+    /*
+      ── 可調整參數 ────────────────────────────────────────────
+      修改這一區即可調整整個模擬；數值以畫布的 CSS 像素與秒為單位。
+    */
+    const CONFIG = {
+      BALL_RADIUS: 8,                 // 球半徑
+      GRAVITY: 500,                    // 向下重力（px/s²）
+      START_VERTICAL_SPEED: -430,      // 開始時的向上速度（負值向上）
+      START_HORIZONTAL_SPEED: 165,     // 開始時的水平速度
+      BOUNCINESS: 0.77,                // 0~1；圓環碰撞後保留的法向速度
+      SURFACE_FRICTION: 0.7,           // 0~1；碰撞時切向速度／旋轉交換程度
+      BALL_AIR_DRAG: 0.012,            // 空氣阻力，避免速度無限制累積
+
+      FIRST_RING_RADIUS: 118,          // 最內圈半徑
+      RING_SPACING: 32,                // 各圈等距間隔
+      VISIBLE_RING_COUNT: 13,          // 同時保留的圓環數量（通過後自動補上）
+      RING_STROKE: 2.2,                  // 圓環線寬
+      
+      GAP_ROTATION_SPEED_MIN: 0.1,     // 最小轉速
+      GAP_ROTATION_SPEED_MAX: 0.85,    // 最大轉速
+
+      GAP_WIDTH_MIN_RATIO: 1.0,        // 最小缺口倍率
+      GAP_WIDTH_MAX_RATIO: 3.2,        // 最大缺口倍率
+
+      BOOST_CHANCE: 0.05,              // 加速觸發機率 (0.07 = 7%)
+      BOOSTED_BOUNCES: 1,              // 每次啟動後加速幾次彈跳
+      BOOST_MULTIPLIER: 2,             // 加速彈跳倍率
+      MAX_SPEED: 1050,                 // 速度安全上限
+      MIN_SPEED: 300,                  // 速度安全下限，防止球靜止 (px/s)
+      
+      RING_SHRINK_SPEED: 5,            // 圓框內縮速度 (px/s)
+      RING_MIN_RADIUS: 12,             // 圓框最小半徑 (需大於球體，以免破圖)
+
+      // 圓環受擊彈性震動參數
+      RING_SHAKE_MULTIPLIER: 0.22,     // 圓環震動幅度倍率 (依據碰撞力道)
+      RING_SHAKE_STIFFNESS: 1500,      // 震動彈簧剛性 (越高頻率越快、越快回彈)
+      RING_SHAKE_DAMPING: 25,          // 震動阻尼 (越高越快停止震動)
+
+      // 體積煙霧粒子系統參數
+      PARTICLE_COUNT: 700,             // 煙霧粒子數量
+      SMOKE_MAX_LIFE: 6,               // 煙霧存活最大秒數
+      WAKE_RADIUS: 70,                 // 球體影響煙霧的流體半徑 (風壓範圍)
+      WAKE_FORCE: 420,                 // 球體帶動煙霧的推力
+      UPDRAFT_FORCE: 37,               // 熱氣流向上飄散的基礎加速度
+
+      // 環境自然風參數
+      WIND_FORCE_MIN: 10,             
+      WIND_FORCE_MAX: 85,             
+      WIND_CHANGE_INTERVAL: 3.5,      
+      WIND_SPACING_MULTIPLIER: 0.08,   // 風力影響圓環間距的倍率
+      WIND_BEND_MULTIPLIER: 0.003,   // 【新增】風力影響隧道 X/Y 彎曲偏移的倍率
+
+      // 絕對距離視覺漸變參數
+      FADE_START_RADIUS: 120,          // 半徑小於此值：完全實體、最亮
+      FADE_END_RADIUS: 422,            // 半徑大於此值：完全透明、融入黑暗
+      USER_IMPULSE: 550,               // 點擊畫面施加的排斥力道 (px/s)
+
+      // 點擊煙霧參數 (壓入螢幕向外擴散)
+      CLICK_SMOKE_COUNT: 30,           // 點擊生成的煙霧數量
+      CLICK_SMOKE_RADIUS: 10,          // 點擊煙霧生成的初始半徑
+      CLICK_SMOKE_BURST_MIN: 20,       // 最小向外擴散速度
+      CLICK_SMOKE_BURST_MAX: 80,       // 最大向外擴散速度
+
+      // 球體噴煙參數
+      BALL_BOOST_DURATION: 0.1,        // 噴煙持續時間 (秒)
+      BALL_BOOST_SMOKE_COUNT: 30,      // 【微增】確保扇形夠飽滿
+      BALL_BOOST_SMOKE_SPEED: 310,     // 【調高】為了突顯中心噴射的扇形效果
+      BALL_BOOST_SMOKE_SPREAD: 1.5,    // 【微寬】散佈角度 (弧度) 讓兩側區別明顯
+    };    
+
+
+    const canvas = document.getElementById("scene");
+    const context = canvas.getContext("2d");
+    const scoreElement = document.getElementById("score");
+    const pauseBtn = document.getElementById("pause-btn");
+
+    let width = 0;
+    let height = 0;
+    let dpr = 1;
+    let center = { x: 0, y: 0 };
+    let lastTime = performance.now();
+    let paused = false;
+    let passCount = 0;
+    let bounceCount = 0;
+    let boostRemaining = 0;
+    let nextRingId = 0;
+    
+    let rings = [];
+    let ball;
+    let ripples = []; 
+    let particles = []; 
+    
+    let envWind = {
+      vx: 0, vy: 0, targetVx: 0, targetVy: 0, timer: 0
+    };
+
+    const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
+    const angleDistance = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+
+    function resize() {
+      const previousCenter = center;
+      const relativeBallX = ball ? ball.x - previousCenter.x : 0;
+      const relativeBallY = ball ? ball.y - previousCenter.y : 0;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+      center = { x: width / 2, y: height / 2 };
+      if (ball) {
+        const changeX = center.x - previousCenter.x;
+        const changeY = center.y - previousCenter.y;
+        ball.x = center.x + relativeBallX;
+        ball.y = center.y + relativeBallY;
+        ball.trail.forEach((point) => {
+          point.x += changeX;
+          point.y += changeY;
+        });
+      }
+    }
+
+    function randomGapAngle(id) {
+      const seeded = Math.sin(id * 127.1 + 19.7) * 43758.5453123;
+      return ((seeded - Math.floor(seeded)) * Math.PI * 2) - Math.PI;
+    }
+
+    function getGapHalfAngle(ring) {
+      const physicalGapWidth = (CONFIG.BALL_RADIUS * 2) * ring.gapWidthRatio;
+      const halfGap = physicalGapWidth / 2;
+      return Math.asin(clamp(halfGap / ring.radius, 0, 0.95));
+    }
+
+    function createRing(radius) {
+      const id = nextRingId++;
+      const randomSpeed = CONFIG.GAP_ROTATION_SPEED_MIN + Math.random() * (CONFIG.GAP_ROTATION_SPEED_MAX - CONFIG.GAP_ROTATION_SPEED_MIN);
+      const direction = Math.random() < 0.5 ? 1 : -1;
+      const finalRotationSpeed = randomSpeed * direction;
+      const gapWidthRatio = CONFIG.GAP_WIDTH_MIN_RATIO + Math.random() * (CONFIG.GAP_WIDTH_MAX_RATIO - CONFIG.GAP_WIDTH_MIN_RATIO);
+
+      return {
+        id,
+        radius,
+        gapAngle: randomGapAngle(id),
+        rotationSpeed: finalRotationSpeed,
+        gapWidthRatio: gapWidthRatio,      
+        broken: false,
+        shakeX: 0,
+        shakeY: 0,
+        shakeVx: 0,
+        shakeVy: 0,
+        windOffsetX: 0, // 【新增】風力造成的 X 軸飄移
+        windOffsetY: 0  // 【新增】風力造成的 Y 軸飄移
+      };
+    }
+
+    function reset() {
+      passCount = 0;
+      bounceCount = 0;
+      boostRemaining = 0;
+      nextRingId = 0;
+      rings = [];
+      for (let index = 0; index < CONFIG.VISIBLE_RING_COUNT; index += 1) {
+        rings.push(createRing(CONFIG.FIRST_RING_RADIUS + index * CONFIG.RING_SPACING));
+      }
+      ball = {
+        x: center.x,
+        y: center.y - 18,
+        vx: CONFIG.START_HORIZONTAL_SPEED,
+        vy: CONFIG.START_VERTICAL_SPEED,
+        angle: 0,
+        spin: 0,
+        trail: [],
+        boostSmokeTimer: 0,       
+        boostSmokeAccumulator: 0, 
+        boostDirX: 0,             
+        boostDirY: 0,
+      };
+      ripples = [];
+      particles = [];
+      envWind = { vx: 0, vy: 0, targetVx: 0, targetVy: 0, timer: 0 };
+      
+      scoreElement.textContent = "0";
+      paused = false;
+      lastTime = performance.now();
+    }
+
+    function activeRing() {
+      return rings.find((ring) => !ring.broken);
+    }
+
+    function inGap(ring, angle) {
+      return Math.abs(angleDistance(angle, ring.gapAngle)) <= getGapHalfAngle(ring);
+    }
+
+    function breakRing(ring) {
+      const ratio = clamp((ring.radius - CONFIG.FADE_START_RADIUS) / (CONFIG.FADE_END_RADIUS - CONFIG.FADE_START_RADIUS), 0, 1);
+      const easeRatio = Math.pow(ratio, 1.2); 
+      const r = Math.round(222 + (5 - 222) * easeRatio);
+      const g = Math.round(226 + (5 - 226) * easeRatio);
+      const b = Math.round(229 + (5 - 229) * easeRatio);
+      const baseAlpha = 1 - easeRatio;
+
+      const gap = getGapHalfAngle(ring);
+      const startAngle = ring.gapAngle + gap;
+      const endAngle = ring.gapAngle - gap + Math.PI * 2;
+      const arcLength = endAngle - startAngle;
+      
+      const vTan = ring.radius * ring.rotationSpeed; 
+      
+      // 【修改】破碎的特效基底中心必須加上風力飄移量
+      const ringCenterX = center.x + ring.windOffsetX + ring.shakeX;
+      const ringCenterY = center.y + ring.windOffsetY + ring.shakeY;
+
+      for (let i = 0; i < CONFIG.PARTICLE_COUNT; i++) {
+        const angle = startAngle + Math.random() * arcLength;
+        const radiusOffset = (Math.random() - 0.5) * 6;
+        
+        // 使用疊加偏移後的動態中心
+        const px = ringCenterX + Math.cos(angle) * (ring.radius + radiusOffset);
+        const py = ringCenterY + Math.sin(angle) * (ring.radius + radiusOffset);
+
+        const vxTan = -Math.sin(angle) * vTan;
+        const vyTan = Math.cos(angle) * vTan;
+        
+        const isCore = Math.random() < 0.6;
+        const randomBurst = isCore ? (Math.random() - 0.5) * 5 : (Math.random() - 0.5) * 15; 
+        
+        particles.push({
+          x: px, y: py,
+          vx: vxTan + Math.cos(angle) * randomBurst,
+          vy: vyTan + Math.sin(angle) * randomBurst,
+          life: 0,
+          maxLife: CONFIG.SMOKE_MAX_LIFE * (0.4 + Math.random() * 0.6),
+          size: isCore ? (Math.random() * 6 + 3) : (Math.random() * 12 + 6),
+          growth: isCore ? 8 : 18, 
+          color: `${r},${g},${b}`,
+          baseAlpha: isCore ? baseAlpha * 0.12 : baseAlpha * 0.05,
+          swirlPhaseX: Math.random() * Math.PI * 2, swirlPhaseY: Math.random() * Math.PI * 2,
+          swirlFreq: 1.5 + Math.random() * 2, swirlAmp: 10 + Math.random() * 20
+        });
+      }
+
+      ring.broken = true;
+      passCount += 1;
+      scoreElement.textContent = String(passCount);
+    }
+
+    function collideWithRing(ring) {
+      // 【修改】碰撞計算的圓心改為加上風向偏移量
+      const ringCenterX = center.x + ring.windOffsetX;
+      const ringCenterY = center.y + ring.windOffsetY;
+
+      const dx = ball.x - ringCenterX;
+      const dy = ball.y - ringCenterY;
+      const distance = Math.hypot(dx, dy) || 0.0001;
+      const normalX = dx / distance;
+      const normalY = dy / distance;
+      const angle = Math.atan2(dy, dx);
+      const radialVelocity = ball.vx * normalX + ball.vy * normalY;
+      const innerBoundary = ring.radius - CONFIG.BALL_RADIUS;
+
+      if (distance < innerBoundary || radialVelocity <= 0) return;
+
+      if (inGap(ring, angle)) {
+        breakRing(ring);
+        return;
+      }
+
+      ring.shakeVx += normalX * radialVelocity * CONFIG.RING_SHAKE_MULTIPLIER;
+      ring.shakeVy += normalY * radialVelocity * CONFIG.RING_SHAKE_MULTIPLIER;
+
+      // 【修改】將球體修正回動態偏心邊界內
+      ball.x = ringCenterX + normalX * innerBoundary;
+      ball.y = ringCenterY + normalY * innerBoundary;
+
+      const tangentX = -normalY;
+      const tangentY = normalX;
+      
+      const tangentVelocity = ball.vx * tangentX + ball.vy * tangentY;
+      let rebound = -radialVelocity * CONFIG.BOUNCINESS;
+
+      if (boostRemaining > 0) {
+        rebound *= CONFIG.BOOST_MULTIPLIER;
+        boostRemaining -= 1;
+      }
+      
+      const ringAngularVelocity = ring.rotationSpeed;
+      const ringSurfaceVelocity = ring.radius * ringAngularVelocity;
+      const ballSurfaceVel = tangentVelocity + ball.spin * CONFIG.BALL_RADIUS;
+      const slipVel = ballSurfaceVel - ringSurfaceVelocity;
+      const frictionImpulse = slipVel * (CONFIG.SURFACE_FRICTION / 2);
+      const newTangentVelocity = tangentVelocity - frictionImpulse;
+
+      ball.vx = normalX * rebound + tangentX * newTangentVelocity;
+      ball.vy = normalY * rebound + tangentY * newTangentVelocity;
+      ball.spin -= frictionImpulse / CONFIG.BALL_RADIUS;
+
+      bounceCount += 1;
+
+      // ==========================================
+      // 【新增】碰撞時在球體左右切線邊緣產生煙霧 (各 3 顆)
+      // ==========================================
+      for (let i = 0; i < 2; i++) {
+        // side = 1 為右側, -1 為左側
+        const sides = [1, -1]; 
+        sides.forEach(side => {
+          // 1. 設定發射點：球心 + (切向量 * 方向 * 半徑)
+          const startX = ball.x + tangentX * side * CONFIG.BALL_RADIUS;
+          const startY = ball.y + tangentY * side * CONFIG.BALL_RADIUS;
+
+          // 2. 設定速度：沿著切線散開 (tangentSpeed)，並強制往內縮 (-normal) 避免穿過圓環
+          const tangentSpeed = 0.2 + Math.random() * 0.02; // 切線方向噴散速度
+          const inwardSpeed = 0.1 + Math.random() * 0.01;  // 向環中心彈回的速度
+
+          // normal 向量是指向圓環外側，所以這裡用減的 (-normalX) 來確保煙霧往內飛
+          const vx = (tangentX * side * tangentSpeed) - (normalX * inwardSpeed);
+          const vy = (tangentY * side * tangentSpeed) - (normalY * inwardSpeed);
+
+          particles.push({
+            x: startX, 
+            y: startY, 
+            vx: vx + ball.vx * 0.015, // 繼承一點點球反彈後的速度讓視覺更自然
+            vy: vy + ball.vy * 0.015, 
+            life: 0,
+            maxLife: CONFIG.SMOKE_MAX_LIFE * (0.1 + Math.random() * 0.1), // 生命週期較短，呈現瞬間噴出感
+            size: Math.random() * 4 + 1,
+            growth: 8 + Math.random() * 2,
+            color: `215, 220, 225`,
+            baseAlpha: 0.2 + Math.random() * 0.1,
+            swirlPhaseX: Math.random() * Math.PI * 2, 
+            swirlPhaseY: Math.random() * Math.PI * 2,
+            swirlFreq: 1.5 + Math.random() * 2, 
+            swirlAmp: 5 + Math.random() * 8
+          });
+        });
+      }
+      // ==========================================
+
+      if (Math.random() < CONFIG.BOOST_CHANCE) {
+        boostRemaining = CONFIG.BOOSTED_BOUNCES;
+      }
+
+      const postBounceSpeed = Math.hypot(ball.vx, ball.vy);
+      if (postBounceSpeed < CONFIG.MIN_SPEED) {
+        if (postBounceSpeed < 0.1) {
+          ball.vx = -normalX * CONFIG.MIN_SPEED;
+          ball.vy = -normalY * CONFIG.MIN_SPEED;
+        } else {
+          const scale = CONFIG.MIN_SPEED / postBounceSpeed;
+          ball.vx *= scale;
+          ball.vy *= scale;
+        }
+      }
+    }
+
+    function update(dt) {
+      const drag = Math.max(0, 1 - CONFIG.BALL_AIR_DRAG * dt);
+      ball.vx *= drag;
+      ball.vy = ball.vy * drag + CONFIG.GRAVITY * dt;
+      ball.x += ball.vx * dt;
+      ball.y += ball.vy * dt;
+      ball.angle += ball.spin * dt;
+      ball.spin *= Math.max(0, 1 - 0.28 * dt);
+
+      // 環境自然風計算
+      envWind.timer -= dt;
+      if (envWind.timer <= 0) {
+        envWind.timer = CONFIG.WIND_CHANGE_INTERVAL + Math.random() * 2;
+        const windForce = CONFIG.WIND_FORCE_MIN + Math.random() * (CONFIG.WIND_FORCE_MAX - CONFIG.WIND_FORCE_MIN);
+        const windAngle = Math.random() * Math.PI * 2;
+        envWind.targetVx = Math.cos(windAngle) * windForce;
+        envWind.targetVy = Math.sin(windAngle) * windForce;
+      }
+      envWind.vx += (envWind.targetVx - envWind.vx) * dt * 0.5;
+      envWind.vy += (envWind.targetVy - envWind.vy) * dt * 0.5;
+      
+      const currentWindForce = Math.hypot(envWind.vx, envWind.vy);
+      const dynamicSpacing = CONFIG.RING_SPACING + (currentWindForce * CONFIG.WIND_SPACING_MULTIPLIER);
+
+      const ring = activeRing();
+      if (ring) collideWithRing(ring);
+
+      const speed = Math.hypot(ball.vx, ball.vy);
+      if (speed > CONFIG.MAX_SPEED) {
+        const scale = CONFIG.MAX_SPEED / speed;
+        ball.vx *= scale;
+        ball.vy *= scale;
+      }
+
+      if (ball.boostSmokeTimer > 0) {
+        ball.boostSmokeTimer -= dt;
+        const emissionRate = CONFIG.BALL_BOOST_SMOKE_COUNT / CONFIG.BALL_BOOST_DURATION;
+        ball.boostSmokeAccumulator += emissionRate * dt;
+
+        while (ball.boostSmokeAccumulator >= 1) {
+          ball.boostSmokeAccumulator -= 1;
+          const spawnAngle = Math.atan2(ball.boostDirY, ball.boostDirX);
+          const halfSpread = CONFIG.BALL_BOOST_SMOKE_SPREAD / 2;
+          const angleOffset = (Math.random() - 0.5) * CONFIG.BALL_BOOST_SMOKE_SPREAD;
+          const angle = spawnAngle + angleOffset;
+          const px = ball.x + Math.cos(angle) * CONFIG.BALL_RADIUS * 0.8;
+          const py = ball.y + Math.sin(angle) * CONFIG.BALL_RADIUS * 0.8;
+          const offsetRatio = angleOffset / halfSpread; 
+          const shapeProfile = 1 - Math.pow(offsetRatio, 2); 
+          const baseSpeed = CONFIG.BALL_BOOST_SMOKE_SPEED * (0.15 + 0.85 * shapeProfile);
+          const partSpeed = baseSpeed * (0.8 + Math.random() * 0.4);
+          const vx = Math.cos(angle) * partSpeed + ball.vx * 0.12;
+          const vy = Math.sin(angle) * partSpeed + ball.vy * 0.12;
+          particles.push({
+            x: px, y: py, vx: vx, vy: vy, life: 0,
+            maxLife: CONFIG.SMOKE_MAX_LIFE * (0.3 + Math.random() * 0.3), 
+            size: Math.random() * 10 + 5,        
+            growth: 15 + Math.random() * 10,   
+            color: `215, 220, 225`,            
+            baseAlpha: 0.15 + Math.random() * 0.1, 
+            swirlPhaseX: Math.random() * Math.PI * 2, swirlPhaseY: Math.random() * Math.PI * 2,
+            swirlFreq: 1.5 + Math.random() * 2, swirlAmp: 10 + Math.random() * 20
+          });
+        }
+      }
+
+      let actualShrink = 0;
+      if (ring) {
+        actualShrink = Math.min(
+          CONFIG.RING_SHRINK_SPEED * dt,
+          Math.max(0, ring.radius - CONFIG.RING_MIN_RADIUS)
+        );
+      }
+
+      let firstUnbroken = true;
+      let previousRadius = 0;
+
+      rings.forEach((item) => {
+        item.gapAngle += item.rotationSpeed * dt;
+        
+        if (!item.broken) {
+          if (firstUnbroken) {
+            item.radius -= actualShrink;
+            firstUnbroken = false;
+            previousRadius = item.radius;
+          } else {
+            item.radius = previousRadius + dynamicSpacing;
+            previousRadius = item.radius;
+          }
+        }
+        
+        // 【新增】根據圓環的半徑大小套用風力偏移，形成越外側越歪斜的 3D 透視折彎感
+        item.windOffsetX = envWind.vx * item.radius * CONFIG.WIND_BEND_MULTIPLIER;
+        item.windOffsetY = envWind.vy * item.radius * CONFIG.WIND_BEND_MULTIPLIER;
+
+        item.shakeVx += (-CONFIG.RING_SHAKE_STIFFNESS * item.shakeX - CONFIG.RING_SHAKE_DAMPING * item.shakeVx) * dt;
+        item.shakeVy += (-CONFIG.RING_SHAKE_STIFFNESS * item.shakeY - CONFIG.RING_SHAKE_DAMPING * item.shakeVy) * dt;
+        item.shakeX += item.shakeVx * dt;
+        item.shakeY += item.shakeVy * dt;
+      });
+      
+      rings = rings.filter((item) => !item.broken);
+
+      while (rings.length < CONFIG.VISIBLE_RING_COUNT) {
+        const lastRadius = rings.length ? rings[rings.length - 1].radius : CONFIG.FIRST_RING_RADIUS;
+        rings.push(createRing(lastRadius + dynamicSpacing));
+      }
+
+      ball.trail.push({ x: ball.x, y: ball.y, alpha: 1 });
+      if (ball.trail.length > 13) ball.trail.shift();
+
+      ripples.forEach(r => r.age += dt);
+      ripples = ripples.filter(r => r.age < 0.6);
+
+      particles.forEach(p => {
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vx *= (1 - 1.2 * dt); 
+        p.vy *= (1 - 1.2 * dt);
+        p.vy -= CONFIG.UPDRAFT_FORCE * dt;
+        
+        p.vx += envWind.vx * dt;
+        p.vy += envWind.vy * dt;
+
+        p.x += Math.cos(p.life * p.swirlFreq + p.swirlPhaseX) * p.swirlAmp * dt;
+        p.y += Math.sin(p.life * p.swirlFreq + p.swirlPhaseY) * p.swirlAmp * dt;
+
+        const dx = p.x - ball.x;
+        const dy = p.y - ball.y;
+        const dist = Math.hypot(dx, dy);
+        
+        if (dist < CONFIG.WAKE_RADIUS) {
+          const force = Math.pow(1 - dist / CONFIG.WAKE_RADIUS, 1.5);
+          const bSpeed = Math.hypot(ball.vx, ball.vy) || 1;
+          const bDirX = ball.vx / bSpeed;
+          const bDirY = ball.vy / bSpeed;
+          const dot = dx * bDirX + dy * bDirY;
+          
+          if (dot < 0) {
+            p.vx += ball.vx * force * 2.8 * dt;
+            p.vy += ball.vy * force * 2.8 * dt;
+            const projX = bDirX * dot; 
+            const projY = bDirY * dot;
+            const toAxisX = projX - dx; 
+            const toAxisY = projY - dy;
+            const toAxisDist = Math.hypot(toAxisX, toAxisY) || 1;
+            
+            p.vx += (toAxisX / toAxisDist) * CONFIG.WAKE_FORCE * force * 0.9 * dt;
+            p.vy += (toAxisY / toAxisDist) * CONFIG.WAKE_FORCE * force * 0.9 * dt;
+          } else {
+            p.vx += ball.vx * force * 0.5 * dt;
+            p.vy += ball.vy * force * 0.5 * dt;
+            if (dist > 1) {
+              p.vx += (dx / dist) * CONFIG.WAKE_FORCE * force * 1.2 * dt;
+              p.vy += (dy / dist) * CONFIG.WAKE_FORCE * force * 1.2 * dt;
+            }
+          }
+        }
+        p.life += dt;
+      });
+      particles = particles.filter(p => p.life < p.maxLife);
+    }
+
+    function drawArc(radius, start, end, r, g, b, alpha, offsetX = 0, offsetY = 0, lineWidth = CONFIG.RING_STROKE) {
+      context.beginPath();
+      context.arc(center.x + offsetX, center.y + offsetY, radius, start, end);
+      context.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      context.lineWidth = lineWidth;
+      context.lineCap = "round";
+      context.stroke();
+    }
+
+    function drawRing(ring) {
+      const gap = getGapHalfAngle(ring);
+      const start = ring.gapAngle + gap;
+      const end = ring.gapAngle - gap + Math.PI * 2;
+      const ratio = clamp((ring.radius - CONFIG.FADE_START_RADIUS) / (CONFIG.FADE_END_RADIUS - CONFIG.FADE_START_RADIUS), 0, 1);
+      const easeRatio = Math.pow(ratio, 1.2); 
+      const r = Math.round(222 + (5 - 222) * easeRatio);
+      const g = Math.round(226 + (5 - 226) * easeRatio);
+      const b = Math.round(229 + (5 - 229) * easeRatio);
+      const baseAlpha = 1 - easeRatio;
+      
+      // 【修改】將 windOffsetX 與 shakeX 疊加後傳入繪製函式
+      drawArc(ring.radius, start, end, r, g, b, baseAlpha, ring.windOffsetX + ring.shakeX, ring.windOffsetY + ring.shakeY);
+    }
+
+    function drawParticles() {
+      context.globalCompositeOperation = "lighter";
+      particles.forEach(p => {
+        const lifeRatio = p.life / p.maxLife;
+        const currentSize = p.size + p.growth * lifeRatio;
+        const alphaFade = 1 - Math.pow(lifeRatio, 1.5);
+        const alpha = Math.max(0, alphaFade * p.baseAlpha);
+        
+        if (alpha > 0.005) {
+          const grad = context.createRadialGradient(p.x, p.y, 0, p.x, p.y, currentSize);
+          grad.addColorStop(0, `rgba(${p.color}, ${alpha})`);
+          grad.addColorStop(0.4, `rgba(${p.color}, ${alpha * 0.5})`);
+          grad.addColorStop(1, `rgba(${p.color}, 0)`);
+          context.beginPath();
+          context.arc(p.x, p.y, currentSize, 0, Math.PI * 2);
+          context.fillStyle = grad;
+          context.fill();
+        }
+      });
+      context.globalCompositeOperation = "source-over"; 
+    }
+
+    function drawBall() {
+      for (let index = 0; index < ball.trail.length; index += 1) {
+        const point = ball.trail[index];
+        const alpha = (index / ball.trail.length) * 0.12;
+        context.beginPath();
+        context.arc(point.x, point.y, CONFIG.BALL_RADIUS * 0.75, 0, Math.PI * 2);
+        context.fillStyle = `rgba(255,255,255,${alpha})`;
+        context.fill();
+      }
+
+      context.save();
+      context.translate(ball.x, ball.y);
+      context.rotate(ball.angle);
+      const shine = context.createRadialGradient(-4, -5, 1, 0, 0, CONFIG.BALL_RADIUS * 1.25);
+      shine.addColorStop(0, "#ffffff");
+      shine.addColorStop(0.64, "#f7f7f7");
+      shine.addColorStop(1, "#cfd2d4");
+      context.beginPath();
+      context.arc(0, 0, CONFIG.BALL_RADIUS, 0, Math.PI * 2);
+      context.fillStyle = shine;
+      context.fill();
+      context.strokeStyle = "rgba(255,255,255,.78)";
+      context.lineWidth = 1;
+      context.stroke();
+      context.beginPath();
+      context.arc(-3.2, -3.6, 2.2, 0, Math.PI * 2);
+      context.fillStyle = "rgba(255,255,255,.96)";
+      context.fill();
+      context.beginPath();
+      context.arc(0, 0, CONFIG.BALL_RADIUS * 0.57, -0.9, 0.9);
+      context.strokeStyle = "rgba(112,118,122,.34)";
+      context.lineWidth = 1.25;
+      context.stroke();
+      context.restore();
+    }
+
+    function drawRipples() {
+      ripples.forEach(r => {
+        const progress = r.age / 0.6; 
+        const radius = 10 + progress * 50; 
+        const alpha = (1 - progress) * 0.6; 
+        context.beginPath();
+        context.arc(r.x, r.y, radius, 0, Math.PI * 2);
+        context.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+        context.lineWidth = 1.5;
+        context.stroke();
+      });
+    }
+
+    function render() {
+      context.clearRect(0, 0, width, height);
+      context.fillStyle = "#050505";
+      context.fillRect(0, 0, width, height);
+      rings.forEach((ring) => drawRing(ring));
+      drawParticles(); 
+      drawRipples();
+      drawBall();
+    }
+
+    function frame(now) {
+      const elapsed = Math.min((now - lastTime) / 1000, 0.034);
+      lastTime = now;
+      if (!paused) update(elapsed);
+      render();
+      requestAnimationFrame(frame);
+    }
+
+    canvas.addEventListener("pointerdown", (event) => {
+      if (paused) return; 
+      
+      const rect = canvas.getBoundingClientRect();
+      const touchX = event.clientX - rect.left;
+      const touchY = event.clientY - rect.top;
+      const dx = ball.x - touchX;
+      const dy = ball.y - touchY;
+      const dist = Math.hypot(dx, dy) || 1; 
+
+      ball.vx += (dx / dist) * CONFIG.USER_IMPULSE;
+      ball.vy += (dy / dist) * CONFIG.USER_IMPULSE;
+      ripples.push({ x: touchX, y: touchY, age: 0 });
+
+      for (let i = 0; i < CONFIG.CLICK_SMOKE_COUNT; i++) {
+        const r = CONFIG.CLICK_SMOKE_RADIUS * Math.sqrt(Math.random());
+        const theta = Math.random() * 2 * Math.PI;
+        const px = touchX + r * Math.cos(theta);
+        const py = touchY + r * Math.sin(theta);
+        const burstSpeed = CONFIG.CLICK_SMOKE_BURST_MIN + Math.random() * (CONFIG.CLICK_SMOKE_BURST_MAX - CONFIG.CLICK_SMOKE_BURST_MIN);
+        const vx = Math.cos(theta) * burstSpeed;
+        const vy = Math.sin(theta) * burstSpeed;
+
+        particles.push({
+          x: px, y: py, vx: vx, vy: vy, life: 0,
+          maxLife: CONFIG.SMOKE_MAX_LIFE * (0.25 + Math.random() * 0.3), 
+          size: Math.random() * 10 + 5,      
+          growth: 15 + Math.random() * 10,   
+          color: `215, 220, 225`,            
+          baseAlpha: 0.12 + Math.random() * 0.08, 
+          swirlPhaseX: Math.random() * Math.PI * 2, swirlPhaseY: Math.random() * Math.PI * 2,
+          swirlFreq: 1.5 + Math.random() * 2, swirlAmp: 10 + Math.random() * 20
+        });
+      }
+
+      ball.boostDirX = -dx / dist;
+      ball.boostDirY = -dy / dist;
+      ball.boostSmokeTimer = CONFIG.BALL_BOOST_DURATION;
+    });
+
+    pauseBtn.addEventListener("click", () => {
+      paused = !paused;
+      lastTime = performance.now(); 
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key.toLowerCase() === "r") reset();
+      if (event.code === "Space") {
+        event.preventDefault();
+        paused = !paused;
+        lastTime = performance.now();
+      }
+    });
+    
+    window.addEventListener("resize", resize);
+
+    resize();
+    reset();
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
