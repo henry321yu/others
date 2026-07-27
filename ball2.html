@@ -41,7 +41,7 @@
     */
     const CONFIG = {
       BALL_RADIUS: 11,                 // 球半徑
-      GRAVITY: 100,                    // 向下重力（px/s²）
+      GRAVITY: 300,                    // 向下重力（px/s²）
       START_VERTICAL_SPEED: -430,      // 開始時的向上速度（負值向上）
       START_HORIZONTAL_SPEED: 165,     // 開始時的水平速度
       BOUNCINESS: 0.88,                // 0~1；圓環碰撞後保留的法向速度
@@ -57,7 +57,7 @@
 
       BOOST_AFTER_BOUNCES: 7,          // 累積幾次碰撞後啟動加速
       BOOSTED_BOUNCES: 3,              // 每次啟動後加速幾次彈跳
-      BOOST_MULTIPLIER: 1.24,          // 加速彈跳倍率
+      BOOST_MULTIPLIER: 10,          // 加速彈跳倍率
       MAX_SPEED: 1050,                 // 速度安全上限
       BREAK_DURATION: 1.15,            // 穿越缺口後，圓環潰散動畫秒數
     };
