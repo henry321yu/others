@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>無限彈跳球 - 圈圈潰堤模擬</title>
+<style>
+    /* 重置網頁邊距，讓畫布填滿整個畫面，並設定與參考圖一樣的純黑背景 */
+    body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #050505;
+        color: white;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    canvas {
+        display: block;
+    }
+    /* 右上角計分板 UI */
+    #ui {
+        position: absolute;
+        top: 25px;
+        right: 35px;
+        font-size: 26px;
+        font-weight: bold;
+        letter-spacing: 1px;
+        pointer-events: none;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+    }
+    #score {
+        color: #e52b20; /* 用紅色突顯分數 */
+    }
+</style>
+</head>
+<body>
+
+<div id="ui">通過圈數: <span id="score">0</span></div>
+<canvas id="gameCanvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+
+    let width, height, cx, cy;
+    
+    // 讓畫布自動適應視窗大小
+    function resize() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+        cx = width / 2;
+        cy = height / 2;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // ==========================================
+    // 1. 球體屬性設定
+    // ==========================================
+    const ball = {
+        x: cx,
+        y: cy,
+        vx: 3,         // 初始 X 速度
+        vy: 0,         // 初始 Y 速度
+        radius: 12,    // 球體大小
+        rotation: 0,   // 當前旋轉角度
+        omega: 0       // 角速度 (旋轉速度)
+    };
+
+    // ==========================================
+    // 2. 物理與環境設定
+    // ==========================================
+    const gravity = 0.02;            // 重力自由掉落
+    const bounce = 0.85;            // 彈力係數 (保留的動能)
+    const friction = 0.08;          // 摩擦係數 (碰撞時轉換為旋轉的比例)
+    const gapWidth = Math.PI / 2.5; // 缺口弧度大小
+    const ringSpacing = 20;         // 圈圈之間的無限等距
+    const shrinkSpeed = 0.01;        // 圈圈向內縮的速度
+    const ringRotationSpeed = 0.005;// 圈圈緩慢旋轉 (確保球最終能遇到缺口)
+    let score = 0;
+    let rings = [];
+
+    // 初始化鋪滿畫面的圈圈
+    const maxRings = Math.ceil(Math.max(window.innerWidth, window.innerHeight) / ringSpacing) + 2;
+    for (let i = 0; i < maxRings; i++) {
+        rings.push({
+            r: 80 + i * ringSpacing,
+            angleOffset: Math.random() * Math.PI * 2 // 隨機生成缺口位置
+        });
+    }
+
+    // ==========================================
+    // 3. 繪圖函數
+    // ==========================================
+    
+    // 繪製致敬 image_dcbd1c.png 的足球
+    function drawSoccerBall(x, y, radius, rotation) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotation);
+
+        // 畫白色基底
+        ctx.beginPath();
+        ctx.arc(0, 0, radius, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.closePath();
+
+        // 畫足球中心的五邊形與線條 (簡化以維持效能)
+        ctx.fillStyle = '#111111';
+        ctx.beginPath();
+        for(let i=0; i<5; i++) {
+            let angle = i * Math.PI * 2 / 5;
+            let px = Math.cos(angle) * radius * 0.45;
+            let py = Math.sin(angle) * radius * 0.45;
+            if(i===0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.fill();
+        ctx.closePath();
+
+        ctx.lineWidth = radius * 0.15;
+        ctx.strokeStyle = '#111111';
+        for(let i=0; i<5; i++) {
+            let angle = i * Math.PI * 2 / 5;
+            let px1 = Math.cos(angle) * radius * 0.45;
+            let py1 = Math.sin(angle) * radius * 0.45;
+            let px2 = Math.cos(angle) * radius;
+            let py2 = Math.sin(angle) * radius;
+            ctx.beginPath();
+            ctx.moveTo(px1, py1);
+            ctx.lineTo(px2, py2);
+            ctx.stroke();
+        }
+        
+        ctx.restore();
+    }
+
+    // 繪製紅綠漸層的圈圈
+    function drawRings() {
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+
+        // 完美重現參考圖：上半部紅色，下半部深綠/青色
+        let grad = ctx.createLinearGradient(0, cy - height/2, 0, cy + height/2);
+        grad.addColorStop(0, "#e52b20");    // 頂部紅色
+        grad.addColorStop(0.5, "#e52b20");  // 中間紅色邊界
+        grad.addColorStop(0.5, "#004d40");  // 中間深綠色邊界
+        grad.addColorStop(1, "#004d40");    // 底部深綠色
+        ctx.strokeStyle = grad;
+
+        for (let ring of rings) {
+            let startAngle = ring.angleOffset + gapWidth;
+            let endAngle = ring.angleOffset + Math.PI * 2;
+            
+            ctx.beginPath();
+            ctx.arc(cx, cy, ring.r, startAngle, endAngle);
+            ctx.stroke();
+        }
+    }
+
+    // ==========================================
+    // 4. 物理與邏輯更新
+    // ==========================================
+    function update() {
+        // 套用重力自由掉落
+        ball.vy += gravity;
+
+        // 更新球體座標與旋轉角度
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+        ball.rotation += ball.omega;
+
+        // 計算最小半徑，確保「不會縮到缺口小於球體」
+        const minRadius = (ball.radius * 2.2) / Math.sin(gapWidth / 2);
+        
+        // 圈圈向內縮與旋轉
+        let canShrink = rings[0].r > minRadius;
+        for (let ring of rings) {
+            if (canShrink) ring.r -= shrinkSpeed;
+            ring.angleOffset += ringRotationSpeed; 
+        }
+
+        // 外圍無限補充新的圈圈
+        if (rings[rings.length - 1].r < Math.max(width, height) + ringSpacing) {
+            rings.push({
+                r: rings[rings.length - 1].r + ringSpacing,
+                angleOffset: Math.random() * Math.PI * 2
+            });
+        }
+
+        // 碰撞偵測 (僅針對最內部、即將接觸的圈圈)
+        let innerRing = rings[0];
+        let dx = ball.x - cx;
+        let dy = ball.y - cy;
+        let dist = Math.sqrt(dx * dx + dy * dy);
+
+        // 當球體觸碰到圈圈邊緣
+        if (dist + ball.radius >= innerRing.r) {
+            let angle = Math.atan2(dy, dx);
+            
+            // 將角度正規化為 0 ~ 2PI 之間
+            let diff = (angle - innerRing.angleOffset) % (Math.PI * 2);
+            if (diff < 0) diff += Math.PI * 2;
+            
+            // 扣除球體本身的寬度，避免球卡在缺口邊緣
+            let angularBallWidth = Math.asin(ball.radius / innerRing.r);
+            let isInsideGap = diff > angularBallWidth && diff < gapWidth - angularBallWidth;
+
+            if (isInsideGap) {
+                // 如果球順利完全通過缺口，該圈圈潰堤
+                if (dist - ball.radius > innerRing.r) {
+                    rings.shift(); // 移除第一圈，淪到下一個圈圈
+                    score++;
+                    scoreEl.innerText = score;
+                }
+            } else {
+                // 接觸彈起邏輯 (推回邊界)
+                let nx = dx / dist; // 法線 (向外)
+                let ny = dy / dist;
+
+                ball.x = cx + nx * (innerRing.r - ball.radius);
+                ball.y = cy + ny * (innerRing.r - ball.radius);
+
+                let vDotN = ball.vx * nx + ball.vy * ny; // 法向速度
+                let tx = -ny; // 切線
+                let ty = nx;
+                let vDotT = ball.vx * tx + ball.vy * ty; // 切向速度
+
+                if (vDotN > 0) {
+                    // 反彈：根據彈力係數反轉法向速度
+                    ball.vx -= (1 + bounce) * vDotN * nx;
+                    ball.vy -= (1 + bounce) * vDotN * ny;
+
+                    // 摩擦旋轉：計算球表面的相對滑動速度
+                    let vSurface = ball.omega * ball.radius; 
+                    let vRel = vDotT - vSurface; 
+                    
+                    // 改變球體自轉 (omega) 與切向速度
+                    ball.omega += vRel * friction; 
+                    ball.vx -= vRel * friction * 0.5 * tx; 
+                    ball.vy -= vRel * friction * 0.5 * ty;
+                }
+            }
+        }
+    }
+
+    // ==========================================
+    // 5. 主渲染迴圈
+    // ==========================================
+    function loop() {
+        // 清空畫布
+        ctx.clearRect(0, 0, width, height);
+        
+        update();
+        drawRings();
+        drawSoccerBall(ball.x, ball.y, ball.radius, ball.rotation);
+
+        requestAnimationFrame(loop);
+    }
+
+    // 啟動動畫
+    loop();
+</script>
+</body>
+</html>
