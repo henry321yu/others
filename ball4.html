@@ -76,18 +76,21 @@
       RING_SHRINK_SPEED: 5,            // 圓框內縮速度 (px/s)
       RING_MIN_RADIUS: 12,             // 圓框最小半徑 (需大於球體，以免破圖)
 
-      // 【全新】體積煙霧粒子系統參數
-      PARTICLE_COUNT: 1000,             // 煙霧粒子數量
-      SMOKE_MAX_LIFE: 7.2,             // 煙霧存活最大秒數 (加長讓煙霧能有足夠時間捲曲)
-      WAKE_RADIUS: 70,                // 球體影響煙霧的流體半徑 (風壓範圍)
+      // 【新增】圓環受擊彈性震動參數
+      RING_SHAKE_MULTIPLIER: 0.22,     // 圓環震動幅度倍率 (依據碰撞力道)
+      RING_SHAKE_STIFFNESS: 1500,      // 震動彈簧剛性 (越高頻率越快、越快回彈)
+      RING_SHAKE_DAMPING: 25,          // 震動阻尼 (越高越快停止震動)
+
+      // 體積煙霧粒子系統參數
+      PARTICLE_COUNT: 1000,            // 煙霧粒子數量
+      SMOKE_MAX_LIFE: 7.2,             // 煙霧存活最大秒數
+      WAKE_RADIUS: 70,                 // 球體影響煙霧的流體半徑 (風壓範圍)
       WAKE_FORCE: 420,                 // 球體帶動煙霧的推力
       UPDRAFT_FORCE: 37,               // 熱氣流向上飄散的基礎加速度
 
       // 絕對距離視覺漸變參數
       FADE_START_RADIUS: 120,          // 半徑小於此值：完全實體、最亮
-      FADE_END_RADIUS: 562,            // 半徑大於此值：完全透明、融入黑暗（對應生成圈的位置）
-
-      // 玩家互動參數
+      FADE_END_RADIUS: 562,            // 半徑大於此值：完全透明、融入黑暗
       USER_IMPULSE: 550,               // 點擊畫面施加的排斥力道 (px/s)
     };
 
@@ -156,6 +159,11 @@
         gapAngle: randomGapAngle(id),
         gapDirection: id % 2 ? 1 : -1,
         broken: false,
+        // 加入圓環震動的物理變數
+        shakeX: 0,
+        shakeY: 0,
+        shakeVx: 0,
+        shakeVy: 0,
       };
     }
 
@@ -209,15 +217,15 @@
 
       for (let i = 0; i < CONFIG.PARTICLE_COUNT; i++) {
         const angle = startAngle + Math.random() * arcLength;
-        // 在弧線上散佈，加上些微厚度
         const radiusOffset = (Math.random() - 0.5) * 6;
-        const px = center.x + Math.cos(angle) * (ring.radius + radiusOffset);
-        const py = center.y + Math.sin(angle) * (ring.radius + radiusOffset);
+        
+        // 考量圓環當下的震動偏移，讓煙霧能在受擊點正確生成
+        const px = center.x + ring.shakeX + Math.cos(angle) * (ring.radius + radiusOffset);
+        const py = center.y + ring.shakeY + Math.sin(angle) * (ring.radius + radiusOffset);
 
         const vxTan = -Math.sin(angle) * vTan;
         const vyTan = Math.cos(angle) * vTan;
         
-        // 區分核心濃煙與外圍輕煙，製造體積層次感
         const isCore = Math.random() < 0.6;
         const randomBurst = isCore ? (Math.random() - 0.5) * 5 : (Math.random() - 0.5) * 15; 
         
@@ -228,13 +236,11 @@
           vy: vyTan + Math.sin(angle) * randomBurst,
           life: 0,
           maxLife: CONFIG.SMOKE_MAX_LIFE * (0.4 + Math.random() * 0.6),
-          // 起始尺寸大一點(以漸層顯示)，並設定擴張率
           size: isCore ? (Math.random() * 6 + 3) : (Math.random() * 12 + 6),
           growth: isCore ? 8 : 18, 
           color: `${r},${g},${b}`,
           baseAlpha: isCore ? baseAlpha * 0.12 : baseAlpha * 0.05,
           
-          // 擾動參數：讓煙霧有捲曲感
           swirlPhaseX: Math.random() * Math.PI * 2,
           swirlPhaseY: Math.random() * Math.PI * 2,
           swirlFreq: 1.5 + Math.random() * 2,
@@ -266,6 +272,10 @@
         breakRing(ring);
         return;
       }
+
+      // 【新增】觸發圓環受擊震動 (依據碰撞法線與徑向力道)
+      ring.shakeVx += normalX * radialVelocity * CONFIG.RING_SHAKE_MULTIPLIER;
+      ring.shakeVy += normalY * radialVelocity * CONFIG.RING_SHAKE_MULTIPLIER;
 
       ball.x = center.x + normalX * innerBoundary;
       ball.y = center.y + normalY * innerBoundary;
@@ -343,6 +353,11 @@
         if (!item.broken) {
           item.radius -= actualShrink;
         }
+        // 【新增】更新圓環的阻尼彈簧物理狀態，讓他能來回回彈與靜止
+        item.shakeVx += (-CONFIG.RING_SHAKE_STIFFNESS * item.shakeX - CONFIG.RING_SHAKE_DAMPING * item.shakeVx) * dt;
+        item.shakeVy += (-CONFIG.RING_SHAKE_STIFFNESS * item.shakeY - CONFIG.RING_SHAKE_DAMPING * item.shakeVy) * dt;
+        item.shakeX += item.shakeVx * dt;
+        item.shakeY += item.shakeVy * dt;
       });
       
       rings = rings.filter((item) => !item.broken);
@@ -358,32 +373,25 @@
       ripples.forEach(r => r.age += dt);
       ripples = ripples.filter(r => r.age < 0.6);
 
-      // 煙霧粒子流體模擬更新
       particles.forEach(p => {
-        // 基本位移與空氣阻力
         p.x += p.vx * dt;
         p.y += p.vy * dt;
-        p.vx *= (1 - 1.2 * dt); // 阻力降低，讓它能飄更遠
+        p.vx *= (1 - 1.2 * dt); 
         p.vy *= (1 - 1.2 * dt);
 
-        // 熱氣流上升 (Thermal Updraft)
         p.vy -= CONFIG.UPDRAFT_FORCE * dt;
 
-        // 煙霧捲曲擾動 (Turbulent Swirl)
         p.x += Math.cos(p.life * p.swirlFreq + p.swirlPhaseX) * p.swirlAmp * dt;
         p.y += Math.sin(p.life * p.swirlFreq + p.swirlPhaseY) * p.swirlAmp * dt;
 
-        // 球體流體互動 (Wake Effect)
         const dx = p.x - ball.x;
         const dy = p.y - ball.y;
         const dist = Math.hypot(dx, dy);
         
         if (dist < CONFIG.WAKE_RADIUS) {
           const force = Math.pow(1 - dist / CONFIG.WAKE_RADIUS, 1.5);
-          // 被球的尾流拖曳
           p.vx += ball.vx * force * 2.5 * dt;
           p.vy += ball.vy * force * 2.5 * dt;
-          // 被球擠開
           if (dist > 1) {
             p.vx += (dx / dist) * CONFIG.WAKE_FORCE * force * dt;
             p.vy += (dy / dist) * CONFIG.WAKE_FORCE * force * dt;
@@ -395,9 +403,10 @@
       particles = particles.filter(p => p.life < p.maxLife);
     }
 
-    function drawArc(radius, start, end, r, g, b, alpha, lineWidth = CONFIG.RING_STROKE) {
+    // 更新繪圖函式，支援偏移參數
+    function drawArc(radius, start, end, r, g, b, alpha, offsetX = 0, offsetY = 0, lineWidth = CONFIG.RING_STROKE) {
       context.beginPath();
-      context.arc(center.x, center.y, radius, start, end);
+      context.arc(center.x + offsetX, center.y + offsetY, radius, start, end);
       context.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
       context.lineWidth = lineWidth;
       context.lineCap = "round";
@@ -421,23 +430,21 @@
       const b = Math.round(229 + (5 - 229) * easeRatio);
       const baseAlpha = 1 - easeRatio;
 
-      drawArc(ring.radius, start, end, r, g, b, baseAlpha);
+      // 帶入各自的 shakeX 與 shakeY 偏移
+      drawArc(ring.radius, start, end, r, g, b, baseAlpha, ring.shakeX, ring.shakeY);
     }
 
     function drawParticles() {
-      // 使用 lighter 創造光暈與煙霧交疊的厚實亮度
       context.globalCompositeOperation = "lighter";
       
       particles.forEach(p => {
         const lifeRatio = p.life / p.maxLife;
         const currentSize = p.size + p.growth * lifeRatio;
         
-        // 拋物線淡出：初期較快顯現，後期平滑消失
         const alphaFade = 1 - Math.pow(lifeRatio, 1.5);
         const alpha = Math.max(0, alphaFade * p.baseAlpha);
         
         if (alpha > 0.005) {
-          // 利用 RadialGradient 創造柔和的煙霧筆刷感
           const grad = context.createRadialGradient(p.x, p.y, 0, p.x, p.y, currentSize);
           grad.addColorStop(0, `rgba(${p.color}, ${alpha})`);
           grad.addColorStop(0.4, `rgba(${p.color}, ${alpha * 0.5})`);
