@@ -48,17 +48,18 @@
       SURFACE_FRICTION: 0.7,           // 0~1；碰撞時切向速度／旋轉交換程度
       BALL_AIR_DRAG: 0.012,            // 空氣阻力，避免速度無限制累積
 
-      FIRST_RING_RADIUS: 12,          // 最內圈半徑
+      FIRST_RING_RADIUS: 118,          // 最內圈半徑
       RING_SPACING: 37,                // 各圈等距間隔
-      VISIBLE_RING_COUNT: 7,          // 同時保留的圓環數量（通過後自動補上）
+      VISIBLE_RING_COUNT: 13,          // 同時保留的圓環數量（通過後自動補上）
       RING_STROKE: 2.5,                // 圓環線寬
       GAP_EXTRA_CLEARANCE: 7,          // 缺口比球直徑額外寬出的單邊餘量
-      GAP_ROTATION_SPEED: 0.76,        // 缺口轉動速度（rad/s），確保最終會迎向球
+      GAP_ROTATION_SPEED: 0.22,        // 缺口轉動速度（rad/s），確保最終會迎向球
 
       BOOST_CHANCE: 0.08,              // 加速觸發機率 (0.08 = 8%)
       BOOSTED_BOUNCES: 5,              // 每次啟動後加速幾次彈跳
-      BOOST_MULTIPLIER: 6,            // 加速彈跳倍率
+      BOOST_MULTIPLIER: 10,            // 加速彈跳倍率
       MAX_SPEED: 1050,                 // 速度安全上限
+      MIN_SPEED: 180,                  // 速度安全下限，防止球靜止 (px/s)
       BREAK_DURATION: 1.15,            // 穿越缺口後，圓環潰散動畫秒數
       
       RING_SHRINK_SPEED: 5,            // 圓框內縮速度 (px/s)
@@ -173,12 +174,24 @@
       rings.push(createRing(lastRadius + CONFIG.RING_SPACING));
     }
 
-    function limitSpeed() {
+    // 新增：同時限制最高與最低速度，確保球不會暴衝也不會靜止
+    function constrainSpeed() {
       const speed = Math.hypot(ball.vx, ball.vy);
       if (speed > CONFIG.MAX_SPEED) {
         const scale = CONFIG.MAX_SPEED / speed;
         ball.vx *= scale;
         ball.vy *= scale;
+      } else if (speed < CONFIG.MIN_SPEED) {
+        // 防止 speed 為 0 導致除以零的錯誤
+        if (speed < 0.1) {
+          // 如果幾乎靜止，給予一個向下的基礎速度讓它繼續動
+          ball.vy = CONFIG.MIN_SPEED;
+        } else {
+          // 等比例放大速度向量，維持當前移動方向
+          const scale = CONFIG.MIN_SPEED / speed;
+          ball.vx *= scale;
+          ball.vy *= scale;
+        }
       }
     }
 
@@ -205,7 +218,6 @@
       const tangentX = -normalY;
       const tangentY = normalX;
       
-      // 球體中心本身的切向速度
       const tangentVelocity = ball.vx * tangentX + ball.vy * tangentY;
       let rebound = -radialVelocity * CONFIG.BOUNCINESS;
 
@@ -213,31 +225,16 @@
         rebound *= CONFIG.BOOST_MULTIPLIER;
         boostRemaining -= 1;
       }
-
-      /* 
-         ── 物理升級：考慮圓環旋轉與球體自轉的摩擦力 ──
-      */
       
-      // 1. 計算圓環在碰撞點的表面切向速度 (v = r * w)
       const ringAngularVelocity = ring.gapDirection * CONFIG.GAP_ROTATION_SPEED;
       const ringSurfaceVelocity = ring.radius * ringAngularVelocity;
-
-      // 2. 計算球體「接觸點」的總切向速度 (包含球自身的移動與自轉速度)
       const ballSurfaceVel = tangentVelocity + ball.spin * CONFIG.BALL_RADIUS;
-
-      // 3. 計算球體表面與圓環表面的「相對滑動速度」
       const slipVel = ballSurfaceVel - ringSurfaceVelocity;
-
-      // 4. 計算摩擦力造成的衝量 (除以 2 確保動能平滑分配給線性速度與旋轉，避免高摩擦力時產生震盪)
       const frictionImpulse = slipVel * (CONFIG.SURFACE_FRICTION / 2);
-
-      // 5. 更新切向速度：受到摩擦力衝量影響而被減速，或被旋轉的圓環「帶動」
       const newTangentVelocity = tangentVelocity - frictionImpulse;
 
       ball.vx = normalX * rebound + tangentX * newTangentVelocity;
       ball.vy = normalY * rebound + tangentY * newTangentVelocity;
-      
-      // 6. 更新球體自轉：摩擦力對球體表面產生反向的力矩，使球體產生真實的「滾動」行為
       ball.spin -= frictionImpulse / CONFIG.BALL_RADIUS;
 
       bounceCount += 1;
@@ -245,8 +242,6 @@
       if (Math.random() < CONFIG.BOOST_CHANCE) {
         boostRemaining = CONFIG.BOOSTED_BOUNCES;
       }
-      
-      limitSpeed();
     }
 
     function update(dt) {
@@ -260,6 +255,9 @@
 
       const ring = activeRing();
       if (ring) collideWithRing(ring);
+
+      // 每幀都強制檢查速度，確保球體隨時保持最小動能
+      constrainSpeed();
 
       let actualShrink = 0;
       if (ring) {
