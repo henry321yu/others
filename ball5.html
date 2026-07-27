@@ -41,7 +41,7 @@
   <canvas id="scene" aria-label="Bouncing sim"></canvas>
   <div class="hud">Circles<strong id="score">0</strong></div>
   <div class="hint">
-    <span id="pause-btn" class="btn-pause">Pause</span> · tap to interact · R reset
+    <span id="pause-btn" class="btn-pause">Pause</span> · Tap to intract · R reset
   </div>
 
   <script>
@@ -64,18 +64,16 @@
       RING_SPACING: 37,                // 各圈等距間隔
       VISIBLE_RING_COUNT: 13,          // 同時保留的圓環數量（通過後自動補上）
       RING_STROKE: 4,                  // 圓環線寬
+      
+      GAP_ROTATION_SPEED_MIN: 0.1,     // 最小轉速
+      GAP_ROTATION_SPEED_MAX: 0.85,    // 最大轉速
 
-      // 【新增】圓環隨機轉速區間 (rad/s)
-      GAP_ROTATION_SPEED_MIN: 0.1,    // 最小轉速
-      GAP_ROTATION_SPEED_MAX: 1.25,    // 最大轉速
-
-      // 【新增】圓環隨機開口區間 (相對於球體直徑的倍率)
-      GAP_WIDTH_MIN_RATIO: 1.1,        // 最小缺口倍率 (1.2倍代表絕對過得去)
+      GAP_WIDTH_MIN_RATIO: 1.1,        // 最小缺口倍率
       GAP_WIDTH_MAX_RATIO: 3.2,        // 最大缺口倍率
 
       BOOST_CHANCE: 0.07,              // 加速觸發機率 (0.07 = 7%)
       BOOSTED_BOUNCES: 1,              // 每次啟動後加速幾次彈跳
-      BOOST_MULTIPLIER: 3,             // 加速彈跳倍率
+      BOOST_MULTIPLIER: 2,             // 加速彈跳倍率
       MAX_SPEED: 1050,                 // 速度安全上限
       MIN_SPEED: 300,                  // 速度安全下限，防止球靜止 (px/s)
       
@@ -88,11 +86,16 @@
       RING_SHAKE_DAMPING: 25,          // 震動阻尼 (越高越快停止震動)
 
       // 體積煙霧粒子系統參數
-      PARTICLE_COUNT: 1000,            // 煙霧粒子數量
+      PARTICLE_COUNT: 800,            // 煙霧粒子數量
       SMOKE_MAX_LIFE: 7.2,             // 煙霧存活最大秒數
       WAKE_RADIUS: 70,                 // 球體影響煙霧的流體半徑 (風壓範圍)
       WAKE_FORCE: 420,                 // 球體帶動煙霧的推力
       UPDRAFT_FORCE: 37,               // 熱氣流向上飄散的基礎加速度
+
+      // 【新增】環境自然風參數
+      WIND_FORCE_MIN: 10,              // 最小自然風力
+      WIND_FORCE_MAX: 85,              // 最大自然風力
+      WIND_CHANGE_INTERVAL: 3.5,       // 風向與風力改變的基礎時間間隔 (秒)
 
       // 絕對距離視覺漸變參數
       FADE_START_RADIUS: 120,          // 半徑小於此值：完全實體、最亮
@@ -120,6 +123,15 @@
     let ball;
     let ripples = []; 
     let particles = []; 
+    
+    // 【新增】環境風的全域狀態
+    let envWind = {
+      vx: 0,           // 當前實際風速X
+      vy: 0,           // 當前實際風速Y
+      targetVx: 0,     // 目標風速X (風向)
+      targetVy: 0,     // 目標風速Y (風向)
+      timer: 0         // 下一次改變風向的倒數計時器
+    };
 
     const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
     const angleDistance = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
@@ -152,31 +164,27 @@
       return ((seeded - Math.floor(seeded)) * Math.PI * 2) - Math.PI;
     }
 
-    // 【新增】動態計算單一圓環的缺口半角 (確保縮小過程物理寬度不變)
     function getGapHalfAngle(ring) {
       const physicalGapWidth = (CONFIG.BALL_RADIUS * 2) * ring.gapWidthRatio;
       const halfGap = physicalGapWidth / 2;
-      // 0.95 防呆：避免縮太小時反三角函數算不出數值（破圖）
       return Math.asin(clamp(halfGap / ring.radius, 0, 0.95));
     }
 
     function createRing(radius) {
       const id = nextRingId++;
       
-      // 【新增】為每個圓環獨立決定隨機轉向與轉速
       const randomSpeed = CONFIG.GAP_ROTATION_SPEED_MIN + Math.random() * (CONFIG.GAP_ROTATION_SPEED_MAX - CONFIG.GAP_ROTATION_SPEED_MIN);
       const direction = Math.random() < 0.5 ? 1 : -1;
       const finalRotationSpeed = randomSpeed * direction;
 
-      // 【新增】為每個圓環獨立決定隨機缺口倍率
       const gapWidthRatio = CONFIG.GAP_WIDTH_MIN_RATIO + Math.random() * (CONFIG.GAP_WIDTH_MAX_RATIO - CONFIG.GAP_WIDTH_MIN_RATIO);
 
       return {
         id,
         radius,
         gapAngle: randomGapAngle(id),
-        rotationSpeed: finalRotationSpeed, // 保存專屬轉速
-        gapWidthRatio: gapWidthRatio,      // 保存專屬缺口大小
+        rotationSpeed: finalRotationSpeed,
+        gapWidthRatio: gapWidthRatio,      
         broken: false,
         shakeX: 0,
         shakeY: 0,
@@ -205,6 +213,10 @@
       };
       ripples = [];
       particles = [];
+      
+      // 重置自然風狀態
+      envWind = { vx: 0, vy: 0, targetVx: 0, targetVy: 0, timer: 0 };
+      
       scoreElement.textContent = "0";
       paused = false;
       lastTime = performance.now();
@@ -388,14 +400,37 @@
       ripples.forEach(r => r.age += dt);
       ripples = ripples.filter(r => r.age < 0.6);
 
+      // 【更新】環境自然風的邏輯計算
+      envWind.timer -= dt;
+      if (envWind.timer <= 0) {
+        // 重置倒數計時器 (基礎時間加上一些隨機波動)
+        envWind.timer = CONFIG.WIND_CHANGE_INTERVAL + Math.random() * 2;
+        // 決定新的隨機風力與風向
+        const windForce = CONFIG.WIND_FORCE_MIN + Math.random() * (CONFIG.WIND_FORCE_MAX - CONFIG.WIND_FORCE_MIN);
+        const windAngle = Math.random() * Math.PI * 2; // 0 到 360 度全方位隨機
+        
+        envWind.targetVx = Math.cos(windAngle) * windForce;
+        envWind.targetVy = Math.sin(windAngle) * windForce;
+      }
+      // 利用線性插值(Lerp)讓實際風速緩慢、平滑地過渡到目標風速
+      envWind.vx += (envWind.targetVx - envWind.vx) * dt * 0.5;
+      envWind.vy += (envWind.targetVy - envWind.vy) * dt * 0.5;
+
+
       particles.forEach(p => {
         p.x += p.vx * dt;
         p.y += p.vy * dt;
         p.vx *= (1 - 1.2 * dt); 
         p.vy *= (1 - 1.2 * dt);
 
+        // 向上熱氣流
         p.vy -= CONFIG.UPDRAFT_FORCE * dt;
+        
+        // 【新增】受到環境自然風的吹拂推動
+        p.vx += envWind.vx * dt;
+        p.vy += envWind.vy * dt;
 
+        // 煙霧自身的捲曲擾動
         p.x += Math.cos(p.life * p.swirlFreq + p.swirlPhaseX) * p.swirlAmp * dt;
         p.y += Math.sin(p.life * p.swirlFreq + p.swirlPhaseY) * p.swirlAmp * dt;
 
