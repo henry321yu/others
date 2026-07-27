@@ -345,7 +345,46 @@
       ball.spin -= frictionImpulse / CONFIG.BALL_RADIUS;
 
       bounceCount += 1;
-      
+
+      // ==========================================
+      // 【新增】碰撞時在球體左右切線邊緣產生煙霧 (各 3 顆)
+      // ==========================================
+      for (let i = 0; i < 2; i++) {
+        // side = 1 為右側, -1 為左側
+        const sides = [1, -1]; 
+        sides.forEach(side => {
+          // 1. 設定發射點：球心 + (切向量 * 方向 * 半徑)
+          const startX = ball.x + tangentX * side * CONFIG.BALL_RADIUS;
+          const startY = ball.y + tangentY * side * CONFIG.BALL_RADIUS;
+
+          // 2. 設定速度：沿著切線散開 (tangentSpeed)，並強制往內縮 (-normal) 避免穿過圓環
+          const tangentSpeed = 0.2 + Math.random() * 0.02; // 切線方向噴散速度
+          const inwardSpeed = 0.1 + Math.random() * 0.01;  // 向環中心彈回的速度
+
+          // normal 向量是指向圓環外側，所以這裡用減的 (-normalX) 來確保煙霧往內飛
+          const vx = (tangentX * side * tangentSpeed) - (normalX * inwardSpeed);
+          const vy = (tangentY * side * tangentSpeed) - (normalY * inwardSpeed);
+
+          particles.push({
+            x: startX, 
+            y: startY, 
+            vx: vx + ball.vx * 0.015, // 繼承一點點球反彈後的速度讓視覺更自然
+            vy: vy + ball.vy * 0.015, 
+            life: 0,
+            maxLife: CONFIG.SMOKE_MAX_LIFE * (0.1 + Math.random() * 0.1), // 生命週期較短，呈現瞬間噴出感
+            size: Math.random() * 4 + 1,
+            growth: 8 + Math.random() * 2,
+            color: `215, 220, 225`,
+            baseAlpha: 0.2 + Math.random() * 0.1,
+            swirlPhaseX: Math.random() * Math.PI * 2, 
+            swirlPhaseY: Math.random() * Math.PI * 2,
+            swirlFreq: 1.5 + Math.random() * 2, 
+            swirlAmp: 5 + Math.random() * 8
+          });
+        });
+      }
+      // ==========================================
+
       if (Math.random() < CONFIG.BOOST_CHANCE) {
         boostRemaining = CONFIG.BOOSTED_BOUNCES;
       }
