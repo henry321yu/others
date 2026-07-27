@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>無限缺口圓環彈跳</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #050505; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+    .hud {
+      position: fixed; top: 24px; right: 28px; z-index: 1;
+      color: rgba(255,255,255,.92); font: 500 15px/1.25 ui-sans-serif, system-ui, "Microsoft JhengHei", sans-serif;
+      letter-spacing: .08em; text-align: right; user-select: none;
+    }
+    .hud strong { display: block; margin-top: 4px; font-size: 34px; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+    .hint {
+      position: fixed; left: 24px; bottom: 22px; z-index: 1;
+      color: rgba(255,255,255,.38); font: 13px/1.4 ui-sans-serif, system-ui, "Microsoft JhengHei", sans-serif;
+      user-select: none;
+    }
+    @media (max-width: 560px) {
+      .hud { top: 17px; right: 18px; font-size: 12px; }
+      .hud strong { font-size: 28px; }
+      .hint { left: 18px; bottom: 16px; font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="scene" aria-label="白色彈跳球穿越無限缺口圓環的物理模擬"></canvas>
+  <div class="hud">已通過圈數<strong id="score">0</strong></div>
+  <div class="hint">點擊畫面暫停　·　R 重設</div>
+
+  <script>
+    "use strict";
+
+    /*
+      ── 可調整參數 ────────────────────────────────────────────
+      修改這一區即可調整整個模擬；數值以畫布的 CSS 像素與秒為單位。
+    */
+    const CONFIG = {
+      BALL_RADIUS: 11,                 // 球半徑
+      GRAVITY: 300,                    // 向下重力（px/s²）
+      START_VERTICAL_SPEED: -430,      // 開始時的向上速度（負值向上）
+      START_HORIZONTAL_SPEED: 165,     // 開始時的水平速度
+      BOUNCINESS: 0.88,                // 0~1；圓環碰撞後保留的法向速度
+      SURFACE_FRICTION: 0.17,          // 0~1；碰撞時切向速度／旋轉交換程度
+      BALL_AIR_DRAG: 0.012,            // 空氣阻力，避免速度無限制累積
+
+      FIRST_RING_RADIUS: 118,          // 最內圈半徑
+      RING_SPACING: 37,                // 各圈等距間隔
+      VISIBLE_RING_COUNT: 13,          // 同時保留的圓環數量（通過後自動補上）
+      RING_STROKE: 2.5,                // 圓環線寬
+      GAP_EXTRA_CLEARANCE: 7,          // 缺口比球直徑額外寬出的單邊餘量
+      GAP_ROTATION_SPEED: 0.22,        // 缺口轉動速度（rad/s），確保最終會迎向球
+
+      BOOST_CHANCE: 0.08,              // 加速觸發機率 (0.08 = 8%)
+      BOOSTED_BOUNCES: 3,              // 每次啟動後加速幾次彈跳
+      BOOST_MULTIPLIER: 10,            // 加速彈跳倍率
+      MAX_SPEED: 1050,                 // 速度安全上限
+      BREAK_DURATION: 1.15,            // 穿越缺口後，圓環潰散動畫秒數
+      
+      RING_SHRINK_SPEED: 15,           // 圓框內縮速度 (px/s)
+      RING_MIN_RADIUS: 45,             // 圓框最小半徑 (需大於球體，以免破圖)
+    };
+
+    const canvas = document.getElementById("scene");
+    const context = canvas.getContext("2d");
+    const scoreElement = document.getElementById("score");
+
+    let width = 0;
+    let height = 0;
+    let dpr = 1;
+    let center = { x: 0, y: 0 };
+    let lastTime = performance.now();
+    let paused = false;
+    let passCount = 0;
+    let bounceCount = 0;
+    let boostRemaining = 0;
+    let nextRingId = 0;
+    let rings = [];
+    let ball;
+
+    const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
+    const angleDistance = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+
+    function resize() {
+      const previousCenter = center;
+      const relativeBallX = ball ? ball.x - previousCenter.x : 0;
+      const relativeBallY = ball ? ball.y - previousCenter.y : 0;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+      center = { x: width / 2, y: height / 2 };
+      if (ball) {
+        const changeX = center.x - previousCenter.x;
+        const changeY = center.y - previousCenter.y;
+        ball.x = center.x + relativeBallX;
+        ball.y = center.y + relativeBallY;
+        ball.trail.forEach((point) => {
+          point.x += changeX;
+          point.y += changeY;
+        });
+      }
+    }
+
+    function randomGapAngle(id) {
+      const seeded = Math.sin(id * 127.1 + 19.7) * 43758.5453123;
+      return ((seeded - Math.floor(seeded)) * Math.PI * 2) - Math.PI;
+    }
+
+    function gapHalfAngle(radius) {
+      const halfGapWidth = CONFIG.BALL_RADIUS + CONFIG.GAP_EXTRA_CLEARANCE;
+      return Math.asin(clamp(halfGapWidth / radius, 0, 0.92)) + 0.035;
+    }
+
+    function createRing(radius) {
+      const id = nextRingId++;
+      return {
+        id,
+        radius,
+        gapAngle: randomGapAngle(id),
+        gapDirection: id % 2 ? 1 : -1,
+        broken: false,
+        breakAge: 0,
+        breakAngle: 0,
+      };
+    }
+
+    function reset() {
+      passCount = 0;
+      bounceCount = 0;
+      boostRemaining = 0;
+      nextRingId = 0;
+      rings = [];
+      for (let index = 0; index < CONFIG.VISIBLE_RING_COUNT; index += 1) {
+        rings.push(createRing(CONFIG.FIRST_RING_RADIUS + index * CONFIG.RING_SPACING));
+      }
+      ball = {
+        x: center.x,
+        y: center.y - 18,
+        vx: CONFIG.START_HORIZONTAL_SPEED,
+        vy: CONFIG.START_VERTICAL_SPEED,
+        angle: 0,
+        spin: 0,
+        trail: [],
+      };
+      scoreElement.textContent = "0";
+      paused = false;
+      lastTime = performance.now();
+    }
+
+    function activeRing() {
+      return rings.find((ring) => !ring.broken);
+    }
+
+    function inGap(ring, angle) {
+      return Math.abs(angleDistance(angle, ring.gapAngle)) <= gapHalfAngle(ring.radius);
+    }
+
+    function breakRing(ring, exitAngle) {
+      ring.broken = true;
+      ring.breakAge = 0;
+      ring.breakAngle = exitAngle;
+      passCount += 1;
+      scoreElement.textContent = String(passCount);
+
+      const lastRadius = rings[rings.length - 1].radius;
+      rings.push(createRing(lastRadius + CONFIG.RING_SPACING));
+    }
+
+    function limitSpeed() {
+      const speed = Math.hypot(ball.vx, ball.vy);
+      if (speed > CONFIG.MAX_SPEED) {
+        const scale = CONFIG.MAX_SPEED / speed;
+        ball.vx *= scale;
+        ball.vy *= scale;
+      }
+    }
+
+    function collideWithRing(ring) {
+      const dx = ball.x - center.x;
+      const dy = ball.y - center.y;
+      const distance = Math.hypot(dx, dy) || 0.0001;
+      const normalX = dx / distance;
+      const normalY = dy / distance;
+      const angle = Math.atan2(dy, dx);
+      const radialVelocity = ball.vx * normalX + ball.vy * normalY;
+      const innerBoundary = ring.radius - CONFIG.BALL_RADIUS;
+
+      if (distance < innerBoundary || radialVelocity <= 0) return;
+
+      if (inGap(ring, angle)) {
+        breakRing(ring, angle);
+        return;
+      }
+
+      ball.x = center.x + normalX * innerBoundary;
+      ball.y = center.y + normalY * innerBoundary;
+
+      const tangentX = -normalY;
+      const tangentY = normalX;
+      const tangentVelocity = ball.vx * tangentX + ball.vy * tangentY;
+      let rebound = -radialVelocity * CONFIG.BOUNCINESS;
+
+      if (boostRemaining > 0) {
+        rebound *= CONFIG.BOOST_MULTIPLIER;
+        boostRemaining -= 1;
+      }
+
+      const slowedTangent = tangentVelocity * (1 - CONFIG.SURFACE_FRICTION);
+      ball.vx = normalX * rebound + tangentX * slowedTangent;
+      ball.vy = normalY * rebound + tangentY * slowedTangent;
+      ball.spin += (tangentVelocity / CONFIG.BALL_RADIUS) * CONFIG.SURFACE_FRICTION;
+
+      bounceCount += 1;
+      
+      // 機率性觸發加速 (8%)
+      if (Math.random() < CONFIG.BOOST_CHANCE) {
+        boostRemaining = CONFIG.BOOSTED_BOUNCES;
+      }
+      
+      limitSpeed();
+    }
+
+    function update(dt) {
+      const drag = Math.max(0, 1 - CONFIG.BALL_AIR_DRAG * dt);
+      ball.vx *= drag;
+      ball.vy = ball.vy * drag + CONFIG.GRAVITY * dt;
+      ball.x += ball.vx * dt;
+      ball.y += ball.vy * dt;
+      ball.angle += ball.spin * dt;
+      ball.spin *= Math.max(0, 1 - 0.28 * dt);
+
+      const ring = activeRing();
+      if (ring) collideWithRing(ring);
+
+      rings.forEach((item) => {
+        item.gapAngle += item.gapDirection * CONFIG.GAP_ROTATION_SPEED * dt;
+        if (item.broken) {
+          item.breakAge += dt;
+        } else {
+          // 圓環持續向內縮，直到達到設定的最小半徑
+          item.radius = Math.max(CONFIG.RING_MIN_RADIUS, item.radius - CONFIG.RING_SHRINK_SPEED * dt);
+        }
+      });
+      rings = rings.filter((item) => !item.broken || item.breakAge < CONFIG.BREAK_DURATION);
+
+      while (rings.length < CONFIG.VISIBLE_RING_COUNT) {
+        const lastRadius = rings.length ? rings[rings.length - 1].radius : CONFIG.FIRST_RING_RADIUS;
+        rings.push(createRing(lastRadius + CONFIG.RING_SPACING));
+      }
+
+      ball.trail.push({ x: ball.x, y: ball.y, alpha: 1 });
+      if (ball.trail.length > 13) ball.trail.shift();
+    }
+
+    function drawArc(radius, start, end, alpha, lineWidth = CONFIG.RING_STROKE) {
+      context.beginPath();
+      context.arc(center.x, center.y, radius, start, end);
+      context.strokeStyle = `rgba(222, 226, 229, ${alpha})`;
+      context.lineWidth = lineWidth;
+      context.lineCap = "round";
+      context.stroke();
+    }
+
+    function drawRing(ring, index) {
+      const gap = gapHalfAngle(ring.radius);
+      const start = ring.gapAngle + gap;
+      const end = ring.gapAngle - gap + Math.PI * 2;
+
+      if (!ring.broken) {
+        const fade = clamp(0.81 - index * 0.038, 0.28, 0.81);
+        drawArc(ring.radius, start, end, fade);
+        return;
+      }
+
+      const progress = clamp(ring.breakAge / CONFIG.BREAK_DURATION, 0, 1);
+      const pieces = 7;
+      const available = Math.PI * 2 - gap * 2;
+      for (let piece = 0; piece < pieces; piece += 1) {
+        const pieceStart = start + (available / pieces) * piece + 0.035;
+        const pieceEnd = start + (available / pieces) * (piece + 1) - 0.035;
+        const middle = (pieceStart + pieceEnd) / 2;
+        const drift = progress * progress * (16 + piece * 7);
+        context.save();
+        context.translate(Math.cos(middle) * progress * 9, drift);
+        context.rotate((piece - 3) * progress * 0.08);
+        drawArc(ring.radius, pieceStart, pieceEnd, (1 - progress) * 0.56);
+        context.restore();
+      }
+    }
+
+    function drawBall() {
+      for (let index = 0; index < ball.trail.length; index += 1) {
+        const point = ball.trail[index];
+        const alpha = (index / ball.trail.length) * 0.12;
+        context.beginPath();
+        context.arc(point.x, point.y, CONFIG.BALL_RADIUS * 0.75, 0, Math.PI * 2);
+        context.fillStyle = `rgba(255,255,255,${alpha})`;
+        context.fill();
+      }
+
+      context.save();
+      context.translate(ball.x, ball.y);
+      context.rotate(ball.angle);
+      const shine = context.createRadialGradient(-4, -5, 1, 0, 0, CONFIG.BALL_RADIUS * 1.25);
+      shine.addColorStop(0, "#ffffff");
+      shine.addColorStop(0.64, "#f7f7f7");
+      shine.addColorStop(1, "#cfd2d4");
+      context.beginPath();
+      context.arc(0, 0, CONFIG.BALL_RADIUS, 0, Math.PI * 2);
+      context.fillStyle = shine;
+      context.fill();
+      context.strokeStyle = "rgba(255,255,255,.78)";
+      context.lineWidth = 1;
+      context.stroke();
+      context.beginPath();
+      context.arc(-3.2, -3.6, 2.2, 0, Math.PI * 2);
+      context.fillStyle = "rgba(255,255,255,.96)";
+      context.fill();
+      context.beginPath();
+      context.arc(0, 0, CONFIG.BALL_RADIUS * 0.57, -0.9, 0.9);
+      context.strokeStyle = "rgba(112,118,122,.34)";
+      context.lineWidth = 1.25;
+      context.stroke();
+      context.restore();
+    }
+
+    function render() {
+      context.clearRect(0, 0, width, height);
+      context.fillStyle = "#050505";
+      context.fillRect(0, 0, width, height);
+      rings.forEach(drawRing);
+      drawBall();
+    }
+
+    function frame(now) {
+      const elapsed = Math.min((now - lastTime) / 1000, 0.034);
+      lastTime = now;
+      if (!paused) update(elapsed);
+      render();
+      requestAnimationFrame(frame);
+    }
+
+    canvas.addEventListener("click", () => { paused = !paused; });
+    window.addEventListener("keydown", (event) => {
+      if (event.key.toLowerCase() === "r") reset();
+      if (event.code === "Space") {
+        event.preventDefault();
+        paused = !paused;
+      }
+    });
+    window.addEventListener("resize", resize);
+
+    resize();
+    reset();
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
