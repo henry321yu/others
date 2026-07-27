@@ -39,7 +39,7 @@
 </head>
 <body>
   <canvas id="scene" aria-label="白色彈跳球穿越無限缺口圓環的物理模擬"></canvas>
-  <div class="hud">已通過圈數<strong id="score">0</strong></div>
+  <div class="hud">Circles<strong id="score">0</strong></div>
   <div class="hint">
     <span id="pause-btn" class="btn-pause">暫停 / 繼續</span> · 點擊畫面推動球體 · R 重設
   </div>
@@ -72,7 +72,7 @@
       BOOST_MULTIPLIER: 3,             // 加速彈跳倍率
       MAX_SPEED: 1050,                 // 速度安全上限
       MIN_SPEED: 300,                  // 速度安全下限，防止球靜止 (px/s)
-      BREAK_DURATION: 1.5,             // 穿越缺口後，圓環潰散動畫秒數
+      BREAK_DURATION: 3,             // 穿越缺口後，圓環潰散動畫秒數
       
       RING_SHRINK_SPEED: 5,            // 圓框內縮速度 (px/s)
       RING_MIN_RADIUS: 12,             // 圓框最小半徑 (需大於球體，以免破圖)
