@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Bouncing Ball - Sand Particles</title>
+  <title>Bouncing Ball - Sand Particles Physics</title>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
@@ -84,8 +84,9 @@
       RING_SHAKE_STIFFNESS: 1500,      // 震動彈簧剛性 (越高頻率越快、越快回彈)
       RING_SHAKE_DAMPING: 25,          // 震動阻尼 (越高越快停止震動)
 
-      // 【新增】碎裂沙子顆粒系統參數 (取代原本的破裂煙霧)
-      SAND_COUNT: 1000,                 // 破碎產生的沙粒數量
+      // 碎裂沙子顆粒系統參數
+      SAND_OPACITY: 0.7,               // 【新增】調整沙子透明度 (0.0 完全透明 ~ 1.0 完全不透明)
+      SAND_COUNT: 500,                 // 破碎產生的沙粒數量
       SAND_GRAVITY: 350,               // 沙粒掉落的重力
       SAND_BOUNCE: 0.35,               // 沙粒碰撞圓環的彈性 (低彈性如沙)
       SAND_FRICTION: 0.85,             // 沙粒在圓環上滑動的摩擦保留率
@@ -139,6 +140,13 @@
     let bounceCount = 0;
     let boostRemaining = 0;
     let nextRingId = 0;
+    
+    // 全域 ID 用於避免雙重檢查碰撞
+    let nextParticleId = 0; 
+    
+    // 預先建立的空間網格 (Spatial Grid) 避免每幀產生垃圾回收
+    const spatialGrid = new Map();
+    const SAND_CELL_SIZE = 4; // 網格尺寸大小，稍微大於沙粒的極限直徑即可
     
     let rings = [];
     let ball;
@@ -214,6 +222,7 @@
       bounceCount = 0;
       boostRemaining = 0;
       nextRingId = 0;
+      nextParticleId = 0;
       rings = [];
       for (let index = 0; index < CONFIG.VISIBLE_RING_COUNT; index += 1) {
         rings.push(createRing(CONFIG.FIRST_RING_RADIUS + index * CONFIG.RING_SPACING));
@@ -266,7 +275,9 @@
       const ringCenterX = center.x + ring.windOffsetX + ring.shakeX;
       const ringCenterY = center.y + ring.windOffsetY + ring.shakeY;
 
-      // 【更新】生成實體沙粒而非煙霧
+      // 【套用透明度調整】
+      const sandAlpha = Math.max(0, baseAlpha * CONFIG.SAND_OPACITY);
+
       for (let i = 0; i < CONFIG.SAND_COUNT; i++) {
         const angle = startAngle + Math.random() * arcLength;
         const radiusOffset = (Math.random() - 0.5) * CONFIG.RING_STROKE * 1.5;
@@ -277,18 +288,18 @@
         const vxTan = -Math.sin(angle) * vTan;
         const vyTan = Math.cos(angle) * vTan;
         
-        // 賦予破裂瞬間微小的彈跳與四射感
         const burst = (Math.random() - 0.5) * 80;
         const burstX = Math.cos(angle) * burst;
         const burstY = Math.sin(angle) * burst;
         
         particles.push({
-          type: 'sand', // 標記為沙子
+          id: nextParticleId++, // 新增獨立 ID 為了後續碰撞判定
+          type: 'sand', 
           x: px, y: py,
           vx: vxTan + burstX,
           vy: vyTan + burstY,
           size: CONFIG.SAND_SIZE_MIN + Math.random() * (CONFIG.SAND_SIZE_MAX - CONFIG.SAND_SIZE_MIN),
-          color: `rgba(${r}, ${g}, ${b}, ${baseAlpha * 0.9 + 0.1})` // 繼承原本圓環褪色的視覺
+          color: `rgba(${r}, ${g}, ${b}, ${sandAlpha})`
         });
       }
 
@@ -359,6 +370,7 @@
           const vy = (tangentY * side * tangentSpeed) - (normalY * inwardSpeed);
 
           particles.push({
+            id: nextParticleId++,
             type: 'smoke',
             x: startX, 
             y: startY, 
@@ -444,6 +456,7 @@
           const vx = Math.cos(angle) * partSpeed + ball.vx * 0.12;
           const vy = Math.sin(angle) * partSpeed + ball.vy * 0.12;
           particles.push({
+            id: nextParticleId++,
             type: 'smoke',
             x: px, y: py, vx: vx, vy: vy, life: 0,
             maxLife: CONFIG.SMOKE_MAX_LIFE * (0.3 + Math.random() * 0.3), 
@@ -504,26 +517,26 @@
       ripples.forEach(r => r.age += dt);
       ripples = ripples.filter(r => r.age < 0.6);
 
-      // 【更新】分別處理沙粒與煙霧的物理運算
+      // 分開處理煙霧與沙粒陣列，並清理空間網格
+      const sandParticles = [];
+      spatialGrid.clear();
+
       particles.forEach(p => {
         if (p.type === 'sand') {
           // ==============================
-          // 沙粒物理 (重力、碰撞與滑動)
+          // 第一階段：沙粒個體物理與圓環碰撞
           // ==============================
           p.vy += CONFIG.SAND_GRAVITY * dt;
           
-          // 沙子稍微受環境風力影響
           p.vx += envWind.vx * dt * 0.3;
           p.vy += envWind.vy * dt * 0.3;
 
-          // 微弱的空氣阻力
           p.vx *= (1 - 0.5 * dt);
           p.vy *= (1 - 0.5 * dt);
 
           let nextX = p.x + p.vx * dt;
           let nextY = p.y + p.vy * dt;
 
-          // 與現存圓環進行碰撞運算
           rings.forEach(ring => {
             const ringCenterX = center.x + ring.windOffsetX + ring.shakeX;
             const ringCenterY = center.y + ring.windOffsetY + ring.shakeY;
@@ -533,23 +546,18 @@
 
             const thickness = CONFIG.RING_STROKE / 2 + p.size;
             
-            // 檢查沙子是否貼近某個圓環
             if (Math.abs(dist - ring.radius) < thickness) {
               const angle = Math.atan2(dy, dx);
               
-              // 若不在缺口內，則會發生碰撞
               if (!inGap(ring, angle)) {
-                // 將沙粒擠出圓環表面
                 const isInside = dist < ring.radius;
                 const targetDist = isInside ? ring.radius - thickness : ring.radius + thickness;
                 nextX = ringCenterX + (dx / dist) * targetDist;
                 nextY = ringCenterY + (dy / dist) * targetDist;
 
-                // 碰撞面的法向量(向外)
                 const hitNormalX = isInside ? -(dx / dist) : (dx / dist);
                 const hitNormalY = isInside ? -(dy / dist) : (dy / dist);
                 
-                // 檢查是否正往表面撞擊
                 const radialV = p.vx * hitNormalX + p.vy * hitNormalY;
                 if (radialV < 0) { 
                   const vnX = hitNormalX * radialV;
@@ -557,11 +565,9 @@
                   const vtX = p.vx - vnX;
                   const vtY = p.vy - vnY;
 
-                  // 保留切線摩擦力與反彈衰減
                   p.vx = vtX * CONFIG.SAND_FRICTION - vnX * CONFIG.SAND_BOUNCE;
                   p.vy = vtY * CONFIG.SAND_FRICTION - vnY * CONFIG.SAND_BOUNCE;
 
-                  // 添加圓環本身旋轉造成的表面拖曳力
                   const ringTanSpeed = ring.radius * ring.rotationSpeed;
                   const ringTanX = -(dy / dist) * ringTanSpeed;
                   const ringTanY = (dx / dist) * ringTanSpeed;
@@ -575,6 +581,18 @@
 
           p.x = nextX;
           p.y = nextY;
+
+          // 註冊沙粒到空間網格中
+          sandParticles.push(p);
+          const cx = Math.floor(p.x / SAND_CELL_SIZE);
+          const cy = Math.floor(p.y / SAND_CELL_SIZE);
+          // 產生獨特的網格 Key (假設 x,y 不會超過 +-上萬 像素)
+          const key = cx + cy * 10000;
+          if (spatialGrid.has(key)) {
+            spatialGrid.get(key).push(p);
+          } else {
+            spatialGrid.set(key, [p]);
+          }
 
         } else {
           // ==============================
@@ -627,6 +645,81 @@
         }
       });
       
+      // ==============================
+      // 第二階段：【新增】沙粒互相碰撞物理 (空間雜湊優化)
+      // ==============================
+      for (let i = 0; i < sandParticles.length; i++) {
+        const p = sandParticles[i];
+        const cx = Math.floor(p.x / SAND_CELL_SIZE);
+        const cy = Math.floor(p.y / SAND_CELL_SIZE);
+
+        // 搜尋當前格子及周邊 8 個格子的粒子
+        for (let ox = -1; ox <= 1; ox++) {
+          for (let oy = -1; oy <= 1; oy++) {
+            const key = (cx + ox) + (cy + oy) * 10000;
+            const cell = spatialGrid.get(key);
+            
+            if (cell) {
+              for (let j = 0; j < cell.length; j++) {
+                const other = cell[j];
+                // 透過 ID 判斷，避免自我碰撞，且避免 A 計算 B 後、B 又計算 A (優化效能)
+                if (p.id < other.id) {
+                  const dx = p.x - other.x;
+                  const dy = p.y - other.y;
+                  const distSq = dx * dx + dy * dy;
+                  const minDist = p.size + other.size;
+
+                  // 發生碰撞與重疊
+                  if (distSq < minDist * minDist && distSq > 0.0001) {
+                    const dist = Math.sqrt(distSq);
+                    const overlap = minDist - dist;
+                    const nx = dx / dist;
+                    const ny = dy / dist;
+
+                    // 1. 位置修正 (輕微推開防止黏死穿透)
+                    const correction = overlap * 0.5;
+                    p.x += nx * correction;
+                    p.y += ny * correction;
+                    other.x -= nx * correction;
+                    other.y -= ny * correction;
+
+                    // 2. 速度衝量 (物理反彈與模擬沙子的黏滯摩擦)
+                    const rvx = p.vx - other.vx;
+                    const rvy = p.vy - other.vy;
+                    const vNorm = rvx * nx + rvy * ny;
+
+                    // 兩者正在靠近時才交換動量
+                    if (vNorm < 0) {
+                      // 模擬沙粒極低的彈性
+                      const restitution = 0.05; 
+                      const impulse = -(1 + restitution) * vNorm * 0.5;
+                      
+                      // 給予彈性衝力
+                      p.vx += nx * impulse;
+                      p.vy += ny * impulse;
+                      other.vx -= nx * impulse;
+                      other.vy -= ny * impulse;
+
+                      // 切線方向摩擦力 (讓堆疊起來更穩定，不易溜走)
+                      const tangentX = -ny;
+                      const tangentY = nx;
+                      const vTan = rvx * tangentX + rvy * tangentY;
+                      const friction = 0.15; 
+                      const tanImpulse = -vTan * friction * 0.5;
+
+                      p.vx += tangentX * tanImpulse;
+                      p.vy += tangentY * tanImpulse;
+                      other.vx -= tangentX * tanImpulse;
+                      other.vy -= tangentY * tanImpulse;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
       // 過濾已經死亡或掉出畫面的粒子
       particles = particles.filter(p => {
         if (p.type === 'sand') {
@@ -785,6 +878,7 @@
         const vy = Math.sin(theta) * burstSpeed;
 
         particles.push({
+          id: nextParticleId++,
           type: 'smoke',
           x: px, y: py, vx: vx, vy: vy, life: 0,
           maxLife: CONFIG.SMOKE_MAX_LIFE * (0.25 + Math.random() * 0.3), 
