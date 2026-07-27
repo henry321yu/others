@@ -12,7 +12,7 @@
     .hud {
       position: fixed; top: 24px; right: 28px; z-index: 1;
       color: rgba(255,255,255,.92); font: 500 15px/1.25 ui-sans-serif, system-ui, "Microsoft JhengHei", sans-serif;
-      letter-spacing: .08em; text-align: right; user-select: none;
+      letter-spacing: .08em; text-align: right; user-select: none; pointer-events: none;
     }
     .hud strong { display: block; margin-top: 4px; font-size: 34px; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
     .hint {
@@ -20,6 +20,16 @@
       color: rgba(255,255,255,.38); font: 13px/1.4 ui-sans-serif, system-ui, "Microsoft JhengHei", sans-serif;
       user-select: none;
     }
+    /* 讓暫停按鈕有互動感 */
+    .btn-pause {
+      cursor: pointer;
+      pointer-events: auto;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      transition: color 0.2s;
+    }
+    .btn-pause:hover { color: rgba(255,255,255,.8); }
+    
     @media (max-width: 560px) {
       .hud { top: 17px; right: 18px; font-size: 12px; }
       .hud strong { font-size: 28px; }
@@ -30,7 +40,9 @@
 <body>
   <canvas id="scene" aria-label="白色彈跳球穿越無限缺口圓環的物理模擬"></canvas>
   <div class="hud">已通過圈數<strong id="score">0</strong></div>
-  <div class="hint">點擊畫面暫停 · R 重設</div>
+  <div class="hint">
+    <span id="pause-btn" class="btn-pause">暫停 / 繼續</span> · 點擊畫面推動球體 · R 重設
+  </div>
 
   <script>
     "use strict";
@@ -64,11 +76,15 @@
       
       RING_SHRINK_SPEED: 5,            // 圓框內縮速度 (px/s)
       RING_MIN_RADIUS: 12,             // 圓框最小半徑 (需大於球體，以免破圖)
+
+      // 【新增】玩家互動參數
+      USER_IMPULSE: 550,               // 點擊畫面施加的排斥力道 (px/s)
     };
 
     const canvas = document.getElementById("scene");
     const context = canvas.getContext("2d");
     const scoreElement = document.getElementById("score");
+    const pauseBtn = document.getElementById("pause-btn");
 
     let width = 0;
     let height = 0;
@@ -82,6 +98,7 @@
     let nextRingId = 0;
     let rings = [];
     let ball;
+    let ripples = []; // 儲存點擊產生的波紋特效
 
     const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
     const angleDistance = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
@@ -150,6 +167,7 @@
         spin: 0,
         trail: [],
       };
+      ripples = [];
       scoreElement.textContent = "0";
       paused = false;
       lastTime = performance.now();
@@ -222,15 +240,12 @@
         boostRemaining = CONFIG.BOOSTED_BOUNCES;
       }
 
-      // 【物理升級】僅在碰撞彈跳時套用最小速度，確保球能彈起，同時不干擾空中的自然拋物線
       const postBounceSpeed = Math.hypot(ball.vx, ball.vy);
       if (postBounceSpeed < CONFIG.MIN_SPEED) {
         if (postBounceSpeed < 0.1) {
-          // 如果幾乎靜止，給予朝向圓心（內側）的法向速度 (-normal)
           ball.vx = -normalX * CONFIG.MIN_SPEED;
           ball.vy = -normalY * CONFIG.MIN_SPEED;
         } else {
-          // 等比例放大速度向量，維持當前反彈方向
           const scale = CONFIG.MIN_SPEED / postBounceSpeed;
           ball.vx *= scale;
           ball.vy *= scale;
@@ -250,7 +265,6 @@
       const ring = activeRing();
       if (ring) collideWithRing(ring);
 
-      // 每幀僅限制最高速度，避免破圖或暴衝
       const speed = Math.hypot(ball.vx, ball.vy);
       if (speed > CONFIG.MAX_SPEED) {
         const scale = CONFIG.MAX_SPEED / speed;
@@ -284,9 +298,12 @@
 
       ball.trail.push({ x: ball.x, y: ball.y, alpha: 1 });
       if (ball.trail.length > 13) ball.trail.shift();
+
+      // 更新波紋特效
+      ripples.forEach(r => r.age += dt);
+      ripples = ripples.filter(r => r.age < 0.6);
     }
 
-    // 擴充繪圖函式，支援直接傳入 rgb 與 alpha，以利精準控制色彩
     function drawArc(radius, start, end, r, g, b, alpha, lineWidth = CONFIG.RING_STROKE) {
       context.beginPath();
       context.arc(center.x, center.y, radius, start, end);
@@ -301,21 +318,18 @@
       const start = ring.gapAngle + gap;
       const end = ring.gapAngle - gap + Math.PI * 2;
 
-      // 【視覺升級】計算該環相對於最內圈的位置，由亮白漸深至背景色 #050505 (rgb 5,5,5)
       const visualIndex = Math.max(0, index - activeIdx);
       const ratio = clamp(visualIndex / (CONFIG.VISIBLE_RING_COUNT - 1), 0, 1);
-      const easeRatio = Math.pow(ratio, 1.2); // 加上指數曲線，讓前幾圈亮一點
+      const easeRatio = Math.pow(ratio, 1.2); 
       const r = Math.round(222 + (5 - 222) * easeRatio);
       const g = Math.round(226 + (5 - 226) * easeRatio);
       const b = Math.round(229 + (5 - 229) * easeRatio);
 
       if (!ring.broken) {
-        // 未擊碎的環維持完全不透明，直接靠 RGB 加深至底色
         drawArc(ring.radius, start, end, r, g, b, 1);
         return;
       }
 
-      // 擊碎動畫仍保留 alpha 透明度衰退
       const progress = clamp(ring.breakAge / CONFIG.BREAK_DURATION, 0, 1);
       const pieces = 7;
       const available = Math.PI * 2 - gap * 2;
@@ -368,16 +382,29 @@
       context.restore();
     }
 
+    function drawRipples() {
+      ripples.forEach(r => {
+        const progress = r.age / 0.6; // 0 到 1
+        const radius = 10 + progress * 50; // 波紋擴大的半徑
+        const alpha = (1 - progress) * 0.6; // 漸漸透明
+        context.beginPath();
+        context.arc(r.x, r.y, radius, 0, Math.PI * 2);
+        context.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+        context.lineWidth = 1.5;
+        context.stroke();
+      });
+    }
+
     function render() {
       context.clearRect(0, 0, width, height);
       context.fillStyle = "#050505";
       context.fillRect(0, 0, width, height);
       
-      // 取得當前「最內層」的活躍圓環索引，藉此計算層次漸變
       const activeIdx = rings.findIndex(r => !r.broken);
       const safeActiveIdx = activeIdx >= 0 ? activeIdx : 0;
       rings.forEach((ring, index) => drawRing(ring, index, safeActiveIdx));
       
+      drawRipples();
       drawBall();
     }
 
@@ -389,14 +416,42 @@
       requestAnimationFrame(frame);
     }
 
-    canvas.addEventListener("click", () => { paused = !paused; });
+    // 【新增】點擊畫面產生衝擊波推動球體
+    canvas.addEventListener("pointerdown", (event) => {
+      if (paused) return; // 暫停時不反應
+      
+      const rect = canvas.getBoundingClientRect();
+      const touchX = event.clientX - rect.left;
+      const touchY = event.clientY - rect.top;
+
+      // 計算點擊位置到球的向量 (以此產生排斥推力)
+      const dx = ball.x - touchX;
+      const dy = ball.y - touchY;
+      const dist = Math.hypot(dx, dy) || 1; // 避免除以 0
+
+      // 將向量單位化後乘上設定力道
+      ball.vx += (dx / dist) * CONFIG.USER_IMPULSE;
+      ball.vy += (dy / dist) * CONFIG.USER_IMPULSE;
+      
+      // 新增波紋視覺特效
+      ripples.push({ x: touchX, y: touchY, age: 0 });
+    });
+
+    // 獨立的暫停控制邏輯
+    pauseBtn.addEventListener("click", () => {
+      paused = !paused;
+      lastTime = performance.now(); // 避免恢復時發生大幅跳動
+    });
+
     window.addEventListener("keydown", (event) => {
       if (event.key.toLowerCase() === "r") reset();
       if (event.code === "Space") {
         event.preventDefault();
         paused = !paused;
+        lastTime = performance.now();
       }
     });
+    
     window.addEventListener("resize", resize);
 
     resize();
