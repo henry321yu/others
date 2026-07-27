@@ -45,10 +45,10 @@
       START_VERTICAL_SPEED: -430,      // 開始時的向上速度（負值向上）
       START_HORIZONTAL_SPEED: 165,     // 開始時的水平速度
       BOUNCINESS: 0.95,                // 0~1；圓環碰撞後保留的法向速度
-      SURFACE_FRICTION: 0.7,          // 0~1；碰撞時切向速度／旋轉交換程度
+      SURFACE_FRICTION: 0.7,           // 0~1；碰撞時切向速度／旋轉交換程度
       BALL_AIR_DRAG: 0.012,            // 空氣阻力，避免速度無限制累積
 
-      FIRST_RING_RADIUS: 12,          // 最內圈半徑
+      FIRST_RING_RADIUS: 118,          // 最內圈半徑
       RING_SPACING: 37,                // 各圈等距間隔
       VISIBLE_RING_COUNT: 13,          // 同時保留的圓環數量（通過後自動補上）
       RING_STROKE: 2.5,                // 圓環線寬
@@ -61,7 +61,7 @@
       MAX_SPEED: 1050,                 // 速度安全上限
       BREAK_DURATION: 1.15,            // 穿越缺口後，圓環潰散動畫秒數
       
-      RING_SHRINK_SPEED: 5,           // 圓框內縮速度 (px/s)
+      RING_SHRINK_SPEED: 5,            // 圓框內縮速度 (px/s)
       RING_MIN_RADIUS: 12,             // 圓框最小半徑 (需大於球體，以免破圖)
     };
 
@@ -204,6 +204,8 @@
 
       const tangentX = -normalY;
       const tangentY = normalX;
+      
+      // 球體中心本身的切向速度
       const tangentVelocity = ball.vx * tangentX + ball.vy * tangentY;
       let rebound = -radialVelocity * CONFIG.BOUNCINESS;
 
@@ -212,14 +214,34 @@
         boostRemaining -= 1;
       }
 
-      const slowedTangent = tangentVelocity * (1 - CONFIG.SURFACE_FRICTION);
-      ball.vx = normalX * rebound + tangentX * slowedTangent;
-      ball.vy = normalY * rebound + tangentY * slowedTangent;
-      ball.spin += (tangentVelocity / CONFIG.BALL_RADIUS) * CONFIG.SURFACE_FRICTION;
+      /* 
+         ── 物理升級：考慮圓環旋轉與球體自轉的摩擦力 ──
+      */
+      
+      // 1. 計算圓環在碰撞點的表面切向速度 (v = r * w)
+      const ringAngularVelocity = ring.gapDirection * CONFIG.GAP_ROTATION_SPEED;
+      const ringSurfaceVelocity = ring.radius * ringAngularVelocity;
+
+      // 2. 計算球體「接觸點」的總切向速度 (包含球自身的移動與自轉速度)
+      const ballSurfaceVel = tangentVelocity + ball.spin * CONFIG.BALL_RADIUS;
+
+      // 3. 計算球體表面與圓環表面的「相對滑動速度」
+      const slipVel = ballSurfaceVel - ringSurfaceVelocity;
+
+      // 4. 計算摩擦力造成的衝量 (除以 2 確保動能平滑分配給線性速度與旋轉，避免高摩擦力時產生震盪)
+      const frictionImpulse = slipVel * (CONFIG.SURFACE_FRICTION / 2);
+
+      // 5. 更新切向速度：受到摩擦力衝量影響而被減速，或被旋轉的圓環「帶動」
+      const newTangentVelocity = tangentVelocity - frictionImpulse;
+
+      ball.vx = normalX * rebound + tangentX * newTangentVelocity;
+      ball.vy = normalY * rebound + tangentY * newTangentVelocity;
+      
+      // 6. 更新球體自轉：摩擦力對球體表面產生反向的力矩，使球體產生真實的「滾動」行為
+      ball.spin -= frictionImpulse / CONFIG.BALL_RADIUS;
 
       bounceCount += 1;
       
-      // 機率性觸發加速 (8%)
       if (Math.random() < CONFIG.BOOST_CHANCE) {
         boostRemaining = CONFIG.BOOSTED_BOUNCES;
       }
@@ -239,10 +261,8 @@
       const ring = activeRing();
       if (ring) collideWithRing(ring);
 
-      // 計算本幀「整體」最多能往內縮多少
       let actualShrink = 0;
       if (ring) {
-        // 只有在最內圈還大於最小半徑時，才允許整個結構一起往內縮
         actualShrink = Math.min(
           CONFIG.RING_SHRINK_SPEED * dt,
           Math.max(0, ring.radius - CONFIG.RING_MIN_RADIUS)
@@ -254,7 +274,6 @@
         if (item.broken) {
           item.breakAge += dt;
         } else {
-          // 所有尚未擊碎的圓環，套用相同的內縮距離，完美保持等距
           item.radius -= actualShrink;
         }
       });
