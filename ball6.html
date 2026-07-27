@@ -68,8 +68,9 @@
       GAP_ROTATION_SPEED_MIN: 0.1,     // 最小轉速
       GAP_ROTATION_SPEED_MAX: 0.85,    // 最大轉速
 
-      GAP_WIDTH_MIN_RATIO: 1.0,        // 最小缺口倍率
-      GAP_WIDTH_MAX_RATIO: 3.2,        // 最大缺口倍率
+      GAP_WIDTH_CLOSE_RATIO: 0.0,      // 最內圈缺口倍率
+      GAP_WIDTH_MIN_RATIO: 1.5,        // 生成時最小缺口倍率
+      GAP_WIDTH_MAX_RATIO: 3.5,        // 生成時最大缺口倍率
 
       BOOST_CHANCE: 0.07,              // 加速觸發機率 (0.07 = 7%)
       BOOSTED_BOUNCES: 1,              // 每次啟動後加速幾次彈跳
@@ -78,7 +79,7 @@
       MIN_SPEED: 300,                  // 速度安全下限，防止球靜止 (px/s)
       
       RING_SHRINK_SPEED: 5,            // 圓框內縮速度 (px/s)
-      RING_MIN_RADIUS: 12,             // 圓框最小半徑 (需大於球體，以免破圖)
+      RING_MIN_RADIUS: 6,              // 圓框最小半徑 (需小於球體半徑以便觸發結束)
 
       // 圓環受擊彈性震動參數
       RING_SHAKE_MULTIPLIER: 0.22,     // 圓環震動幅度倍率 (依據碰撞力道)
@@ -103,7 +104,7 @@
       USER_IMPULSE: 550,               // 點擊畫面施加的排斥力道 (px/s)
 
       // 點擊煙霧參數
-      CLICK_SMOKE_COUNT: 50,          // 點擊生成的煙霧數量
+      CLICK_SMOKE_COUNT: 50,           // 點擊生成的煙霧數量
       CLICK_SMOKE_RADIUS: 15,          // 點擊煙霧生成填滿的圓形半徑
     };
 
@@ -118,6 +119,11 @@
     let center = { x: 0, y: 0 };
     let lastTime = performance.now();
     let paused = false;
+    
+    // 【新增】遊戲狀態與計時器
+    let gameState = "playing"; // "playing", "gameover"
+    let gameOverTimer = 0;
+
     let passCount = 0;
     let bounceCount = 0;
     let boostRemaining = 0;
@@ -168,12 +174,30 @@
       return ((seeded - Math.floor(seeded)) * Math.PI * 2) - Math.PI;
     }
 
+    // 【修改】控制缺口急遽縮小（閉合）的時機與曲線
     function getGapHalfAngle(ring) {
-      const physicalGapWidth = (CONFIG.BALL_RADIUS * 2) * ring.gapWidthRatio;
+      // 1. 調整時機：圓環半徑小於這個數值時，缺口才開始往 CLOSE_RATIO 縮小
+      // （設定為 80 代表圓環還很大時，缺口都會保持最大，靠近中心才開始縮）
+      const SHRINK_START_RADIUS = 125; 
+
+      // 2. 計算進度 (大於 80 時 progress 為 1，小於 80 時逐漸變為 0)
+      const progress = clamp(
+        (ring.radius - CONFIG.RING_MIN_RADIUS) / (SHRINK_START_RADIUS - CONFIG.RING_MIN_RADIUS), 
+        0, 1
+      );
+      
+      // 3. 調整曲線：使用開根號 (0.5次方) 讓 progress 衰減得慢一點
+      // 這樣可以確保缺口在最後一刻（半徑非常小的時候）才急速「夾死」球體
+      const easeProgress = Math.pow(progress, 0.5);
+      
+      const currentGapRatio = CONFIG.GAP_WIDTH_CLOSE_RATIO + (ring.maxGapWidthRatio - CONFIG.GAP_WIDTH_CLOSE_RATIO) * easeProgress;
+
+      const physicalGapWidth = (CONFIG.BALL_RADIUS * 2) * currentGapRatio;
       const halfGap = physicalGapWidth / 2;
       return Math.asin(clamp(halfGap / ring.radius, 0, 0.95));
     }
 
+    // 儲存圓環剛生成時的最大隨機缺口倍率
     function createRing(radius) {
       const id = nextRingId++;
       
@@ -181,14 +205,14 @@
       const direction = Math.random() < 0.5 ? 1 : -1;
       const finalRotationSpeed = randomSpeed * direction;
 
-      const gapWidthRatio = CONFIG.GAP_WIDTH_MIN_RATIO + Math.random() * (CONFIG.GAP_WIDTH_MAX_RATIO - CONFIG.GAP_WIDTH_MIN_RATIO);
+      const maxGapWidthRatio = CONFIG.GAP_WIDTH_MIN_RATIO + Math.random() * (CONFIG.GAP_WIDTH_MAX_RATIO - CONFIG.GAP_WIDTH_MIN_RATIO);
 
       return {
         id,
         radius,
         gapAngle: randomGapAngle(id),
         rotationSpeed: finalRotationSpeed,
-        gapWidthRatio: gapWidthRatio,      
+        maxGapWidthRatio: maxGapWidthRatio,
         broken: false,
         shakeX: 0,
         shakeY: 0,
@@ -198,6 +222,9 @@
     }
 
     function reset() {
+      gameState = "playing"; // 重置為遊玩狀態
+      gameOverTimer = 0;
+      
       passCount = 0;
       bounceCount = 0;
       boostRemaining = 0;
@@ -218,7 +245,6 @@
       ripples = [];
       particles = [];
       
-      // 重置自然風狀態
       envWind = { vx: 0, vy: 0, targetVx: 0, targetVy: 0, timer: 0 };
       
       scoreElement.textContent = "0";
@@ -230,8 +256,62 @@
       return rings.find((ring) => !ring.broken);
     }
 
+    // 【修改】嚴格檢查球體是否能通過缺口
     function inGap(ring, angle) {
-      return Math.abs(angleDistance(angle, ring.gapAngle)) <= getGapHalfAngle(ring);
+      const gapHalfAngle = getGapHalfAngle(ring);
+      
+      // 計算球體本身的半徑佔用了多少角度
+      // 0.99 避免浮點數或剛好重疊時的 NaN 錯誤
+      const ballHalfAngle = Math.asin(clamp(CONFIG.BALL_RADIUS / ring.radius, 0, 0.99));
+      
+      // 如果缺口的實體寬度連球都塞不下，絕對無法通過
+      if (gapHalfAngle <= ballHalfAngle) return false;
+      
+      // 球心必須要在「缺口總角減去球體佔用角度」的範圍內，才不會撞到缺口的邊緣
+      const allowedHalfAngle = gapHalfAngle - ballHalfAngle;
+      
+      return Math.abs(angleDistance(angle, ring.gapAngle)) <= allowedHalfAngle;
+    }
+
+    // 【新增】觸發遊戲結束，球化為煙霧
+    function triggerGameOver() {
+      gameState = "gameover";
+      gameOverTimer = 5.0; // 5秒倒數
+      
+      const bvx = ball.vx;
+      const bvy = ball.vy;
+      // 讓球的實體不再移動，避免繼續帶動煙霧氣流
+      ball.vx = 0; 
+      ball.vy = 0;
+
+      // 生成球化為煙的特效 (150顆高亮白煙)
+      for (let i = 0; i < 150; i++) {
+        const theta = Math.random() * 2 * Math.PI;
+        const r = CONFIG.BALL_RADIUS * Math.sqrt(Math.random());
+        const px = ball.x + r * Math.cos(theta);
+        const py = ball.y + r * Math.sin(theta);
+        
+        const burstSpeed = Math.random() * 100 + 20; 
+        const vx = Math.cos(theta) * burstSpeed;
+        const vy = Math.sin(theta) * burstSpeed;
+
+        particles.push({
+          x: px,
+          y: py,
+          vx: vx + bvx * 0.25, // 繼承原本球體的速度慣性
+          vy: vy + bvy * 0.25,
+          life: 0,
+          maxLife: CONFIG.SMOKE_MAX_LIFE * (0.3 + Math.random() * 0.5),
+          size: Math.random() * 12 + 4,
+          growth: 20 + Math.random() * 15,
+          color: `255, 255, 255`,
+          baseAlpha: 0.8 + Math.random() * 0.2,
+          swirlPhaseX: Math.random() * Math.PI * 2,
+          swirlPhaseY: Math.random() * Math.PI * 2,
+          swirlFreq: 1.5 + Math.random() * 2,
+          swirlAmp: 10 + Math.random() * 20
+        });
+      }
     }
 
     function breakRing(ring) {
@@ -354,101 +434,120 @@
     }
 
     function update(dt) {
-      const drag = Math.max(0, 1 - CONFIG.BALL_AIR_DRAG * dt);
-      ball.vx *= drag;
-      ball.vy = ball.vy * drag + CONFIG.GRAVITY * dt;
-      ball.x += ball.vx * dt;
-      ball.y += ball.vy * dt;
-      ball.angle += ball.spin * dt;
-      ball.spin *= Math.max(0, 1 - 0.28 * dt);
-
-      const ring = activeRing();
-      if (ring) collideWithRing(ring);
-
-      const speed = Math.hypot(ball.vx, ball.vy);
-      if (speed > CONFIG.MAX_SPEED) {
-        const scale = CONFIG.MAX_SPEED / speed;
-        ball.vx *= scale;
-        ball.vy *= scale;
+      // 1. 環境自然風的邏輯計算 (始終運行)
+      envWind.timer -= dt;
+      if (envWind.timer <= 0) {
+        envWind.timer = CONFIG.WIND_CHANGE_INTERVAL + Math.random() * 2;
+        const windForce = CONFIG.WIND_FORCE_MIN + Math.random() * (CONFIG.WIND_FORCE_MAX - CONFIG.WIND_FORCE_MIN);
+        const windAngle = Math.random() * Math.PI * 2; 
+        envWind.targetVx = Math.cos(windAngle) * windForce;
+        envWind.targetVy = Math.sin(windAngle) * windForce;
       }
+      envWind.vx += (envWind.targetVx - envWind.vx) * dt * 0.5;
+      envWind.vy += (envWind.targetVy - envWind.vy) * dt * 0.5;
 
-      let actualShrink = 0;
-      if (ring) {
-        actualShrink = Math.min(
-          CONFIG.RING_SHRINK_SPEED * dt,
-          Math.max(0, ring.radius - CONFIG.RING_MIN_RADIUS)
-        );
-      }
+      // 2. 主遊戲邏輯
+      if (gameState === "playing") {
+        const drag = Math.max(0, 1 - CONFIG.BALL_AIR_DRAG * dt);
+        ball.vx *= drag;
+        ball.vy = ball.vy * drag + CONFIG.GRAVITY * dt;
+        ball.x += ball.vx * dt;
+        ball.y += ball.vy * dt;
+        ball.angle += ball.spin * dt;
+        ball.spin *= Math.max(0, 1 - 0.28 * dt);
 
-      rings.forEach((item) => {
-        item.gapAngle += item.rotationSpeed * dt;
-        if (!item.broken) {
-          item.radius -= actualShrink;
+        const ring = activeRing();
+        if (ring) collideWithRing(ring);
+
+        const speed = Math.hypot(ball.vx, ball.vy);
+        if (speed > CONFIG.MAX_SPEED) {
+          const scale = CONFIG.MAX_SPEED / speed;
+          ball.vx *= scale;
+          ball.vy *= scale;
         }
-        item.shakeVx += (-CONFIG.RING_SHAKE_STIFFNESS * item.shakeX - CONFIG.RING_SHAKE_DAMPING * item.shakeVx) * dt;
-        item.shakeVy += (-CONFIG.RING_SHAKE_STIFFNESS * item.shakeY - CONFIG.RING_SHAKE_DAMPING * item.shakeVy) * dt;
-        item.shakeX += item.shakeVx * dt;
-        item.shakeY += item.shakeVy * dt;
-      });
-      
-      rings = rings.filter((item) => !item.broken);
 
+        // 圓環收縮與旋轉
+        let actualShrink = 0;
+        if (ring) {
+          actualShrink = Math.min(
+            CONFIG.RING_SHRINK_SPEED * dt,
+            Math.max(0, ring.radius - CONFIG.RING_MIN_RADIUS)
+          );
+        }
+
+        rings.forEach((item) => {
+          item.gapAngle += item.rotationSpeed * dt;
+          if (!item.broken) {
+            item.radius -= actualShrink;
+          }
+          item.shakeVx += (-CONFIG.RING_SHAKE_STIFFNESS * item.shakeX - CONFIG.RING_SHAKE_DAMPING * item.shakeVx) * dt;
+          item.shakeVy += (-CONFIG.RING_SHAKE_STIFFNESS * item.shakeY - CONFIG.RING_SHAKE_DAMPING * item.shakeVy) * dt;
+          item.shakeX += item.shakeVx * dt;
+          item.shakeY += item.shakeVy * dt;
+        });
+
+        ball.trail.push({ x: ball.x, y: ball.y, alpha: 1 });
+        if (ball.trail.length > 13) ball.trail.shift();
+
+        // 檢查是否被圓環吞噬 (觸發 Game Over)
+        if (ring && ring.radius <= CONFIG.BALL_RADIUS) {
+          triggerGameOver();
+        }
+
+      } else if (gameState === "gameover") {
+        // 遊戲結束倒數計時
+        gameOverTimer -= dt;
+        if (gameOverTimer <= 0) {
+          reset();
+        }
+        
+        // 僅計算震動物理，圓環停止轉動與縮小
+        rings.forEach((item) => {
+          item.shakeVx += (-CONFIG.RING_SHAKE_STIFFNESS * item.shakeX - CONFIG.RING_SHAKE_DAMPING * item.shakeVx) * dt;
+          item.shakeVy += (-CONFIG.RING_SHAKE_STIFFNESS * item.shakeY - CONFIG.RING_SHAKE_DAMPING * item.shakeVy) * dt;
+          item.shakeX += item.shakeVx * dt;
+          item.shakeY += item.shakeVy * dt;
+        });
+      }
+
+      // 3. 過濾與補充圓環
+      rings = rings.filter((item) => !item.broken);
       while (rings.length < CONFIG.VISIBLE_RING_COUNT) {
         const lastRadius = rings.length ? rings[rings.length - 1].radius : CONFIG.FIRST_RING_RADIUS;
         rings.push(createRing(lastRadius + CONFIG.RING_SPACING));
       }
 
-      ball.trail.push({ x: ball.x, y: ball.y, alpha: 1 });
-      if (ball.trail.length > 13) ball.trail.shift();
-
+      // 4. 水波紋
       ripples.forEach(r => r.age += dt);
       ripples = ripples.filter(r => r.age < 0.6);
 
-      // 環境自然風的邏輯計算
-      envWind.timer -= dt;
-      if (envWind.timer <= 0) {
-        // 重置倒數計時器 (基礎時間加上一些隨機波動)
-        envWind.timer = CONFIG.WIND_CHANGE_INTERVAL + Math.random() * 2;
-        // 決定新的隨機風力與風向
-        const windForce = CONFIG.WIND_FORCE_MIN + Math.random() * (CONFIG.WIND_FORCE_MAX - CONFIG.WIND_FORCE_MIN);
-        const windAngle = Math.random() * Math.PI * 2; // 0 到 360 度全方位隨機
-        
-        envWind.targetVx = Math.cos(windAngle) * windForce;
-        envWind.targetVy = Math.sin(windAngle) * windForce;
-      }
-      // 利用線性插值(Lerp)讓實際風速緩慢、平滑地過渡到目標風速
-      envWind.vx += (envWind.targetVx - envWind.vx) * dt * 0.5;
-      envWind.vy += (envWind.targetVy - envWind.vy) * dt * 0.5;
-
-
+      // 5. 更新粒子 (煙霧) 系統 (始終運行)
       particles.forEach(p => {
         p.x += p.vx * dt;
         p.y += p.vy * dt;
         p.vx *= (1 - 1.2 * dt); 
         p.vy *= (1 - 1.2 * dt);
-
-        // 向上熱氣流
         p.vy -= CONFIG.UPDRAFT_FORCE * dt;
-        
-        // 受到環境自然風的吹拂推動
         p.vx += envWind.vx * dt;
         p.vy += envWind.vy * dt;
 
-        // 煙霧自身的捲曲擾動
         p.x += Math.cos(p.life * p.swirlFreq + p.swirlPhaseX) * p.swirlAmp * dt;
         p.y += Math.sin(p.life * p.swirlFreq + p.swirlPhaseY) * p.swirlAmp * dt;
 
-        const dx = p.x - ball.x;
-        const dy = p.y - ball.y;
-        const dist = Math.hypot(dx, dy);
-        
-        if (dist < CONFIG.WAKE_RADIUS) {
-          const force = Math.pow(1 - dist / CONFIG.WAKE_RADIUS, 1.5);
-          p.vx += ball.vx * force * 2.5 * dt;
-          p.vy += ball.vy * force * 2.5 * dt;
-          if (dist > 1) {
-            p.vx += (dx / dist) * CONFIG.WAKE_FORCE * force * dt;
-            p.vy += (dy / dist) * CONFIG.WAKE_FORCE * force * dt;
+        // 若在遊玩狀態，球體移動會帶動周圍的煙霧
+        if (gameState === "playing") {
+          const dx = p.x - ball.x;
+          const dy = p.y - ball.y;
+          const dist = Math.hypot(dx, dy);
+          
+          if (dist < CONFIG.WAKE_RADIUS) {
+            const force = Math.pow(1 - dist / CONFIG.WAKE_RADIUS, 1.5);
+            p.vx += ball.vx * force * 2.5 * dt;
+            p.vy += ball.vy * force * 2.5 * dt;
+            if (dist > 1) {
+              p.vx += (dx / dist) * CONFIG.WAKE_FORCE * force * dt;
+              p.vy += (dy / dist) * CONFIG.WAKE_FORCE * force * dt;
+            }
           }
         }
 
@@ -513,6 +612,9 @@
     }
 
     function drawBall() {
+      // 遊戲結束時隱藏球體 (已化為煙霧)
+      if (gameState === "gameover") return;
+
       for (let index = 0; index < ball.trail.length; index += 1) {
         const point = ball.trail[index];
         const alpha = (index / ball.trail.length) * 0.12;
@@ -582,7 +684,8 @@
     }
 
     canvas.addEventListener("pointerdown", (event) => {
-      if (paused) return; 
+      // 暫停與遊戲結束狀態下禁用點擊推力
+      if (paused || gameState === "gameover") return; 
       
       const rect = canvas.getBoundingClientRect();
       const touchX = event.clientX - rect.left;
@@ -597,16 +700,14 @@
       
       ripples.push({ x: touchX, y: touchY, age: 0 });
 
-      // 【新增】點擊位置生成均勻填滿圓形的煙霧
+      // 點擊位置生成均勻填滿圓形的煙霧
       for (let i = 0; i < CONFIG.CLICK_SMOKE_COUNT; i++) {
-        // 使用 Math.sqrt 確保粒子在圓面積內均勻分佈
         const r = CONFIG.CLICK_SMOKE_RADIUS * Math.sqrt(Math.random());
         const theta = Math.random() * 2 * Math.PI;
 
         const px = touchX + r * Math.cos(theta);
         const py = touchY + r * Math.sin(theta);
 
-        // 給予些微的初始向外擴散速度
         const burstSpeed = Math.random() * 8;
         const vx = Math.cos(theta) * burstSpeed;
         const vy = Math.sin(theta) * burstSpeed;
@@ -617,11 +718,11 @@
           vx: vx,
           vy: vy,
           life: 0,
-          maxLife: CONFIG.SMOKE_MAX_LIFE * (0.25 + Math.random() * 0.3), // 點擊煙霧存活時間稍短
-          size: Math.random() * 10 + 5,      // 煙霧大小
-          growth: 15 + Math.random() * 10,   // 煙霧膨脹速度
-          color: `215, 220, 225`,            // 煙霧顏色 (灰白)
-          baseAlpha: 0.12 + Math.random() * 0.08, // 煙霧初始透明度
+          maxLife: CONFIG.SMOKE_MAX_LIFE * (0.25 + Math.random() * 0.3),
+          size: Math.random() * 10 + 5,      
+          growth: 15 + Math.random() * 10,   
+          color: `215, 220, 225`,            
+          baseAlpha: 0.12 + Math.random() * 0.08, 
           swirlPhaseX: Math.random() * Math.PI * 2,
           swirlPhaseY: Math.random() * Math.PI * 2,
           swirlFreq: 1.5 + Math.random() * 2,
