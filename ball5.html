@@ -64,8 +64,14 @@
       RING_SPACING: 37,                // 各圈等距間隔
       VISIBLE_RING_COUNT: 13,          // 同時保留的圓環數量（通過後自動補上）
       RING_STROKE: 4,                  // 圓環線寬
-      GAP_EXTRA_CLEARANCE: 7,          // 缺口比球直徑額外寬出的單邊餘量
-      GAP_ROTATION_SPEED: 0.47,        // 缺口轉動速度（rad/s），確保最終會迎向球
+
+      // 【新增】圓環隨機轉速區間 (rad/s)
+      GAP_ROTATION_SPEED_MIN: 0.1,    // 最小轉速
+      GAP_ROTATION_SPEED_MAX: 1.25,    // 最大轉速
+
+      // 【新增】圓環隨機開口區間 (相對於球體直徑的倍率)
+      GAP_WIDTH_MIN_RATIO: 1.1,        // 最小缺口倍率 (1.2倍代表絕對過得去)
+      GAP_WIDTH_MAX_RATIO: 3.2,        // 最大缺口倍率
 
       BOOST_CHANCE: 0.07,              // 加速觸發機率 (0.07 = 7%)
       BOOSTED_BOUNCES: 1,              // 每次啟動後加速幾次彈跳
@@ -76,7 +82,7 @@
       RING_SHRINK_SPEED: 5,            // 圓框內縮速度 (px/s)
       RING_MIN_RADIUS: 12,             // 圓框最小半徑 (需大於球體，以免破圖)
 
-      // 【新增】圓環受擊彈性震動參數
+      // 圓環受擊彈性震動參數
       RING_SHAKE_MULTIPLIER: 0.22,     // 圓環震動幅度倍率 (依據碰撞力道)
       RING_SHAKE_STIFFNESS: 1500,      // 震動彈簧剛性 (越高頻率越快、越快回彈)
       RING_SHAKE_DAMPING: 25,          // 震動阻尼 (越高越快停止震動)
@@ -90,7 +96,7 @@
 
       // 絕對距離視覺漸變參數
       FADE_START_RADIUS: 120,          // 半徑小於此值：完全實體、最亮
-      FADE_END_RADIUS: 562,            // 半徑大於此值：完全透明、融入黑暗
+      FADE_END_RADIUS: 422,            // 半徑大於此值：完全透明、融入黑暗
       USER_IMPULSE: 550,               // 點擊畫面施加的排斥力道 (px/s)
     };
 
@@ -146,20 +152,32 @@
       return ((seeded - Math.floor(seeded)) * Math.PI * 2) - Math.PI;
     }
 
-    function gapHalfAngle(radius) {
-      const halfGapWidth = CONFIG.BALL_RADIUS + CONFIG.GAP_EXTRA_CLEARANCE;
-      return Math.asin(clamp(halfGapWidth / radius, 0, 0.92)) + 0.035;
+    // 【新增】動態計算單一圓環的缺口半角 (確保縮小過程物理寬度不變)
+    function getGapHalfAngle(ring) {
+      const physicalGapWidth = (CONFIG.BALL_RADIUS * 2) * ring.gapWidthRatio;
+      const halfGap = physicalGapWidth / 2;
+      // 0.95 防呆：避免縮太小時反三角函數算不出數值（破圖）
+      return Math.asin(clamp(halfGap / ring.radius, 0, 0.95));
     }
 
     function createRing(radius) {
       const id = nextRingId++;
+      
+      // 【新增】為每個圓環獨立決定隨機轉向與轉速
+      const randomSpeed = CONFIG.GAP_ROTATION_SPEED_MIN + Math.random() * (CONFIG.GAP_ROTATION_SPEED_MAX - CONFIG.GAP_ROTATION_SPEED_MIN);
+      const direction = Math.random() < 0.5 ? 1 : -1;
+      const finalRotationSpeed = randomSpeed * direction;
+
+      // 【新增】為每個圓環獨立決定隨機缺口倍率
+      const gapWidthRatio = CONFIG.GAP_WIDTH_MIN_RATIO + Math.random() * (CONFIG.GAP_WIDTH_MAX_RATIO - CONFIG.GAP_WIDTH_MIN_RATIO);
+
       return {
         id,
         radius,
         gapAngle: randomGapAngle(id),
-        gapDirection: id % 2 ? 1 : -1,
+        rotationSpeed: finalRotationSpeed, // 保存專屬轉速
+        gapWidthRatio: gapWidthRatio,      // 保存專屬缺口大小
         broken: false,
-        // 加入圓環震動的物理變數
         shakeX: 0,
         shakeY: 0,
         shakeVx: 0,
@@ -197,7 +215,7 @@
     }
 
     function inGap(ring, angle) {
-      return Math.abs(angleDistance(angle, ring.gapAngle)) <= gapHalfAngle(ring.radius);
+      return Math.abs(angleDistance(angle, ring.gapAngle)) <= getGapHalfAngle(ring);
     }
 
     function breakRing(ring) {
@@ -208,18 +226,17 @@
       const b = Math.round(229 + (5 - 229) * easeRatio);
       const baseAlpha = 1 - easeRatio;
 
-      const gap = gapHalfAngle(ring.radius);
+      const gap = getGapHalfAngle(ring);
       const startAngle = ring.gapAngle + gap;
       const endAngle = ring.gapAngle - gap + Math.PI * 2;
       const arcLength = endAngle - startAngle;
       
-      const vTan = ring.radius * (ring.gapDirection * CONFIG.GAP_ROTATION_SPEED); 
+      const vTan = ring.radius * ring.rotationSpeed; 
 
       for (let i = 0; i < CONFIG.PARTICLE_COUNT; i++) {
         const angle = startAngle + Math.random() * arcLength;
         const radiusOffset = (Math.random() - 0.5) * 6;
         
-        // 考量圓環當下的震動偏移，讓煙霧能在受擊點正確生成
         const px = center.x + ring.shakeX + Math.cos(angle) * (ring.radius + radiusOffset);
         const py = center.y + ring.shakeY + Math.sin(angle) * (ring.radius + radiusOffset);
 
@@ -273,7 +290,6 @@
         return;
       }
 
-      // 【新增】觸發圓環受擊震動 (依據碰撞法線與徑向力道)
       ring.shakeVx += normalX * radialVelocity * CONFIG.RING_SHAKE_MULTIPLIER;
       ring.shakeVy += normalY * radialVelocity * CONFIG.RING_SHAKE_MULTIPLIER;
 
@@ -291,7 +307,7 @@
         boostRemaining -= 1;
       }
       
-      const ringAngularVelocity = ring.gapDirection * CONFIG.GAP_ROTATION_SPEED;
+      const ringAngularVelocity = ring.rotationSpeed;
       const ringSurfaceVelocity = ring.radius * ringAngularVelocity;
       const ballSurfaceVel = tangentVelocity + ball.spin * CONFIG.BALL_RADIUS;
       const slipVel = ballSurfaceVel - ringSurfaceVelocity;
@@ -349,11 +365,10 @@
       }
 
       rings.forEach((item) => {
-        item.gapAngle += item.gapDirection * CONFIG.GAP_ROTATION_SPEED * dt;
+        item.gapAngle += item.rotationSpeed * dt;
         if (!item.broken) {
           item.radius -= actualShrink;
         }
-        // 【新增】更新圓環的阻尼彈簧物理狀態，讓他能來回回彈與靜止
         item.shakeVx += (-CONFIG.RING_SHAKE_STIFFNESS * item.shakeX - CONFIG.RING_SHAKE_DAMPING * item.shakeVx) * dt;
         item.shakeVy += (-CONFIG.RING_SHAKE_STIFFNESS * item.shakeY - CONFIG.RING_SHAKE_DAMPING * item.shakeVy) * dt;
         item.shakeX += item.shakeVx * dt;
@@ -403,7 +418,6 @@
       particles = particles.filter(p => p.life < p.maxLife);
     }
 
-    // 更新繪圖函式，支援偏移參數
     function drawArc(radius, start, end, r, g, b, alpha, offsetX = 0, offsetY = 0, lineWidth = CONFIG.RING_STROKE) {
       context.beginPath();
       context.arc(center.x + offsetX, center.y + offsetY, radius, start, end);
@@ -414,7 +428,7 @@
     }
 
     function drawRing(ring) {
-      const gap = gapHalfAngle(ring.radius);
+      const gap = getGapHalfAngle(ring);
       const start = ring.gapAngle + gap;
       const end = ring.gapAngle - gap + Math.PI * 2;
 
@@ -430,7 +444,6 @@
       const b = Math.round(229 + (5 - 229) * easeRatio);
       const baseAlpha = 1 - easeRatio;
 
-      // 帶入各自的 shakeX 與 shakeY 偏移
       drawArc(ring.radius, start, end, r, g, b, baseAlpha, ring.shakeX, ring.shakeY);
     }
 
