@@ -14,22 +14,19 @@
     #hud-container {
       position: fixed; 
       top: 7%; 
-      left: 50%; 
-      transform: translateX(-50%);
+      left: 0;
+      width: 100%; /* 寬度撐滿，使用 flex 置中 */
       z-index: 10;
-      text-align: center; 
-      user-select: none; 
       pointer-events: none; /* 讓點擊直接穿透到後方的 Canvas 畫面上 */
-      -webkit-tap-highlight-color: transparent;
       display: flex;
       flex-direction: column;
-      align-items: center; /* 置中對齊 */
+      align-items: center; /* 完美置中對齊 */
     }
     
     /* 分數數字樣式 */
     #score-number {
       color: rgba(255,255,255,.72); 
-      font: 500 48px/1.25 ui-sans-serif, system-ui, "Microsoft JhengHei", sans-serif; /* 稍微放大一點 */
+      font: 500 48px/1.25 ui-sans-serif, system-ui, "Microsoft JhengHei", sans-serif;
       font-variant-numeric: tabular-nums; 
       letter-spacing: .02em; 
       transition: opacity 0.5s ease;
@@ -69,7 +66,7 @@
     .btn-action:hover { color: rgba(255,255,255,.8); }
     
     @media (max-width: 560px) {
-      #hud-container { top: 12%; padding: 20px; margin: -20px; }
+      #hud-container { top: 12%; }
       #score-number { font-size: 38px; }
       .hint { left: 18px; bottom: 16px; font-size: 11px; }
     }
