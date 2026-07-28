@@ -54,8 +54,8 @@
     const CONFIG = {
       BALL_RADIUS: 8,                  // 球半徑
       GRAVITY: 500,                    // 向下重力（px/s²）
-      START_VERTICAL_SPEED: -430,      // 開始時的向上速度（負值向上）
-      START_HORIZONTAL_SPEED: 165,     // 開始時的水平速度
+      START_SPEED_MIN: 10,             // 開始時的隨機最小速度
+      START_SPEED_MAX: 500,            // 開始時的隨機最大速度
       BOUNCINESS: 0.77,                // 0~1；圓環碰撞後保留的法向速度
       SURFACE_FRICTION: 0.7,           // 0~1；碰撞時切向速度／旋轉交換程度
       BALL_AIR_DRAG: 0.012,            // 空氣阻力，避免速度無限制累積
@@ -90,7 +90,7 @@
       SAND_FADE_RATE: 1.5,             // 超量時舊沙子的漸隱速度 (越小消失越慢)
       SAND_OPACITY: 0.6,               // 調整沙子初始透明度 (0.0 完全透明 ~ 1.0 完全不透明)
       SAND_COUNT: 1000,                // 破碎產生的沙粒數量
-      SAND_GRAVITY: 250,               // 沙粒掉落的重力
+      SAND_GRAVITY: 200,               // 沙粒掉落的重力
       SAND_BOUNCE: 0.35,               // 沙粒碰撞圓環的彈性 (低彈性如沙)
       SAND_FRICTION: 0.85,             // 沙粒在圓環上滑動的摩擦保留率
       SAND_SIZE_MIN: 0.2,              // 沙粒最小半徑
@@ -231,11 +231,17 @@
       for (let index = 0; index < CONFIG.VISIBLE_RING_COUNT; index += 1) {
         rings.push(createRing(CONFIG.FIRST_RING_RADIUS + index * CONFIG.RING_SPACING));
       }
+      // 產生 0 ~ 360 度的隨機角度 (Math.PI * 2 代表 360 度)
+      const randomAngle = Math.random() * Math.PI * 2;
+      // 在我們設定的最小值與最大值之間產生隨機速度
+      const randomSpeed = CONFIG.START_SPEED_MIN + Math.random() * (CONFIG.START_SPEED_MAX - CONFIG.START_SPEED_MIN);
+
       ball = {
         x: center.x,
         y: center.y - 18,
-        vx: CONFIG.START_HORIZONTAL_SPEED,
-        vy: CONFIG.START_VERTICAL_SPEED,
+        // 利用三角函數將隨機角度與速度轉換為 X 和 Y 軸的向量速度
+        vx: Math.cos(randomAngle) * randomSpeed,
+        vy: Math.sin(randomAngle) * randomSpeed,
         angle: 0,
         spin: 0,
         trail: [],
