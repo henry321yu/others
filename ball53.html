@@ -59,14 +59,14 @@
       user-select: none;
       pointer-events: none;
     }
-    .btn-pause {
+    .btn-action {
       cursor: pointer;
       pointer-events: auto;
       text-decoration: underline;
       text-underline-offset: 3px;
       transition: color 0.2s;
     }
-    .btn-pause:hover { color: rgba(255,255,255,.8); }
+    .btn-action:hover { color: rgba(255,255,255,.8); }
     
     @media (max-width: 560px) {
       #hud-container { bottom: 17px; right: 18px; padding: 20px; margin: -20px; }
@@ -79,10 +79,12 @@
   <canvas id="scene" aria-label="Bouncing sim"></canvas>
   <div id="hud-container" title="點擊切換顯示模式">
     <div id="score-number" class="score-mode-hidden">0</div>
-    <div id="mode-toast">常駐顯示</div>
+    <div id="mode-toast">Off</div>
   </div>
   <div class="hint">
-    <span id="pause-btn" class="btn-pause">Pause</span> · Tap to interact · R reset
+    <span id="pause-btn" class="btn-action">Pause</span> · 
+    <span id="fullscreen-btn" class="btn-action">Fullscreen</span> · 
+    Tap to interact · R reset
   </div>
 
   <script>
@@ -176,6 +178,7 @@
     const scoreNumber = document.getElementById("score-number");
     const modeToast = document.getElementById("mode-toast");
     const pauseBtn = document.getElementById("pause-btn");
+    const fullscreenBtn = document.getElementById("fullscreen-btn");
 
     // UI 切換模式相關常數
     const SCORE_MODE_ALWAYS = 0;
@@ -1079,6 +1082,35 @@
       paused = !paused;
       lastTime = performance.now(); 
     });
+
+    // 全螢幕切換邏輯
+    fullscreenBtn.addEventListener("click", () => {
+      if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        const docEl = document.documentElement;
+        if (docEl.requestFullscreen) {
+          docEl.requestFullscreen().catch(console.error);
+        } else if (docEl.webkitRequestFullscreen) {
+          docEl.webkitRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        }
+      }
+    });
+
+    // 監聽全螢幕狀態改變，更新按鈕文字
+    function updateFullscreenText() {
+      if (document.fullscreenElement || document.webkitFullscreenElement) {
+        fullscreenBtn.textContent = "Exit Fullscreen";
+      } else {
+        fullscreenBtn.textContent = "Fullscreen";
+      }
+    }
+    document.addEventListener("fullscreenchange", updateFullscreenText);
+    document.addEventListener("webkitfullscreenchange", updateFullscreenText);
 
     window.addEventListener("keydown", (event) => {
       if (event.key.toLowerCase() === "r") reset();
