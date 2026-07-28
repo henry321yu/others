@@ -10,30 +10,30 @@
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #050505; }
     canvas { display: block; width: 100%; height: 100%; touch-action: none; }
     
-    /* 右下角 HUD 容器 (包含分數與模式提示) */
+    /* 中上方 HUD 容器 (包含分數與模式提示) */
     #hud-container {
       position: fixed; 
-      bottom: 24px; 
-      right: 28px; 
+      top: 7%; 
+      left: 50%; 
+      transform: translateX(-50%);
       z-index: 10;
-      text-align: right; 
+      text-align: center; 
       user-select: none; 
-      cursor: pointer;
-      padding: 30px; /* 擴大點擊熱區，隱藏時也點得到 */
-      margin: -30px;
+      pointer-events: none; /* 讓點擊直接穿透到後方的 Canvas 畫面上 */
       -webkit-tap-highlight-color: transparent;
       display: flex;
       flex-direction: column;
-      align-items: flex-end;
+      align-items: center; /* 置中對齊 */
     }
     
     /* 分數數字樣式 */
     #score-number {
       color: rgba(255,255,255,.92); 
-      font: 500 38px/1.25 ui-sans-serif, system-ui, "Microsoft JhengHei", sans-serif;
+      font: 500 48px/1.25 ui-sans-serif, system-ui, "Microsoft JhengHei", sans-serif; /* 稍微放大一點 */
       font-variant-numeric: tabular-nums; 
       letter-spacing: .02em; 
       transition: opacity 0.5s ease;
+      text-shadow: 0 4px 12px rgba(0,0,0,0.5); /* 增加陰影避免與背景混淆 */
     }
 
     /* 模式提示 Toast 樣式 */
@@ -43,8 +43,8 @@
       margin-top: 4px;
       opacity: 0;
       transition: opacity 0.3s ease;
-      pointer-events: none; /* 避免干擾點擊 */
       font-family: ui-sans-serif, system-ui, "Microsoft JhengHei", sans-serif;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.8);
     }
     
     /* 分數顯示模式 */
@@ -69,22 +69,22 @@
     .btn-action:hover { color: rgba(255,255,255,.8); }
     
     @media (max-width: 560px) {
-      #hud-container { bottom: 17px; right: 18px; padding: 20px; margin: -20px; }
-      #score-number { font-size: 32px; }
+      #hud-container { top: 12%; padding: 20px; margin: -20px; }
+      #score-number { font-size: 38px; }
       .hint { left: 18px; bottom: 16px; font-size: 11px; }
     }
   </style>
 </head>
 <body>
   <canvas id="scene" aria-label="Bouncing sim"></canvas>
-  <div id="hud-container" title="點擊切換顯示模式">
+  <div id="hud-container">
     <div id="score-number" class="score-mode-hidden">0</div>
     <div id="mode-toast">Off</div>
   </div>
   <div class="hint">
-    <span id="pause-btn" class="btn-action">Pause</span> · 
+    <span id="disp-mode-btn" class="btn-action">Disp Mode</span> · 
     <span id="fullscreen-btn" class="btn-action">Fullscreen</span> · 
-    R reset · Tap to interact
+    Tap to interact
   </div>
 
   <script>
@@ -174,10 +174,9 @@
 
     const canvas = document.getElementById("scene");
     const context = canvas.getContext("2d");
-    const hudContainer = document.getElementById("hud-container");
     const scoreNumber = document.getElementById("score-number");
     const modeToast = document.getElementById("mode-toast");
-    const pauseBtn = document.getElementById("pause-btn");
+    const dispModeBtn = document.getElementById("disp-mode-btn");
     const fullscreenBtn = document.getElementById("fullscreen-btn");
 
     // UI 切換模式相關常數
@@ -219,8 +218,9 @@
     const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
     const angleDistance = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
-    // 切換分數顯示模式與 Toast 動畫
-    hudContainer.addEventListener("click", () => {
+    // 切換分數顯示模式與 Toast 動畫的邏輯
+    function toggleScoreMode(e) {
+      if (e) e.stopPropagation();
       scoreMode = (scoreMode + 1) % 3;
       updateScoreDisplayMode();
       
@@ -231,7 +231,10 @@
       toastTimeout = setTimeout(() => {
         modeToast.style.opacity = 0;
       }, 1500); // 浮現 1.5 秒後淡出
-    });
+    }
+
+    // 只綁定點擊事件至 Disp Mode 按鈕
+    dispModeBtn.addEventListener("click", toggleScoreMode);
 
     function updateScoreDisplayMode() {
       scoreNumber.classList.remove("score-mode-always", "score-mode-smart", "score-mode-hidden", "active");
@@ -1078,11 +1081,6 @@
       ball.boostSmokeTimer = CONFIG.BALL_BOOST_DURATION;
     });
 
-    pauseBtn.addEventListener("click", () => {
-      paused = !paused;
-      lastTime = performance.now(); 
-    });
-
     // 全螢幕切換邏輯
     fullscreenBtn.addEventListener("click", () => {
       if (!document.fullscreenElement && !document.webkitFullscreenElement) {
@@ -1113,7 +1111,6 @@
     document.addEventListener("webkitfullscreenchange", updateFullscreenText);
 
     window.addEventListener("keydown", (event) => {
-      if (event.key.toLowerCase() === "r") reset();
       if (event.code === "Space") {
         event.preventDefault();
         paused = !paused;
