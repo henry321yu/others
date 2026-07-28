@@ -51,8 +51,8 @@
       修改這一區即可調整整個模擬；數值以畫布的 CSS 像素與秒為單位。
     */
     const CONFIG = {
-      BALL_RADIUS: 8,                 // 球半徑
-      GRAVITY: 500,                   // 向下重力（px/s²）
+      BALL_RADIUS: 8,                  // 球半徑
+      GRAVITY: 500,                    // 向下重力（px/s²）
       START_VERTICAL_SPEED: -430,      // 開始時的向上速度（負值向上）
       START_HORIZONTAL_SPEED: 165,     // 開始時的水平速度
       BOUNCINESS: 0.77,                // 0~1；圓環碰撞後保留的法向速度
@@ -85,10 +85,10 @@
       RING_SHAKE_DAMPING: 25,          // 震動阻尼 (越高越快停止震動)
 
       // 碎裂沙子顆粒系統參數
-      SAND_MAX_TOTAL_COUNT: 3000,      // 【新增】畫面上允許的最大沙子總數
-      SAND_FADE_RATE: 1.5,             // 【新增】超量時舊沙子的漸隱速度 (越小消失越慢)
+      SAND_MAX_TOTAL_COUNT: 3000,      // 畫面上允許的最大沙子總數
+      SAND_FADE_RATE: 1.5,             // 超量時舊沙子的漸隱速度 (越小消失越慢)
       SAND_OPACITY: 0.7,               // 調整沙子初始透明度 (0.0 完全透明 ~ 1.0 完全不透明)
-      SAND_COUNT: 1500,                 // 破碎產生的沙粒數量
+      SAND_COUNT: 1500,                // 破碎產生的沙粒數量
       SAND_GRAVITY: 250,               // 沙粒掉落的重力
       SAND_BOUNCE: 0.35,               // 沙粒碰撞圓環的彈性 (低彈性如沙)
       SAND_FRICTION: 0.85,             // 沙粒在圓環上滑動的摩擦保留率
@@ -97,6 +97,7 @@
 
       // 體積煙霧粒子系統參數 (保留給球體摩擦與點擊)
       SMOKE_MAX_LIFE: 6,               // 煙霧存活最大秒數
+      RING_BREAK_SMOKE_COUNT: 100,     // 圓環破碎時產生的煙霧數量
       WAKE_RADIUS: 70,                 // 球體影響煙霧的流體半徑 (風壓範圍)
       WAKE_FORCE: 420,                 // 球體帶動煙霧的推力
       UPDRAFT_FORCE: 37,               // 熱氣流向上飄散的基礎加速度
@@ -105,10 +106,8 @@
       WIND_FORCE_MIN: 10,              
       WIND_FORCE_MAX: 85,              
       WIND_CHANGE_INTERVAL: 3.5,       
-      // WIND_SPACING_MULTIPLIER: 0.08,   // 風力影響圓環間距的倍率
-      // WIND_BEND_MULTIPLIER: 0.003,     // 風力影響隧道 X/Y 彎曲偏移的倍率
-      WIND_SPACING_MULTIPLIER: 0.016,   // 風力影響圓環間距的倍率
-      WIND_BEND_MULTIPLIER: 0.0006,     // 風力影響隧道 X/Y 彎曲偏移的倍率
+      WIND_SPACING_MULTIPLIER: 0.016,  // 風力影響圓環間距的倍率
+      WIND_BEND_MULTIPLIER: 0.0006,    // 風力影響隧道 X/Y 彎曲偏移的倍率
 
       // 絕對距離視覺漸變參數
       FADE_START_RADIUS: 120,          // 半徑小於此值：完全實體、最亮
@@ -282,6 +281,7 @@
       // 套用透明度調整
       const sandAlpha = Math.max(0, baseAlpha * CONFIG.SAND_OPACITY);
 
+      // 產生固態沙子
       for (let i = 0; i < CONFIG.SAND_COUNT; i++) {
         const angle = startAngle + Math.random() * arcLength;
         const radiusOffset = (Math.random() - 0.5) * CONFIG.RING_STROKE * 1.5;
@@ -303,10 +303,44 @@
           vx: vxTan + burstX,
           vy: vyTan + burstY,
           size: CONFIG.SAND_SIZE_MIN + Math.random() * (CONFIG.SAND_SIZE_MAX - CONFIG.SAND_SIZE_MIN),
-          // 分開儲存顏色與透明度，為了實作舊沙子漸隱
           r: r, g: g, b: b, alpha: sandAlpha,
-          fading: false,  // 標記是否準備消散
-          dead: false     // 標記是否已徹底消失
+          fading: false,  
+          dead: false     
+        });
+      }
+
+      // 產生煙霧效果
+      for (let i = 0; i < CONFIG.RING_BREAK_SMOKE_COUNT; i++) {
+        const angle = startAngle + Math.random() * arcLength;
+        const radiusOffset = (Math.random() - 0.5) * CONFIG.RING_STROKE * 4;
+        
+        const px = ringCenterX + Math.cos(angle) * (ring.radius + radiusOffset);
+        const py = ringCenterY + Math.sin(angle) * (ring.radius + radiusOffset);
+
+        const vxTan = -Math.sin(angle) * vTan;
+        const vyTan = Math.cos(angle) * vTan;
+        
+        // 給煙霧一點微小向外或向內爆裂的力道
+        const burst = (Math.random() - 0.5) * 60;
+        const burstX = Math.cos(angle) * burst;
+        const burstY = Math.sin(angle) * burst;
+        
+        particles.push({
+          id: nextParticleId++,
+          type: 'smoke',
+          x: px, y: py,
+          vx: vxTan * 0.4 + burstX,  // 保留部份圓環旋轉動能
+          vy: vyTan * 0.4 + burstY,
+          life: 0,
+          maxLife: CONFIG.SMOKE_MAX_LIFE * (0.15 + Math.random() * 0.25), // 破碎煙霧壽命稍微短一些
+          size: Math.random() * 8 + 4,
+          growth: 15 + Math.random() * 10,
+          color: `215, 220, 225`,
+          baseAlpha: 0.15 + Math.random() * 0.1,
+          swirlPhaseX: Math.random() * Math.PI * 2, 
+          swirlPhaseY: Math.random() * Math.PI * 2,
+          swirlFreq: 1.5 + Math.random() * 2, 
+          swirlAmp: 10 + Math.random() * 20
         });
       }
 
@@ -524,7 +558,6 @@
       ripples.forEach(r => r.age += dt);
       ripples = ripples.filter(r => r.age < 0.6);
 
-      // 【新增】檢查當前有多少活躍的沙子，計算超出數量
       let activeSandCount = 0;
       for (let i = 0; i < particles.length; i++) {
         if (particles[i].type === 'sand' && !particles[i].dead && !particles[i].fading) {
@@ -533,34 +566,27 @@
       }
       let excessSand = activeSandCount - CONFIG.SAND_MAX_TOTAL_COUNT;
 
-      // 分開處理煙霧與沙粒陣列，並清理空間網格
       const sandParticles = [];
       spatialGrid.clear();
 
       particles.forEach(p => {
         if (p.type === 'sand') {
           
-          // ==============================
-          // 容量限制與漸退邏輯 (最舊的優先標記)
-          // ==============================
           if (excessSand > 0 && !p.fading && !p.dead) {
-            p.fading = true; // 標記為準備漸隱消除
+            p.fading = true; 
             excessSand--;
           }
           
           if (p.fading) {
-            p.alpha -= CONFIG.SAND_FADE_RATE * dt; // 降低透明度
+            p.alpha -= CONFIG.SAND_FADE_RATE * dt; 
             if (p.alpha <= 0) {
               p.alpha = 0;
-              p.dead = true; // 完全透明後徹底死亡
+              p.dead = true; 
             }
           }
 
-          if (p.dead) return; // 已經死亡的粒子不進行後續物理與網格運算
+          if (p.dead) return; 
 
-          // ==============================
-          // 第一階段：沙粒個體物理與圓環碰撞
-          // ==============================
           p.vy += CONFIG.SAND_GRAVITY * dt;
           
           p.vx += envWind.vx * dt * 0.3;
@@ -617,7 +643,6 @@
           p.x = nextX;
           p.y = nextY;
 
-          // 註冊存活沙粒到空間網格中
           sandParticles.push(p);
           const cx = Math.floor(p.x / SAND_CELL_SIZE);
           const cy = Math.floor(p.y / SAND_CELL_SIZE);
@@ -679,15 +704,11 @@
         }
       });
       
-      // ==============================
-      // 第二階段：沙粒互相碰撞物理 (空間雜湊優化)
-      // ==============================
       for (let i = 0; i < sandParticles.length; i++) {
         const p = sandParticles[i];
         const cx = Math.floor(p.x / SAND_CELL_SIZE);
         const cy = Math.floor(p.y / SAND_CELL_SIZE);
 
-        // 搜尋當前格子及周邊 8 個格子的粒子
         for (let ox = -1; ox <= 1; ox++) {
           for (let oy = -1; oy <= 1; oy++) {
             const key = (cx + ox) + (cy + oy) * 10000;
@@ -696,7 +717,6 @@
             if (cell) {
               for (let j = 0; j < cell.length; j++) {
                 const other = cell[j];
-                // 透過 ID 判斷，避免自我碰撞，且避免 A 計算 B 後、B 又計算 A
                 if (p.id < other.id) {
                   const dx = p.x - other.x;
                   const dy = p.y - other.y;
@@ -747,12 +767,11 @@
         }
       }
 
-      // 過濾已經死亡或掉出畫面的粒子
       particles = particles.filter(p => {
         if (p.type === 'sand') {
-          return p.y < height + 100 && !p.dead; // 掉出螢幕或已漸隱死亡則移除
+          return p.y < height + 100 && !p.dead;
         }
-        return p.life < p.maxLife; // 煙霧壽命
+        return p.life < p.maxLife;
       });
     }
 
@@ -780,17 +799,14 @@
     }
 
     function drawParticles() {
-      // 繪製固態沙粒
       context.globalCompositeOperation = "source-over";
       particles.forEach(p => {
         if (p.type === 'sand' && !p.dead) {
-          // 【更新】使用 rgba 動態套用當前的透明度，實現平滑漸出效果
           context.fillStyle = `rgba(${p.r}, ${p.g}, ${p.b}, ${p.alpha})`;
           context.fillRect(p.x - p.size, p.y - p.size, p.size * 2, p.size * 2);
         }
       });
 
-      // 繪製體積煙霧
       context.globalCompositeOperation = "lighter";
       particles.forEach(p => {
         if (p.type === 'smoke') {
