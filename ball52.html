@@ -115,7 +115,7 @@
       USER_IMPULSE: 550,               // 點擊畫面施加的排斥力道 (px/s)
 
       // 點擊煙霧參數 (壓入螢幕向外擴散)
-      CLICK_SMOKE_COUNT: 30,           // 點擊生成的煙霧數量
+      CLICK_SMOKE_COUNT: 20,           // 點擊生成的煙霧數量
       CLICK_SMOKE_RADIUS: 10,          // 點擊煙霧生成的初始半徑
       CLICK_SMOKE_BURST_MIN: 20,       // 最小向外擴散速度
       CLICK_SMOKE_BURST_MAX: 80,       // 最大向外擴散速度
@@ -300,8 +300,8 @@
           id: nextParticleId++, 
           type: 'sand', 
           x: px, y: py,
-          vx: vxTan + burstX,
-          vy: vyTan + burstY,
+          vx: vxTan * 1.5 + burstX,  // 保留部份圓環旋轉動能
+          vy: vyTan * 1.5 + burstY,
           size: CONFIG.SAND_SIZE_MIN + Math.random() * (CONFIG.SAND_SIZE_MAX - CONFIG.SAND_SIZE_MIN),
           r: r, g: g, b: b, alpha: sandAlpha,
           fading: false,  
@@ -329,10 +329,10 @@
           id: nextParticleId++,
           type: 'smoke',
           x: px, y: py,
-          vx: vxTan * 0.4 + burstX,  // 保留部份圓環旋轉動能
-          vy: vyTan * 0.4 + burstY,
+          vx: vxTan * 1.2 + burstX,  // 保留部份圓環旋轉動能
+          vy: vyTan * 1.2 + burstY,
           life: 0,
-          maxLife: CONFIG.SMOKE_MAX_LIFE * (0.15 + Math.random() * 1), // 破碎煙霧壽命稍微短一些
+          maxLife: CONFIG.SMOKE_MAX_LIFE * (0.15 + Math.random() * 1), // 破碎煙霧壽命
           size: Math.random() * 8 + 4,
           growth: 15 + Math.random() * 10,
           color: `215, 220, 225`,
@@ -924,7 +924,7 @@
           id: nextParticleId++,
           type: 'smoke',
           x: px, y: py, vx: vx, vy: vy, life: 0,
-          maxLife: CONFIG.SMOKE_MAX_LIFE * (0.25 + Math.random() * 0.3), 
+          maxLife: CONFIG.SMOKE_MAX_LIFE * (0.25 + Math.random() * 0.1), 
           size: Math.random() * 10 + 5,      
           growth: 15 + Math.random() * 10,   
           color: `215, 220, 225`,            
