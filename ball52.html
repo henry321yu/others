@@ -73,9 +73,9 @@
 
       BOOST_CHANCE: 0.05,              // 加速觸發機率 (0.07 = 7%)
       BOOSTED_BOUNCES: 1,              // 每次啟動後加速幾次彈跳
-      BOOST_MULTIPLIER: 2,             // 加速彈跳倍率
+      BOOST_MULTIPLIER: 2,           // 加速彈跳倍率
       MAX_SPEED: 1050,                 // 速度安全上限
-      MIN_SPEED: 300,                  // 速度安全下限，防止球靜止 (px/s)
+      MIN_SPEED: 270,                  // 速度安全下限，防止球靜止 (px/s)
       
       RING_SHRINK_SPEED: 5,            // 圓框內縮速度 (px/s)
       RING_MIN_RADIUS: 12,             // 圓框最小半徑 (需大於球體，以免破圖)
@@ -388,9 +388,48 @@
       const tangentVelocity = ball.vx * tangentX + ball.vy * tangentY;
       let rebound = -radialVelocity * CONFIG.BOUNCINESS;
 
+      // 新增：如果目前沒有在加速狀態，依照機率骰出是否觸發加速
+      if (boostRemaining === 0 && Math.random() < CONFIG.BOOST_CHANCE) {
+        boostRemaining = CONFIG.BOOSTED_BOUNCES;
+      }
+
       if (boostRemaining > 0) {
         rebound *= CONFIG.BOOST_MULTIPLIER;
         boostRemaining -= 1;
+
+        // --- 產生加速噴煙 (較少量) ---
+        // 煙霧朝向撞擊面(外側)噴出，即 normalX, normalY 的方向
+        const spawnAngle = Math.atan2(normalY, normalX);
+        const halfSpread = CONFIG.BALL_BOOST_SMOKE_SPREAD / 2;
+        // 取設定檔噴煙量的 40% 作為單次碰撞的少量噴煙 (可調整 0.4 這個倍率)
+        const smokeAmount = Math.floor(CONFIG.BALL_BOOST_SMOKE_COUNT * 0.2);
+
+        for (let i = 0; i < smokeAmount; i++) {
+          const angleOffset = (Math.random() - 0.5) * CONFIG.BALL_BOOST_SMOKE_SPREAD;
+          const angle = spawnAngle + angleOffset;
+          const px = ball.x + Math.cos(angle) * CONFIG.BALL_RADIUS * 0.8;
+          const py = ball.y + Math.sin(angle) * CONFIG.BALL_RADIUS * 0.8;
+          const offsetRatio = angleOffset / halfSpread; 
+          const shapeProfile = 1 - Math.pow(offsetRatio, 2); 
+          const baseSpeed = CONFIG.BALL_BOOST_SMOKE_SPEED * (0.15 + 0.85 * shapeProfile);
+          const partSpeed = baseSpeed * (0.8 + Math.random() * 0.4);
+          const vx = Math.cos(angle) * partSpeed + ball.vx * 0.12;
+          const vy = Math.sin(angle) * partSpeed + ball.vy * 0.12;
+
+          particles.push({
+            id: nextParticleId++,
+            type: 'smoke',
+            x: px, y: py, vx: vx, vy: vy, life: 0,
+            maxLife: CONFIG.SMOKE_MAX_LIFE * (0.3 + Math.random() * 0.3), 
+            size: Math.random() * 10 + 5,        
+            growth: 15 + Math.random() * 10,   
+            color: `215, 220, 225`,            
+            baseAlpha: 0.15 + Math.random() * 0.1, 
+            swirlPhaseX: Math.random() * Math.PI * 2, swirlPhaseY: Math.random() * Math.PI * 2,
+            swirlFreq: 1.5 + Math.random() * 2, swirlAmp: 10 + Math.random() * 20
+          });
+        }
+        // ---------------------------
       }
       
       const ringAngularVelocity = ring.rotationSpeed;
