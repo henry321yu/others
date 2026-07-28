@@ -85,14 +85,14 @@
       RING_SHAKE_DAMPING: 25,          // 震動阻尼 (越高越快停止震動)
 
       // 碎裂沙子顆粒系統參數
-      SAND_MAX_TOTAL_COUNT: 3000,      // 畫面上允許的最大沙子總數
+      SAND_MAX_TOTAL_COUNT: 2000,      // 畫面上允許的最大沙子總數
       SAND_FADE_RATE: 1.5,             // 超量時舊沙子的漸隱速度 (越小消失越慢)
-      SAND_OPACITY: 0.7,               // 調整沙子初始透明度 (0.0 完全透明 ~ 1.0 完全不透明)
-      SAND_COUNT: 1500,                // 破碎產生的沙粒數量
+      SAND_OPACITY: 0.6,               // 調整沙子初始透明度 (0.0 完全透明 ~ 1.0 完全不透明)
+      SAND_COUNT: 1000,                // 破碎產生的沙粒數量
       SAND_GRAVITY: 250,               // 沙粒掉落的重力
       SAND_BOUNCE: 0.35,               // 沙粒碰撞圓環的彈性 (低彈性如沙)
       SAND_FRICTION: 0.85,             // 沙粒在圓環上滑動的摩擦保留率
-      SAND_SIZE_MIN: 0.3,              // 沙粒最小半徑
+      SAND_SIZE_MIN: 0.2,              // 沙粒最小半徑
       SAND_SIZE_MAX: 0.8,              // 沙粒最大半徑
 
       // 體積煙霧粒子系統參數 (保留給球體摩擦與點擊)
@@ -332,7 +332,7 @@
           vx: vxTan * 0.4 + burstX,  // 保留部份圓環旋轉動能
           vy: vyTan * 0.4 + burstY,
           life: 0,
-          maxLife: CONFIG.SMOKE_MAX_LIFE * (0.15 + Math.random() * 0.25), // 破碎煙霧壽命稍微短一些
+          maxLife: CONFIG.SMOKE_MAX_LIFE * (0.15 + Math.random() * 1), // 破碎煙霧壽命稍微短一些
           size: Math.random() * 8 + 4,
           growth: 15 + Math.random() * 10,
           color: `215, 220, 225`,
