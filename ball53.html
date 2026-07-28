@@ -9,17 +9,55 @@
     * { box-sizing: border-box; }
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #050505; }
     canvas { display: block; width: 100%; height: 100%; touch-action: none; }
-    .hud {
-      position: fixed; top: 24px; right: 28px; z-index: 1;
-      color: rgba(255,255,255,.92); font: 500 15px/1.25 ui-sans-serif, system-ui, "Microsoft JhengHei", sans-serif;
-      opacity: 0.0; /* 0 = 完全透明，1 = 完全不透明 */
-      letter-spacing: .08em; text-align: right; user-select: none; pointer-events: none;
+    
+    /* 右下角 HUD 容器 (包含分數與模式提示) */
+    #hud-container {
+      position: fixed; 
+      bottom: 24px; 
+      right: 28px; 
+      z-index: 10;
+      text-align: right; 
+      user-select: none; 
+      cursor: pointer;
+      padding: 30px; /* 擴大點擊熱區，隱藏時也點得到 */
+      margin: -30px;
+      -webkit-tap-highlight-color: transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
     }
-    .hud strong { display: block; margin-top: 4px; font-size: 34px; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+    
+    /* 分數數字樣式 */
+    #score-number {
+      color: rgba(255,255,255,.92); 
+      font: 500 38px/1.25 ui-sans-serif, system-ui, "Microsoft JhengHei", sans-serif;
+      font-variant-numeric: tabular-nums; 
+      letter-spacing: .02em; 
+      transition: opacity 0.5s ease;
+    }
+
+    /* 模式提示 Toast 樣式 */
+    #mode-toast {
+      font-size: 14px;
+      color: rgba(255,255,255,0.6);
+      margin-top: 4px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none; /* 避免干擾點擊 */
+      font-family: ui-sans-serif, system-ui, "Microsoft JhengHei", sans-serif;
+    }
+    
+    /* 分數顯示模式 */
+    #score-number.score-mode-always { opacity: 0.92; }
+    #score-number.score-mode-hidden { opacity: 0; }
+    #score-number.score-mode-smart { opacity: 0; }
+    #score-number.score-mode-smart.active { opacity: 0.92; }
+
     .hint {
       position: fixed; left: 24px; bottom: 22px; z-index: 1;
       color: rgba(255,255,255,.38); font: 13px/1.4 ui-sans-serif, system-ui, "Microsoft JhengHei", sans-serif;
       user-select: none;
+      pointer-events: none;
     }
     .btn-pause {
       cursor: pointer;
@@ -31,15 +69,18 @@
     .btn-pause:hover { color: rgba(255,255,255,.8); }
     
     @media (max-width: 560px) {
-      .hud { top: 17px; right: 18px; font-size: 12px; }
-      .hud strong { font-size: 28px; }
+      #hud-container { bottom: 17px; right: 18px; padding: 20px; margin: -20px; }
+      #score-number { font-size: 32px; }
       .hint { left: 18px; bottom: 16px; font-size: 11px; }
     }
   </style>
 </head>
 <body>
   <canvas id="scene" aria-label="Bouncing sim"></canvas>
-  <div class="hud">Circles<strong id="score">0</strong></div>
+  <div id="hud-container" title="點擊切換顯示模式">
+    <div id="score-number" class="score-mode-hidden">0</div>
+    <div id="mode-toast">常駐顯示</div>
+  </div>
   <div class="hint">
     <span id="pause-btn" class="btn-pause">Pause</span> · Tap to interact · R reset
   </div>
@@ -131,8 +172,19 @@
 
     const canvas = document.getElementById("scene");
     const context = canvas.getContext("2d");
-    const scoreElement = document.getElementById("score");
+    const hudContainer = document.getElementById("hud-container");
+    const scoreNumber = document.getElementById("score-number");
+    const modeToast = document.getElementById("mode-toast");
     const pauseBtn = document.getElementById("pause-btn");
+
+    // UI 切換模式相關常數
+    const SCORE_MODE_ALWAYS = 0;
+    const SCORE_MODE_SMART = 1;
+    const SCORE_MODE_HIDDEN = 2;
+    const MODE_NAMES = ["Always", "Smart", "Off"];
+    let scoreMode = SCORE_MODE_HIDDEN;
+    let smartShowTimeout = null;
+    let toastTimeout = null;
 
     let width = 0;
     let height = 0;
@@ -163,6 +215,41 @@
 
     const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
     const angleDistance = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+
+    // 切換分數顯示模式與 Toast 動畫
+    hudContainer.addEventListener("click", () => {
+      scoreMode = (scoreMode + 1) % 3;
+      updateScoreDisplayMode();
+      
+      // Toast Fade in out 效果
+      modeToast.textContent = MODE_NAMES[scoreMode];
+      modeToast.style.opacity = 1;
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        modeToast.style.opacity = 0;
+      }, 1500); // 浮現 1.5 秒後淡出
+    });
+
+    function updateScoreDisplayMode() {
+      scoreNumber.classList.remove("score-mode-always", "score-mode-smart", "score-mode-hidden", "active");
+      if (scoreMode === SCORE_MODE_ALWAYS) {
+        scoreNumber.classList.add("score-mode-always");
+      } else if (scoreMode === SCORE_MODE_SMART) {
+        scoreNumber.classList.add("score-mode-smart");
+        triggerSmartShow(); // 點擊切換到智慧模式時先顯示一次確認
+      } else if (scoreMode === SCORE_MODE_HIDDEN) {
+        scoreNumber.classList.add("score-mode-hidden");
+      }
+    }
+
+    function triggerSmartShow() {
+      if (scoreMode !== SCORE_MODE_SMART) return;
+      scoreNumber.classList.add("active");
+      if (smartShowTimeout) clearTimeout(smartShowTimeout);
+      smartShowTimeout = setTimeout(() => {
+        scoreNumber.classList.remove("active");
+      }, 2000); // 智慧模式下顯示 2 秒
+    }
 
     function resize() {
       const previousCenter = center;
@@ -245,7 +332,7 @@
         angle: 0,
         spin: 0,
         trail: [],
-        boostSmokeTimer: 0,       
+        boostSmokeTimer: 0,        
         boostSmokeAccumulator: 0, 
         boostDirX: 0,             
         boostDirY: 0,
@@ -254,7 +341,7 @@
       particles = [];
       envWind = { vx: 0, vy: 0, targetVx: 0, targetVy: 0, timer: 0 };
       
-      scoreElement.textContent = "0";
+      scoreNumber.textContent = "0";
       paused = false;
       lastTime = performance.now();
     }
@@ -353,7 +440,10 @@
 
       ring.broken = true;
       passCount += 1;
-      scoreElement.textContent = String(passCount);
+      scoreNumber.textContent = String(passCount);
+
+      // UI 顯示邏輯
+      triggerSmartShow();
     }
 
     function collideWithRing(ring) {
@@ -1003,6 +1093,7 @@
 
     resize();
     reset();
+    updateScoreDisplayMode(); // 初始化顯示狀態
     requestAnimationFrame(frame);
   </script>
 </body>
