@@ -10,17 +10,48 @@
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #050505; }
     canvas { display: block; width: 100%; height: 100%; touch-action: none; }
     
-    /* 中上方 HUD 容器 (包含分數與模式提示) */
-    #hud-container {
+    /* 中上方時間容器 */
+    #time-container {
       position: fixed; 
       top: 7%; 
       left: 0;
-      width: 100%; /* 寬度撐滿，使用 flex 置中 */
+      width: 100%;
       z-index: 10;
-      pointer-events: none; /* 讓點擊直接穿透到後方的 Canvas 畫面上 */
+      pointer-events: none;
+      display: flex;
+      justify-content: center;
+    }
+
+    #time-display {
+      color: rgba(255,255,255,.85); 
+      font: 500 48px/1.25 ui-sans-serif, system-ui, "Microsoft JhengHei", sans-serif;
+      font-variant-numeric: tabular-nums; 
+      letter-spacing: .02em; 
+      transition: opacity 0.5s ease;
+      filter: blur(0.5px); 
+      text-shadow: 
+        0 0 6px rgba(255,255,255,0.6), 
+        0 0 12px rgba(255,255,255,0.3),
+        0 4px 12px rgba(0,0,0,0.8);
+      opacity: 0; /* 預設隱藏 */
+    }
+
+    #time-display.visible {
+      opacity: 0.92;
+    }
+
+    /* 下方 HUD 容器 (包含分數與模式提示) */
+    #hud-container {
+      position: fixed; 
+      top: 93%; 
+      transform: translateY(-100%); 
+      left: 0;
+      width: 100%; 
+      z-index: 10;
+      pointer-events: none; 
       display: flex;
       flex-direction: column;
-      align-items: center; /* 完美置中對齊 */
+      align-items: center; 
     }
     
     /* 分數數字樣式 */
@@ -72,7 +103,9 @@
     .btn-action:hover { color: rgba(255,255,255,.8); }
     
     @media (max-width: 560px) {
-      #hud-container { top: 12%; }
+      #time-container { top: 12%; }
+      #time-display { font-size: 38px; }
+      #hud-container { top: 90%; }
       #score-number { font-size: 38px; }
       .hint { left: 18px; bottom: 16px; font-size: 11px; }
     }
@@ -80,11 +113,18 @@
 </head>
 <body>
   <canvas id="scene" aria-label="bouncing sim"></canvas>
+  
+  <div id="time-container">
+    <div id="time-display">00:00:00</div>
+  </div>
+
   <div id="hud-container">
     <div id="score-number" class="score-mode-hidden">0</div>
     <div id="mode-toast">Off</div>
   </div>
+  
   <div class="hint">
+    <span id="time-btn" class="btn-action">Show time</span> · 
     <span id="disp-mode-btn" class="btn-action">Show number</span> · 
     <span id="fullscreen-btn" class="btn-action">Fullscreen</span> · 
     <!-- Tap to interact -->
@@ -184,6 +224,9 @@
     const modeToast = document.getElementById("mode-toast");
     const dispModeBtn = document.getElementById("disp-mode-btn");
     const fullscreenBtn = document.getElementById("fullscreen-btn");
+    
+    const timeDisplay = document.getElementById("time-display");
+    const timeBtn = document.getElementById("time-btn");
 
     const SCORE_MODE_SMART = 0;
     const SCORE_MODE_ALWAYS = 1;
@@ -193,6 +236,8 @@
     
     let smartShowTimeout = null;
     let toastTimeout = null;
+
+    let isTimeVisible = false;
 
     let width = 0;
     let height = 0;
@@ -222,6 +267,27 @@
     const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
     const angleDistance = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
+    // 時間顯示切換邏輯 (改為顯示裝置本地時間)
+    timeBtn.addEventListener("click", (e) => {
+      if (e) e.stopPropagation();
+      isTimeVisible = !isTimeVisible;
+      
+      if (isTimeVisible) {
+        // 點擊時立即更新一次文字，避免等待下一幀
+        const now = new Date();
+        const h = now.getHours().toString().padStart(2, '0');
+        const m = now.getMinutes().toString().padStart(2, '0');
+        const s = now.getSeconds().toString().padStart(2, '0');
+        timeDisplay.textContent = `${h}:${m}:${s}`;
+        
+        timeDisplay.classList.add("visible");
+        timeBtn.textContent = "Hide time";
+      } else {
+        timeDisplay.classList.remove("visible");
+        timeBtn.textContent = "Show time";
+      }
+    });
+
     // 切換分數顯示模式與 Toast 動畫的邏輯
     function toggleScoreMode(e) {
       if (e) e.stopPropagation();
@@ -237,7 +303,6 @@
       }, 1500); // 浮現 1.5 秒後淡出
     }
 
-    // 只綁定點擊事件至 Disp Mode 按鈕
     dispModeBtn.addEventListener("click", toggleScoreMode);
 
     function updateScoreDisplayMode() {
@@ -324,6 +389,7 @@
       boostRemaining = 0;
       nextRingId = 0;
       nextParticleId = 0;
+
       rings = [];
       for (let index = 0; index < CONFIG.VISIBLE_RING_COUNT; index += 1) {
         rings.push(createRing(CONFIG.FIRST_RING_RADIUS + index * CONFIG.RING_SPACING));
@@ -1027,6 +1093,21 @@
         }
         return p.life < p.maxLife;
       });
+
+      // --- 更新裝置本地時間 ---
+      if (isTimeVisible) {
+        const now = new Date();
+        const h = now.getHours().toString().padStart(2, '0');
+        const m = now.getMinutes().toString().padStart(2, '0');
+        const s = now.getSeconds().toString().padStart(2, '0');
+        // const timeString = `${h}:${m}:${s}`;
+        const timeString = `${h}:${m}`;
+        
+        // 為了避免每幀頻繁操作 DOM，只在秒數有變動時才更新
+        if (timeDisplay.textContent !== timeString) {
+          timeDisplay.textContent = timeString;
+        }
+      }
     }
 
     function drawArc(radius, start, end, r, g, b, alpha, offsetX = 0, offsetY = 0, lineWidth = CONFIG.RING_STROKE) {
