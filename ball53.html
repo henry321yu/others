@@ -215,6 +215,8 @@
       BALL_BOOST_SMOKE_COUNT: 30,      // 噴煙數量
       BALL_BOOST_SMOKE_SPEED: 310,     // 噴射的扇形速度
       BALL_BOOST_SMOKE_SPREAD: 1.5,    // 散佈角度 (弧度)
+
+      TARGET_FPS: 60, // 目標幀率
     };  
 
 
@@ -330,7 +332,7 @@
       const previousCenter = center;
       const relativeBallX = ball ? ball.x - previousCenter.x : 0;
       const relativeBallY = ball ? ball.y - previousCenter.y : 0;
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      dpr = 1; // 強制使用標準解析度，大幅降低 GPU 填色負擔
       width = window.innerWidth;
       height = window.innerHeight;
       canvas.width = Math.round(width * dpr);
@@ -1227,12 +1229,29 @@
       drawBall();
     }
 
+    const FRAME_DELAY = 1000 / CONFIG.TARGET_FPS;
+    let lastRenderTime = 0;
+
     function frame(now) {
-      const elapsed = Math.min((now - lastTime) / 1000, 0.034);
+      // 1. 先呼叫下一次的 requestAnimationFrame
+      requestAnimationFrame(frame);
+      
+      // 2. 計算距離上次渲染經過了多久
+      const timeSinceLastRender = now - lastRenderTime;
+      
+      // 3. 如果時間還沒到設定的延遲時間，就跳過這次渲染 (降幀核心)
+      if (timeSinceLastRender < FRAME_DELAY - 1.5) return;
+      
+      // 校正時間偏差，確保動畫平滑
+      lastRenderTime = now - (timeSinceLastRender % FRAME_DELAY);
+
+      // 4. 原本的物理更新與渲染邏輯
+      // 將時間差轉換為秒，並限制最大值避免切換視窗時物理運算暴走
+      const elapsed = Math.min((now - lastTime) / 1000, 0.05); 
       lastTime = now;
+      
       if (!paused) update(elapsed);
       render();
-      requestAnimationFrame(frame);
     }
 
     canvas.addEventListener("pointerdown", (event) => {
