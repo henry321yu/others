@@ -172,10 +172,10 @@
       RING_SHAKE_DAMPING: 25,          // 震動阻尼 (越高越快停止震動)
 
       // 碎裂沙子顆粒系統參數
-      SAND_MAX_TOTAL_COUNT: 2000,      // 畫面上允許的最大沙子總數
+      SAND_MAX_TOTAL_COUNT: 3000,      // 畫面上允許的最大沙子總數
       SAND_FADE_RATE: 1.5,             // 超量時舊沙子的漸隱速度 (越小消失越慢)
-      SAND_OPACITY: 0.3,               // 調整沙子初始透明度 (0.0 完全透明 ~ 1.0 完全不透明)
-      SAND_COUNT: 1000,                // 破碎產生的沙粒數量
+      SAND_OPACITY: 0.6,               // 調整沙子初始透明度 (0.0 完全透明 ~ 1.0 完全不透明)
+      SAND_COUNT: 500,                // 破碎產生的沙粒數量
       SAND_GRAVITY: 200,               // 沙粒掉落的重力
       SAND_BOUNCE: 0.35,               // 沙粒碰撞圓環的彈性 (低彈性如沙)
       SAND_FRICTION: 0.85,             // 沙粒在圓環上滑動的摩擦保留率
@@ -433,9 +433,12 @@
     function breakRing(ring) {
       const ratio = clamp((ring.radius - CONFIG.FADE_START_RADIUS) / (CONFIG.FADE_END_RADIUS - CONFIG.FADE_START_RADIUS), 0, 1);
       const easeRatio = Math.pow(ratio, 1.2); 
-      const r = Math.round(222 + (5 - 222) * easeRatio);
-      const g = Math.round(226 + (5 - 226) * easeRatio);
-      const b = Math.round(229 + (5 - 229) * easeRatio);
+      
+      // 將原本的起點改為 80 (深灰色)，終點一樣是 5 (背景的極暗灰色)
+      const r = Math.round(120 + (5 - 120) * easeRatio);
+      const g = Math.round(120 + (5 - 120) * easeRatio);
+      const b = Math.round(120 + (5 - 120) * easeRatio);
+      
       const baseAlpha = 1 - easeRatio;
 
       const gap = getGapHalfAngle(ring);
@@ -1049,7 +1052,7 @@
                     const nx = dx / dist;
                     const ny = dy / dist;
 
-                    const correction = overlap * 0.5;
+                    const correction = overlap * 0.15;
                     p.x += nx * correction;
                     p.y += ny * correction;
                     other.x -= nx * correction;
