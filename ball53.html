@@ -159,9 +159,9 @@
 
       BOOST_CHANCE: 0.05,              // 加速觸發機率 (0.07 = 7%)
       BOOSTED_BOUNCES: 1,              // 每次啟動後加速幾次彈跳
-      BOOST_MULTIPLIER: 2,           // 加速彈跳倍率
+      BOOST_MULTIPLIER: 2,             // 加速彈跳倍率
       MAX_SPEED: 1050,                 // 速度安全上限
-      MIN_SPEED: 270,                  // 速度安全下限，防止球靜止 (px/s)
+      MIN_SPEED: 300,                  // 速度安全下限，防止球靜止 (px/s)
       
       RING_SHRINK_SPEED: 5,            // 圓框內縮速度 (px/s)
       RING_MIN_RADIUS: 12,             // 圓框最小半徑 (需大於球體，以免破圖)
@@ -414,6 +414,8 @@
         boostSmokeAccumulator: 0, 
         boostDirX: 0,             
         boostDirY: 0,
+        lowSpeedBounces: 0, // ★ 追蹤連續低速次數
+        targetLowSpeedBounces: Math.floor(Math.random() * 4) + 2, // ★ 新增：初始化隨機目標次數 (2~5)
       };
       ripples = [];
       particles = [];
@@ -651,16 +653,26 @@
         });
       }
 
+      // ★ 修改：連續低速隨機 2~5 次才觸發速度下限輔助推力
       const postBounceSpeed = Math.hypot(ball.vx, ball.vy);
       if (postBounceSpeed < CONFIG.MIN_SPEED) {
-        if (postBounceSpeed < 0.1) {
-          ball.vx = -normalX * CONFIG.MIN_SPEED;
-          ball.vy = -normalY * CONFIG.MIN_SPEED;
-        } else {
-          const scale = CONFIG.MIN_SPEED / postBounceSpeed;
-          ball.vx *= scale;
-          ball.vy *= scale;
+        ball.lowSpeedBounces += 1; // 記錄低速次數
+        if (ball.lowSpeedBounces >= ball.targetLowSpeedBounces) {
+          // 達到隨機低速次數：強制提速並歸零計數器
+          if (postBounceSpeed < 0.1) {
+            ball.vx = -normalX * CONFIG.MIN_SPEED;
+            ball.vy = -normalY * CONFIG.MIN_SPEED;
+          } else {
+            const scale = CONFIG.MIN_SPEED / postBounceSpeed;
+            ball.vx *= scale;
+            ball.vy *= scale;
+          }
+          ball.lowSpeedBounces = 0; // 提速後重置
+          ball.targetLowSpeedBounces = Math.floor(Math.random() * 2) + 1; // 重新骰下一次的目標次數
         }
+      } else {
+        ball.lowSpeedBounces = 0; // 若速度本身足夠，則重置計數
+        ball.targetLowSpeedBounces = Math.floor(Math.random() * 2) + 1; // 重置目標次數
       }
     }
 
