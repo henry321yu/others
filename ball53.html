@@ -269,6 +269,21 @@
 
     const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
     const angleDistance = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+    
+    // --- 效能優化：預先渲染煙霧漸層 (Offscreen Canvas) ---
+    const smokeBakeCanvas = document.createElement("canvas");
+    smokeBakeCanvas.width = 64;
+    smokeBakeCanvas.height = 64;
+    const smokeBakeCtx = smokeBakeCanvas.getContext("2d");
+    const smokeBakeGrad = smokeBakeCtx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    // 預先畫好我們設定的煙霧顏色 (215, 220, 225)
+    smokeBakeGrad.addColorStop(0, `rgba(215, 220, 225, 1)`);
+    smokeBakeGrad.addColorStop(0.4, `rgba(215, 220, 225, 0.5)`);
+    smokeBakeGrad.addColorStop(1, `rgba(215, 220, 225, 0)`);
+    smokeBakeCtx.fillStyle = smokeBakeGrad;
+    smokeBakeCtx.beginPath();
+    smokeBakeCtx.arc(32, 32, 32, 0, Math.PI * 2);
+    smokeBakeCtx.fill();
 
     // 時間顯示切換邏輯 (改為顯示裝置本地時間)
     timeBtn.addEventListener("click", (e) => {
@@ -949,14 +964,21 @@
             const ringCenterY = center.y + ring.windOffsetY + ring.shakeY;
             const dx = nextX - ringCenterX;
             const dy = nextY - ringCenterY;
-            const dist = Math.hypot(dx, dy) || 0.001;
-
+            
+            // 效能優化：先算距離的平方，避免每圈都開根號
+            const distSq = dx * dx + dy * dy;
             const thickness = CONFIG.RING_STROKE / 2 + p.size;
             
-            if (Math.abs(dist - ring.radius) < thickness) {
+            const outerBound = ring.radius + thickness;
+            const innerBound = ring.radius - thickness;
+
+            // 只有當沙子進入圓環的碰撞範圍時，才進行昂貴的開根號計算
+            if (distSq < outerBound * outerBound && distSq > innerBound * innerBound) {
+              const dist = Math.sqrt(distSq) || 0.001;
               const angle = Math.atan2(dy, dx);
               
               if (!inGap(ring, angle)) {
+                 // ... 保留下方原本的碰撞與反彈邏輯 ...
                 const isInside = dist < ring.radius;
                 const targetDist = isInside ? ring.radius - thickness : ring.radius + thickness;
                 nextX = ringCenterX + (dx / dist) * targetDist;
@@ -1207,17 +1229,21 @@
           const alpha = Math.max(0, alphaFade * p.baseAlpha);
           
           if (alpha > 0.005) {
-            const grad = context.createRadialGradient(p.x, p.y, 0, p.x, p.y, currentSize);
-            grad.addColorStop(0, `rgba(${p.color}, ${alpha})`);
-            grad.addColorStop(0.4, `rgba(${p.color}, ${alpha * 0.5})`);
-            grad.addColorStop(1, `rgba(${p.color}, 0)`);
-            context.beginPath();
-            context.arc(p.x, p.y, currentSize, 0, Math.PI * 2);
-            context.fillStyle = grad;
-            context.fill();
+            // === 修改這裡 ===
+            context.globalAlpha = alpha; // 控制透明度
+            // 使用 drawImage 貼上預渲染的煙霧，取代昂貴的漸層計算
+            context.drawImage(
+              smokeBakeCanvas, 
+              p.x - currentSize, 
+              p.y - currentSize, 
+              currentSize * 2, 
+              currentSize * 2
+            );
           }
         }
       });
+      // 記得將透明度重置，以免影響後續渲染
+      context.globalAlpha = 1.0;
       context.globalCompositeOperation = "source-over"; 
     }
 
