@@ -1125,9 +1125,27 @@
         }
       }
 
+      // 取得最外圈圓環的資訊
+      let maxRingRadius = Infinity;
+      let maxRingCx = center.x;
+      let maxRingCy = center.y;
+      
+      if (rings.length > 0) {
+        const outerRing = rings[rings.length - 1]; // 陣列最後一個即為最外圈
+        maxRingRadius = outerRing.radius;
+        maxRingCx = center.x + outerRing.windOffsetX + outerRing.shakeX;
+        maxRingCy = center.y + outerRing.windOffsetY + outerRing.shakeY;
+      }
+
       particles = particles.filter(p => {
         if (p.type === 'sand') {
-          return p.y < height + 100 && !p.dead;
+          // 計算沙子與最外圈圓環中心的距離
+          const dist = Math.hypot(p.x - maxRingCx, p.y - maxRingCy);
+          
+          // 判斷是否在最外圈以內 (加上 10px 緩衝，避免沙子正好在圓環邊緣時就被誤刪)
+          const isInsideOuterRing = dist <= (maxRingRadius + 10);
+          
+          return isInsideOuterRing && p.y < height + 100 && !p.dead;
         }
         return p.life < p.maxLife;
       });
