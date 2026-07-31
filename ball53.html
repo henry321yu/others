@@ -144,7 +144,7 @@
       START_SPEED_MAX: 500,            // 開始時的隨機最大速度
       BOUNCINESS: 0.77,                // 0~1；圓環碰撞後保留的法向速度
       SURFACE_FRICTION: 0.7,           // 0~1；碰撞時切向速度／旋轉交換程度
-      BALL_AIR_DRAG: 0.012,            // 空氣阻力，避免速度無限制累積
+      BALL_AIR_DRAG: 0.008,            // 空氣阻力，避免速度無限制累積
 
       FIRST_RING_RADIUS: 118,          // 最內圈半徑
       RING_SPACING: 32,                // 各圈等距間隔
@@ -161,7 +161,7 @@
       BOOSTED_BOUNCES: 1,              // 每次啟動後加速幾次彈跳
       BOOST_MULTIPLIER: 2,             // 加速彈跳倍率
       MAX_SPEED: 1050,                 // 速度安全上限
-      MIN_SPEED: 320,                  // 速度安全下限，防止球靜止 (px/s)
+      MIN_SPEED: 300,                  // 速度安全下限，防止球靜止 (px/s)
       
       RING_SHRINK_SPEED: 5,            // 圓框內縮速度 (px/s)
       RING_MIN_RADIUS: 12,             // 圓框最小半徑 (需大於球體，以免破圖)
@@ -186,7 +186,7 @@
       SAND_BALL_BOUNCE: 0.65,          // 沙粒與球體碰撞時的彈性
 
       // 體積煙霧粒子系統參數 (保留給球體摩擦與點擊)
-      SMOKE_MAX_TOTAL_COUNT: 400,      // 畫面上允許的最大煙霧總數
+      SMOKE_MAX_TOTAL_COUNT: 500,      // 畫面上允許的最大煙霧總數
       SMOKE_MAX_LIFE: 6,               // 煙霧存活最大秒數
       RING_BREAK_SMOKE_COUNT: 150,     // 圓環破碎時產生的煙霧數量
       WAKE_RADIUS: 70,                 // 球體影響煙霧的流體半徑 (風壓範圍)
@@ -206,14 +206,14 @@
       USER_IMPULSE: 500,               // 點擊畫面施加的排斥力道 (px/s)
 
       // 點擊煙霧參數 (壓入螢幕向外擴散)
-      CLICK_SMOKE_COUNT: 20,           // 點擊生成的煙霧數量
+      CLICK_SMOKE_COUNT: 10,           // 點擊生成的煙霧數量
       CLICK_SMOKE_RADIUS: 10,          // 點擊煙霧生成的初始半徑
       CLICK_SMOKE_BURST_MIN: 20,       // 最小向外擴散速度
       CLICK_SMOKE_BURST_MAX: 80,       // 最大向外擴散速度
 
       // 球體噴煙參數
       BALL_BOOST_DURATION: 0.1,        // 噴煙持續時間 (秒)
-      BALL_BOOST_SMOKE_COUNT: 30,      // 噴煙數量
+      BALL_BOOST_SMOKE_COUNT: 20,      // 噴煙數量
       BALL_BOOST_SMOKE_SPEED: 310,     // 噴射的扇形速度
       BALL_BOOST_SMOKE_SPREAD: 1.5,    // 散佈角度 (弧度)
 
