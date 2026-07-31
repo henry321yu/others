@@ -139,7 +139,7 @@
     */
     const CONFIG = {
       BALL_RADIUS: 8,                  // 球半徑
-      GRAVITY: 400,                    // 向下重力（px/s²）
+      GRAVITY: 500,                    // 向下重力（px/s²）
       START_SPEED_MIN: 10,             // 開始時的隨機最小速度
       START_SPEED_MAX: 500,            // 開始時的隨機最大速度
       BOUNCINESS: 0.77,                // 0~1；圓環碰撞後保留的法向速度
@@ -154,14 +154,14 @@
       GAP_ROTATION_SPEED_MIN: 0.1,     // 最小轉速
       GAP_ROTATION_SPEED_MAX: 0.85,    // 最大轉速
 
-      GAP_WIDTH_MIN_RATIO: 1.5,        // 最小缺口倍率
-      GAP_WIDTH_MAX_RATIO: 3.2,        // 最大缺口倍率
+      GAP_WIDTH_MIN_RATIO: 2.2,        // 最小缺口倍率
+      GAP_WIDTH_MAX_RATIO: 4.2,        // 最大缺口倍率
 
-      BOOST_CHANCE: 0.05,              // 加速觸發機率 (0.07 = 7%)
+      BOOST_CHANCE: 0.12,              // 加速觸發機率 (0.07 = 7%)
       BOOSTED_BOUNCES: 1,              // 每次啟動後加速幾次彈跳
       BOOST_MULTIPLIER: 2,             // 加速彈跳倍率
       MAX_SPEED: 1050,                 // 速度安全上限
-      MIN_SPEED: 300,                  // 速度安全下限，防止球靜止 (px/s)
+      MIN_SPEED: 320,                  // 速度安全下限，防止球靜止 (px/s)
       
       RING_SHRINK_SPEED: 5,            // 圓框內縮速度 (px/s)
       RING_MIN_RADIUS: 12,             // 圓框最小半徑 (需大於球體，以免破圖)
@@ -175,19 +175,20 @@
       SAND_MAX_TOTAL_COUNT: 3000,      // 畫面上允許的最大沙子總數
       SAND_FADE_RATE: 1.5,             // 超量時舊沙子的漸隱速度 (越小消失越慢)
       SAND_OPACITY: 0.6,               // 調整沙子初始透明度 (0.0 完全透明 ~ 1.0 完全不透明)
-      SAND_COUNT: 500,                // 破碎產生的沙粒數量
+      SAND_COUNT: 500,                 // 破碎產生的沙粒數量
       SAND_GRAVITY: 200,               // 沙粒掉落的重力
       SAND_BOUNCE: 0.35,               // 沙粒碰撞圓環的彈性 (低彈性如沙)
       SAND_FRICTION: 0.85,             // 沙粒在圓環上滑動的摩擦保留率
       SAND_SIZE_MIN: 0.2,              // 沙粒最小半徑
       SAND_SIZE_MAX: 0.8,              // 沙粒最大半徑
       
-      SAND_WAKE_MULTIPLIER: 0.45,      // ★新增：沙粒受到球體風壓影響的倍率 (沙子較重所以小於 1)
-      SAND_BALL_BOUNCE: 0.65,          // ★新增：沙粒與球體碰撞時的彈性
+      SAND_WAKE_MULTIPLIER: 0.45,      // 沙粒受到球體風壓影響的倍率 (沙子較重所以小於 1)
+      SAND_BALL_BOUNCE: 0.65,          // 沙粒與球體碰撞時的彈性
 
       // 體積煙霧粒子系統參數 (保留給球體摩擦與點擊)
+      SMOKE_MAX_TOTAL_COUNT: 400,      // 畫面上允許的最大煙霧總數
       SMOKE_MAX_LIFE: 6,               // 煙霧存活最大秒數
-      RING_BREAK_SMOKE_COUNT: 200,     // 圓環破碎時產生的煙霧數量
+      RING_BREAK_SMOKE_COUNT: 150,     // 圓環破碎時產生的煙霧數量
       WAKE_RADIUS: 70,                 // 球體影響煙霧的流體半徑 (風壓範圍)
       WAKE_FORCE: 420,                 // 球體帶動煙霧的推力
       UPDRAFT_FORCE: 37,               // 熱氣流向上飄散的基礎加速度
@@ -202,7 +203,7 @@
       // 絕對距離視覺漸變參數
       FADE_START_RADIUS: 120,          // 半徑小於此值：完全實體、最亮
       FADE_END_RADIUS: 422,            // 半徑大於此值：完全透明、融入黑暗
-      USER_IMPULSE: 550,               // 點擊畫面施加的排斥力道 (px/s)
+      USER_IMPULSE: 500,               // 點擊畫面施加的排斥力道 (px/s)
 
       // 點擊煙霧參數 (壓入螢幕向外擴散)
       CLICK_SMOKE_COUNT: 20,           // 點擊生成的煙霧數量
@@ -216,7 +217,7 @@
       BALL_BOOST_SMOKE_SPEED: 310,     // 噴射的扇形速度
       BALL_BOOST_SMOKE_SPREAD: 1.5,    // 散佈角度 (弧度)
 
-      TARGET_FPS: 60, // 目標幀率
+      TARGET_FPS: 70, // 目標幀率
     };  
 
 
@@ -790,13 +791,21 @@
       ripples.forEach(r => r.age += dt);
       ripples = ripples.filter(r => r.age < 0.6);
 
+      // ★ 新增：分別計算活躍的沙子與煙霧總數
       let activeSandCount = 0;
+      let activeSmokeCount = 0; 
+      
       for (let i = 0; i < particles.length; i++) {
-        if (particles[i].type === 'sand' && !particles[i].dead && !particles[i].fading) {
+        const p = particles[i];
+        if (p.type === 'sand' && !p.dead && !p.fading) {
           activeSandCount++;
+        } else if (p.type === 'smoke' && !p.fastFading && p.life < p.maxLife) {
+          activeSmokeCount++;
         }
       }
+      
       let excessSand = activeSandCount - CONFIG.SAND_MAX_TOTAL_COUNT;
+      let excessSmoke = activeSmokeCount - CONFIG.SMOKE_MAX_TOTAL_COUNT;
 
       const sandParticles = [];
       spatialGrid.clear();
@@ -994,6 +1003,18 @@
           // ==============================
           // 煙霧物理 (流體、消散、球體風壓)
           // ==============================
+          
+          // ★ 新增：當數量超標時，將最舊的煙霧標記為「加速衰減」
+          if (excessSmoke > 0 && !p.fastFading) {
+            p.fastFading = true;
+            excessSmoke--;
+          }
+
+          // ★ 新增：加速衰減的煙霧壽命流逝極快，會迅速淡出消失
+          if (p.fastFading) {
+            p.life += dt * 6; // 6倍數老化
+          }
+
           p.x += p.vx * dt;
           p.y += p.vy * dt;
           p.vx *= (1 - 1.2 * dt); 
