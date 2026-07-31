@@ -87,12 +87,23 @@
     #score-number.score-mode-smart { opacity: 0; }
     #score-number.score-mode-smart.active { opacity: 0.92; }
 
+    /* 左下角選單 */
     .hint {
       position: fixed; left: 24px; bottom: 22px; z-index: 1;
       color: rgba(255,255,255,.15); font: 10px/1.4 ui-sans-serif, system-ui, "Microsoft JhengHei", sans-serif;
       user-select: none;
       pointer-events: none;
     }
+    
+    /* 右下角 FPS 顯示 (樣式與 .hint 相同) */
+    #fps-container {
+      position: fixed; right: 24px; bottom: 22px; z-index: 1;
+      color: rgba(255,255,255,.15); font: 10px/1.4 ui-sans-serif, system-ui, "Microsoft JhengHei", sans-serif;
+      user-select: none;
+      pointer-events: none;
+      font-variant-numeric: tabular-nums;
+    }
+
     .btn-action {
       cursor: pointer;
       pointer-events: auto;
@@ -108,6 +119,7 @@
       #hud-container { top: 93%; }
       #score-number { font-size: 38px; }
       .hint { left: 18px; bottom: 16px; font-size: 11px; }
+      #fps-container { right: 18px; bottom: 16px; font-size: 11px; }
     }
   </style>
 </head>
@@ -127,8 +139,8 @@
     <span id="time-btn" class="btn-action">Show time</span> · 
     <span id="disp-mode-btn" class="btn-action">Show number</span> · 
     <span id="fullscreen-btn" class="btn-action">Fullscreen</span>
-    <!-- Tap to interact -->
   </div>
+
 
   <script>
     "use strict";
@@ -230,6 +242,11 @@
     
     const timeDisplay = document.getElementById("time-display");
     const timeBtn = document.getElementById("time-btn");
+    
+    // FPS DOM 元素與變數
+    const fpsValDisplay = document.getElementById("fps-val");
+    let fpsFrameCount = 0;
+    let fpsLastTimer = performance.now();
 
     const SCORE_MODE_SMART = 0;
     const SCORE_MODE_ALWAYS = 1;
@@ -1322,7 +1339,15 @@
       // 校正時間偏差，確保動畫平滑
       lastRenderTime = now - (timeSinceLastRender % FRAME_DELAY);
 
-      // 4. 原本的物理更新與渲染邏輯
+      // --- 4. 實際渲染 FPS 計算邏輯 ---
+      fpsFrameCount++;
+      if (now - fpsLastTimer >= 1000) {
+        fpsValDisplay.textContent = fpsFrameCount;
+        fpsFrameCount = 0;
+        fpsLastTimer = now;
+      }
+      // -------------------------------
+
       // 將時間差轉換為秒，並限制最大值避免切換視窗時物理運算暴走
       const elapsed = Math.min((now - lastTime) / 1000, 0.05); 
       lastTime = now;
