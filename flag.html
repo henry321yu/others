@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>True 3D Waving Flag Physics</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #050505; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+    
+    #time-container {
+      position: fixed; top: 7%; left: 0; width: 100%; z-index: 10;
+      pointer-events: none; display: flex; justify-content: center;
+    }
+    #time-display {
+      color: rgba(255,255,255,.85); 
+      font: 500 48px/1.25 ui-sans-serif, system-ui, sans-serif;
+      font-variant-numeric: tabular-nums; letter-spacing: .02em; 
+      transition: opacity 0.5s ease; filter: blur(0.3px); 
+      text-shadow: 0 0 6px rgba(255,255,255,0.6), 0 0 12px rgba(255,255,255,0.3), 0 4px 12px rgba(0,0,0,0.8);
+      opacity: 0;
+    }
+    #time-display.visible { opacity: 0.92; }
+
+    #hud-container {
+      position: fixed; top: 90%; transform: translateY(-100%); left: 0; width: 100%; 
+      z-index: 10; pointer-events: none; display: flex; flex-direction: column; align-items: center; 
+    }
+    #mode-toast {
+      font-size: 14px; color: rgba(255,255,255,0.8); margin-top: 4px; opacity: 0;
+      transition: opacity 0.3s ease; font-family: ui-sans-serif, system-ui, sans-serif;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.8); background: rgba(0, 0, 0, 0.4);
+      padding: 6px 16px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .hint {
+      position: fixed; left: 24px; bottom: 22px; z-index: 1;
+      color: rgba(255,255,255,.3); font: 12px/1.4 ui-sans-serif, system-ui, sans-serif;
+      user-select: none; pointer-events: none;
+    }
+    
+    #fps-container {
+      position: fixed; right: 24px; bottom: 22px; z-index: 1;
+      color: rgba(255,255,255,.15); font: 10px/1.4 ui-sans-serif, system-ui, sans-serif;
+      user-select: none; pointer-events: none; font-variant-numeric: tabular-nums;
+    }
+
+    .btn-action { cursor: pointer; pointer-events: auto; text-decoration: underline; text-underline-offset: 3px; transition: color 0.2s; }
+    .btn-action:hover { color: rgba(255,255,255,.9); }
+    
+    @media (max-width: 560px) {
+      #time-container { top: 5%; }
+      #time-display { font-size: 38px; }
+      #hud-container { top: 90%; }
+      .hint { left: 18px; bottom: 16px; font-size: 11px; }
+      #fps-container { right: 18px; bottom: 16px; font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="scene" aria-label="3d waving flag sim"></canvas>
+  
+  <div id="time-container"><div id="time-display">00:00:00</div></div>
+  <div id="hud-container"><div id="mode-toast">Ready</div></div>
+  
+  <div class="hint">
+    <span id="time-btn" class="btn-action">Show time</span> · 
+    <span id="mic-btn" class="btn-action">Enable Mic</span> · 
+    <span id="fullscreen-btn" class="btn-action">Fullscreen</span>
+  </div>
+  <div id="fps-container">FPS: <span id="fps-val">0</span></div>
+
+  <script>
+    "use strict";
+
+    /*
+      ── 3D 真實流體物理與光影引擎參數 ─────────────────────────────
+    */
+    const CONFIG = {
+      // 網格密度：兼顧流暢度與絲綢細緻度
+      FLAG_COLS: 80,                  
+      FLAG_ROWS: 50,                  
+      FLAG_WIDTH: 200,                
+      FLAG_HEIGHT: 150,               
+      FLAG_STIFFNESS: 20,             // 物理約束疊代 (高度防拉長)
+      CLOTH_DRAG: 0.885,              // 空氣阻力
+      GRAVITY: 350,                   // 下拉重力
+      
+      // 3D 相機透視參數
+      CAMERA_Z: -700,
+      FOV: 900,
+
+      // 風力系統
+      WIND_FORCE_MIN: 500,            
+      WIND_FORCE_MAX: 1000,            
+      WIND_CHANGE_INTERVAL: 1,      
+      USER_IMPULSE: 1200,              
+      MIC_SENSITIVITY: 3500,          
+
+      TARGET_FPS: 70,                 
+    };  
+
+    const canvas = document.getElementById("scene");
+    const context = canvas.getContext("2d");
+    const modeToast = document.getElementById("mode-toast");
+    const fullscreenBtn = document.getElementById("fullscreen-btn");
+    const timeDisplay = document.getElementById("time-display");
+    const timeBtn = document.getElementById("time-btn");
+    const micBtn = document.getElementById("mic-btn");
+    const fpsValDisplay = document.getElementById("fps-val");
+
+    // === 修正重點：補上遺漏的全域變數 ===
+    let lastRenderTime = 0; 
+    
+    let fpsFrameCount = 0, fpsLastTimer = performance.now();
+    let toastTimeout = null, isTimeVisible = false;
+    let width = 0, height = 0, dpr = 1, center = { x: 0, y: 0 };
+    let lastTime = performance.now(), paused = false;
+
+    let audioCtx = null, analyser = null, micStream = null;
+    let isMicActive = false, micVolume = 0;
+
+    let flagPoints = [];
+    let flagConstraints = [];
+    let flagFaces = []; // 3D 渲染面
+    let polePos = { x: 0, topY: 0, bottomY: 0, z: 0 };
+
+    let envWind = { vx: 350, vy: -50, targetVx: 350, targetVy: -50, timer: 0 };
+
+    const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
+
+    function showToast(msg) {
+      modeToast.textContent = msg;
+      modeToast.style.opacity = 1;
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => modeToast.style.opacity = 0, 2200);
+    }
+
+    timeBtn.addEventListener("click", (e) => {
+      if (e) e.stopPropagation();
+      isTimeVisible = !isTimeVisible;
+      if (isTimeVisible) {
+        timeDisplay.classList.add("visible");
+        timeBtn.textContent = "Hide time";
+      } else {
+        timeDisplay.classList.remove("visible");
+        timeBtn.textContent = "Show time";
+      }
+    });
+
+    async function toggleMicrophone(e) {
+      if (e) e.stopPropagation();
+      if (isMicActive) {
+        if (micStream) micStream.getTracks().forEach(track => track.stop());
+        if (audioCtx) audioCtx.close();
+        isMicActive = false; micVolume = 0;
+        micBtn.textContent = "Enable Mic";
+        showToast("Microphone Disabled");
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
+        micStream = stream;
+        const source = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        isMicActive = true;
+        micBtn.textContent = "Disable Mic";
+        showToast("Mic Active: Blow to wave the flag!");
+      } catch (err) {
+        showToast("Microphone Access Denied");
+      }
+    }
+    micBtn.addEventListener("click", toggleMicrophone);
+
+    function initFlag() {
+      flagPoints = [];
+      flagConstraints = [];
+      flagFaces = [];
+
+      polePos.x = center.x - CONFIG.FLAG_WIDTH * 0.4;
+      polePos.topY = center.y - CONFIG.FLAG_HEIGHT * 0.5 - 30;
+      polePos.bottomY = center.y + CONFIG.FLAG_HEIGHT * 0.5 + 250;
+      polePos.z = 0;
+
+      const startX = polePos.x;
+      const startY = center.y - CONFIG.FLAG_HEIGHT * 0.5;
+      const spacingX = CONFIG.FLAG_WIDTH / (CONFIG.FLAG_COLS - 1);
+      const spacingY = CONFIG.FLAG_HEIGHT / (CONFIG.FLAG_ROWS - 1);
+
+      // 初始化 3D 質點
+      for (let r = 0; r < CONFIG.FLAG_ROWS; r++) {
+        for (let c = 0; c < CONFIG.FLAG_COLS; c++) {
+          const px = startX + c * spacingX;
+          const py = startY + r * spacingY;
+          flagPoints.push({
+            x: px, y: py, z: 0,
+            oldX: px, oldY: py, oldZ: 0,
+            pinned: (c === 0), 
+            col: c, row: r
+          });
+        }
+      }
+
+      function addConstraint(i1, i2) {
+        const p1 = flagPoints[i1];
+        const p2 = flagPoints[i2];
+        const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y, p1.z - p2.z);
+        flagConstraints.push({ p1, p2, dist });
+      }
+
+      // 建立 3D 物理約束
+      for (let r = 0; r < CONFIG.FLAG_ROWS; r++) {
+        for (let c = 0; c < CONFIG.FLAG_COLS; c++) {
+          const idx = r * CONFIG.FLAG_COLS + c;
+          if (c < CONFIG.FLAG_COLS - 1) addConstraint(idx, idx + 1); 
+          if (r < CONFIG.FLAG_ROWS - 1) addConstraint(idx, idx + CONFIG.FLAG_COLS); 
+          // 對角線抵抗剪切變形
+          if (c < CONFIG.FLAG_COLS - 1 && r < CONFIG.FLAG_ROWS - 1) {
+            addConstraint(idx, idx + CONFIG.FLAG_COLS + 1);
+            addConstraint(idx + 1, idx + CONFIG.FLAG_COLS);
+          }
+        }
+      }
+
+      // 建立渲染用的多邊形面
+      for (let r = 0; r < CONFIG.FLAG_ROWS - 1; r++) {
+        for (let c = 0; c < CONFIG.FLAG_COLS - 1; c++) {
+          flagFaces.push({
+            p1: flagPoints[r * CONFIG.FLAG_COLS + c],
+            p2: flagPoints[r * CONFIG.FLAG_COLS + c + 1],
+            p3: flagPoints[(r + 1) * CONFIG.FLAG_COLS + c + 1],
+            p4: flagPoints[(r + 1) * CONFIG.FLAG_COLS + c],
+            centerZ: 0
+          });
+        }
+      }
+    }
+
+    function resize() {
+      dpr = window.devicePixelRatio || 1;
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+      center = { x: width / 2, y: height / 2 };
+      initFlag();
+    }
+
+    function reset() {
+      envWind = { vx: 400, vy: -30, targetVx: 400, targetVy: -30, timer: 0 };
+      initFlag();
+      lastTime = performance.now();
+    }
+
+    function sampleMicrophone() {
+      if (!isMicActive || !analyser) { micVolume = 0; return; }
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      analyser.getByteFrequencyData(dataArray);
+      let sum = 0;
+      for (let i = 0; i < bufferLength; i++) sum += dataArray[i];
+      const targetVol = (sum / bufferLength) / 255; 
+      micVolume += (targetVol - micVolume) * 0.35; 
+    }
+
+    function update(dt) {
+      envWind.timer -= dt;
+      if (envWind.timer <= 0) {
+        envWind.timer = CONFIG.WIND_CHANGE_INTERVAL + Math.random() * 2;
+        const windForce = CONFIG.WIND_FORCE_MIN + Math.random() * (CONFIG.WIND_FORCE_MAX - CONFIG.WIND_FORCE_MIN);
+        const windAngle = (Math.random() - 0.1) * Math.PI * 0.3; 
+        envWind.targetVx = Math.cos(windAngle) * windForce;
+        envWind.targetVy = Math.sin(windAngle) * windForce;
+      }
+      envWind.vx += (envWind.targetVx - envWind.vx) * dt * 0.8;
+      envWind.vy += (envWind.targetVy - envWind.vy) * dt * 0.8;
+
+      sampleMicrophone();
+      const micWindX = micVolume * CONFIG.MIC_SENSITIVITY;
+
+      const totalWindX = envWind.vx + micWindX;
+      const totalWindY = envWind.vy;
+      const nowSec = performance.now() / 1000;
+
+      // 1. 真實 3D Verlet 物理積分
+      flagPoints.forEach(p => {
+        if (p.pinned) return;
+
+        const vx = (p.x - p.oldX) * CONFIG.CLOTH_DRAG;
+        const vy = (p.y - p.oldY) * CONFIG.CLOTH_DRAG;
+        const vz = (p.z - p.oldZ) * CONFIG.CLOTH_DRAG;
+
+        p.oldX = p.x;
+        p.oldY = p.y;
+        p.oldZ = p.z;
+
+        // 生成低頻、大面積的流體波浪 (創造巨大絲綢皺褶感)
+        const wave1 = Math.sin(nowSec * 5 - p.col * 0.1) * 2.5; 
+        const wave2 = Math.cos(nowSec * 7 + p.row * 0.15) * 1.5;
+        const wave3 = Math.sin(nowSec * 10 - p.col * 0.2 + p.row * 0.2) * 1.0; 
+
+        const flapZ = (wave1 + wave2 + wave3) * totalWindX * 0.7;
+        const liftY = -totalWindX * 0.35; 
+        const flapX = Math.cos(nowSec * 8 - p.col * 0.2) * totalWindX * 0.15;
+
+        const ax = totalWindX + flapX;
+        const ay = totalWindY + CONFIG.GRAVITY + liftY;
+        const az = flapZ;
+
+        p.x += vx + ax * dt * dt;
+        p.y += vy + ay * dt * dt;
+        p.z += vz + az * dt * dt;
+      });
+
+      // 2. 3D 空間幾何約束
+      for (let iter = 0; iter < CONFIG.FLAG_STIFFNESS; iter++) {
+        flagConstraints.forEach(c => {
+          const dx = c.p2.x - c.p1.x;
+          const dy = c.p2.y - c.p1.y;
+          const dz = c.p2.z - c.p1.z;
+          const currentDist = Math.hypot(dx, dy, dz) || 0.0001;
+          const delta = (currentDist - c.dist) / currentDist;
+
+          const adjustX = dx * 0.5 * delta;
+          const adjustY = dy * 0.5 * delta;
+          const adjustZ = dz * 0.5 * delta;
+
+          if (!c.p1.pinned && !c.p2.pinned) {
+            c.p1.x += adjustX; c.p1.y += adjustY; c.p1.z += adjustZ;
+            c.p2.x -= adjustX; c.p2.y -= adjustY; c.p2.z -= adjustZ;
+          } else if (c.p1.pinned && !c.p2.pinned) {
+            c.p2.x -= dx * delta; c.p2.y -= dy * delta; c.p2.z -= dz * delta;
+          } else if (!c.p1.pinned && c.p2.pinned) {
+            c.p1.x += dx * delta; c.p1.y += dy * delta; c.p1.z += dz * delta;
+          }
+        });
+      }
+
+      if (isTimeVisible) {
+        const now = new Date();
+        const h = now.getHours().toString().padStart(2, '0');
+        const m = now.getMinutes().toString().padStart(2, '0');
+        const s = now.getSeconds().toString().padStart(2, '0');
+        const timeString = `${h}:${m}:${s}`;
+        if (timeDisplay.textContent !== timeString) timeDisplay.textContent = timeString;
+      }
+    }
+
+    // 3D 空間到 2D 螢幕的透視投影函數
+    function project3D(p) {
+      const z = p.z - CONFIG.CAMERA_Z;
+      const scale = CONFIG.FOV / Math.max(1, z);
+      return {
+        x: center.x + (p.x - center.x) * scale,
+        y: center.y + (p.y - center.y) * scale
+      };
+    }
+
+    // 渲染面 (共用函數以處理 Z-Sorting)
+    function renderFaces(faces) {
+      // 光源向量 (從左上前方打過來)
+      const lightDir = { x: -0.8, y: -0.4, z: -0.6 };
+      const lightLen = Math.hypot(lightDir.x, lightDir.y, lightDir.z);
+      lightDir.x /= lightLen; lightDir.y /= lightLen; lightDir.z /= lightLen;
+
+      faces.forEach(f => {
+        // 計算 3D 法向量 (Cross Product)
+        const ux = f.p2.x - f.p1.x, uy = f.p2.y - f.p1.y, uz = f.p2.z - f.p1.z;
+        const vx = f.p4.x - f.p1.x, vy = f.p4.y - f.p1.y, vz = f.p4.z - f.p1.z;
+        
+        let nx = uy * vz - uz * vy;
+        let ny = uz * vx - ux * vz;
+        let nz = ux * vy - uy * vx;
+        const nLen = Math.hypot(nx, ny, nz) || 1;
+        nx /= nLen; ny /= nLen; nz /= nLen;
+
+        // 計算受光面 (Dot Product)
+        let dot = Math.abs(nx * lightDir.x + ny * lightDir.y + nz * lightDir.z); 
+
+        // 模擬高級絲綢材質
+        const ambient = 0.2;
+        const diffuse = 0.6;
+        const specular = Math.pow(dot, 16) * 0.45; // 耀眼反光
+        
+        // 偽自我遮蔽 (Ambient Occlusion) - 深層凹陷處自動變暗
+        const depthShadow = clamp(1 - (f.centerZ / 250), 0.3, 1.0);
+        let intensity = clamp((ambient + diffuse * dot + specular) * depthShadow, 0.05, 1);
+
+        // 將 3D 頂點轉換至 2D 螢幕
+        const proj1 = project3D(f.p1);
+        const proj2 = project3D(f.p2);
+        const proj3 = project3D(f.p3);
+        const proj4 = project3D(f.p4);
+
+        context.beginPath();
+        context.moveTo(proj1.x, proj1.y);
+        context.lineTo(proj2.x, proj2.y);
+        context.lineTo(proj3.x, proj3.y);
+        context.lineTo(proj4.x, proj4.y);
+        context.closePath();
+
+        // 絲滑純白上色
+        const baseColor = Math.floor(intensity * 255);
+        const tintB = Math.min(255, baseColor + 8); // 陰影中透出一點微弱藍冷光
+        const colorStr = `rgb(${baseColor}, ${baseColor}, ${tintB})`;
+
+        context.fillStyle = colorStr;
+        context.strokeStyle = colorStr;
+        context.lineWidth = 1.0;
+        context.lineJoin = "bevel"; 
+
+        context.fill();
+        context.stroke();
+      });
+    }
+
+    function drawFlag() {
+      // 1. 紀錄多邊形的 Z 中心深度
+      flagFaces.forEach(f => {
+        f.centerZ = (f.p1.z + f.p2.z + f.p3.z + f.p4.z) / 4;
+      });
+      // 依深度排序 (Painter's Algorithm - 由遠畫到近)
+      flagFaces.sort((a, b) => b.centerZ - a.centerZ);
+
+      // 找出哪一面開始比旗竿 (Z=0) 更靠近鏡頭
+      let splitIdx = flagFaces.length;
+      for (let i = 0; i < flagFaces.length; i++) {
+        if (flagFaces[i].centerZ <= polePos.z) {
+          splitIdx = i;
+          break;
+        }
+      }
+
+      // 2. 先畫：旗幟向後飄，在旗竿「後方」的部分
+      renderFaces(flagFaces.slice(0, splitIdx));
+
+      // 3. 畫旗竿 (套用 3D 透視縮放)
+      const poleRadius = 9;
+      const poleScale = CONFIG.FOV / Math.max(1, polePos.z - CONFIG.CAMERA_Z);
+      const projPoleX = center.x + (polePos.x - center.x) * poleScale;
+      const projTopY = center.y + (polePos.topY - center.y) * poleScale;
+      const projBottomY = center.y + (polePos.bottomY - center.y) * poleScale;
+
+      const poleGradient = context.createLinearGradient(projPoleX - poleRadius * poleScale, 0, projPoleX + poleRadius * poleScale, 0);
+      poleGradient.addColorStop(0, "#1a0b05");
+      poleGradient.addColorStop(0.3, "#7a3e20");
+      poleGradient.addColorStop(0.5, "#a65932");
+      poleGradient.addColorStop(0.8, "#3d1b0d");
+      poleGradient.addColorStop(1, "#110602");
+
+      context.beginPath();
+      context.moveTo(projPoleX, projTopY);
+      context.lineTo(projPoleX, projBottomY);
+      context.lineWidth = poleRadius * 2 * poleScale;
+      context.strokeStyle = poleGradient;
+      context.lineCap = "round";
+      context.stroke();
+
+      context.beginPath();
+      context.arc(projPoleX, projTopY - 8 * poleScale, 16 * poleScale, 0, Math.PI * 2);
+      const ballGrad = context.createRadialGradient(
+        projPoleX - 5 * poleScale, projTopY - 14 * poleScale, 2 * poleScale, 
+        projPoleX, projTopY - 8 * poleScale, 16 * poleScale
+      );
+      ballGrad.addColorStop(0, "#d17747");
+      ballGrad.addColorStop(0.5, "#6b3317");
+      ballGrad.addColorStop(1, "#210d05");
+      context.fillStyle = ballGrad;
+      context.fill();
+
+      // 4. 後畫：旗幟向前飄，遮蓋住旗竿「前方」的部分
+      renderFaces(flagFaces.slice(splitIdx));
+    }
+
+    function render() {
+      context.clearRect(0, 0, width, height);
+      // 繪製微弱的環境光背景
+      const bgGrad = context.createRadialGradient(center.x, center.y, 100, center.x, center.y, width);
+      bgGrad.addColorStop(0, "#111418");
+      bgGrad.addColorStop(1, "#020202");
+      context.fillStyle = bgGrad;
+      context.fillRect(0, 0, width, height);
+
+      drawFlag();
+    }
+
+    const FRAME_DELAY = 1000 / CONFIG.TARGET_FPS;
+    function frame(now) {
+      requestAnimationFrame(frame);
+      const timeSinceLastRender = now - lastRenderTime;
+      if (timeSinceLastRender < FRAME_DELAY - 1.5) return;
+      lastRenderTime = now - (timeSinceLastRender % FRAME_DELAY);
+
+      fpsFrameCount++;
+      if (now - fpsLastTimer >= 1000) {
+        fpsValDisplay.textContent = fpsFrameCount;
+        fpsFrameCount = 0;
+        fpsLastTimer = now;
+      }
+
+      const elapsed = Math.min((now - lastTime) / 1000, 0.05); 
+      lastTime = now;
+      
+      if (!paused) update(elapsed);
+      render();
+    }
+
+    canvas.addEventListener("pointerdown", (event) => {
+      if (paused) return; 
+      const rect = canvas.getBoundingClientRect();
+      const touchX = event.clientX - rect.left;
+      const touchY = event.clientY - rect.top;
+
+      flagPoints.forEach(p => {
+        if (p.pinned) return;
+        const proj = project3D(p);
+        const dx = proj.x - touchX;
+        const dy = proj.y - touchY;
+        const dist = Math.hypot(dx, dy) || 1;
+        
+        if (dist < 300) {
+          const force = (1 - dist / 300) * CONFIG.USER_IMPULSE;
+          // 點擊不僅推開 X Y，更會朝 Z 軸(螢幕深處)爆發
+          p.x += (dx / dist) * force * 0.05;
+          p.y += (dy / dist) * force * 0.05;
+          p.z += force * 0.15; 
+        }
+      });
+    });
+
+    fullscreenBtn.addEventListener("click", () => {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+      else document.exitFullscreen();
+    });
+    document.addEventListener("fullscreenchange", () => {
+      fullscreenBtn.textContent = document.fullscreenElement ? "Exit Fullscreen" : "Fullscreen";
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Space") { e.preventDefault(); paused = !paused; lastTime = performance.now(); }
+    });
+    
+    window.addEventListener("resize", resize);
+    resize();
+    reset();
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
