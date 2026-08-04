@@ -141,6 +141,8 @@
     <span id="fullscreen-btn" class="btn-action">Fullscreen</span>
   </div>
 
+  <!-- 新增 FPS 顯示區塊 -->
+  <div id="fps-container">FPS: <span id="fps-val">0</span></div>
 
   <script>
     "use strict";
@@ -196,6 +198,9 @@
       
       SAND_WAKE_MULTIPLIER: 0.45,      // 沙粒受到球體風壓影響的倍率 (沙子較重所以小於 1)
       SAND_BALL_BOUNCE: 0.65,          // 沙粒與球體碰撞時的彈性
+
+      SAND_SMOKE_RATIO: 0.5,           // 釋放尾跡煙霧的沙子比例 (0.0 ~ 1.0，例如 0.2 代表 20% 的沙子會放煙霧)
+      SAND_SMOKE_DURATION: 1,        // 沙子釋放小煙霧的持續時間 (秒)
 
       // 體積煙霧粒子系統參數 (保留給球體摩擦與點擊)
       SMOKE_MAX_TOTAL_COUNT: 500,      // 畫面上允許的最大煙霧總數
@@ -517,8 +522,8 @@
           fading: false,  
           dead: false,
           
-          smokeTimer: 0.5,                         // 0.5秒內遞減
-          smokeAccumulator: Math.random() * 0.5    // 錯開噴發頻率
+          smokeTimer: Math.random() < CONFIG.SAND_SMOKE_RATIO ? CONFIG.SAND_SMOKE_DURATION : 0,
+          smokeAccumulator: Math.random() * 0.5
         });
       }
 
@@ -863,7 +868,7 @@
           if (p.smokeTimer > 0) {
             p.smokeTimer -= dt;
             if (p.smokeTimer > 0) {
-              const ratio = p.smokeTimer / 0.5; 
+              const ratio = p.smokeTimer / CONFIG.SAND_SMOKE_DURATION;
               p.smokeAccumulator += 3 * ratio * dt; 
               
               while (p.smokeAccumulator >= 1) {
