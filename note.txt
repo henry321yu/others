@@ -151,8 +151,10 @@ sudo zerotier-cli info
 v4l2-ctl --list-devices
 
 
-
-
+查看目前連到的WIFI SSID
+iwgetid wlan0
+詳細版
+iw dev wlan0 link
 
 #########cmd 指令###########
 
