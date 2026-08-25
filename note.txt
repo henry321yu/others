@@ -175,6 +175,8 @@ systeminfo
 shutdown /r /t 0
 關機
 shutdown /s /t 0
+1800秒(halt hour) 後關機
+shutdown /s /t 1800
 
 (
 echo ;請輸入來源與輸出資料夾路徑，不要含空格
