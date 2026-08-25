@@ -72,12 +72,16 @@ def main():
     # 在這裡設定所有的轉發規則 (可自由新增)
     # ==========================================
     forwarding_rules = [
-        # Windows KMS
-        {"local_port": 1688, "target_host": "140.116.205.75", "target_port": 1688},
-        
-        # SolidWorks (主 Port)
-        {"local_port": 25734, "target_host": "140.116.249.45", "target_port": 25734},
+    # Windows KMS
+    {"local_port": 1688, "target_host": "140.116.205.75", "target_port": 1688},
+    
+    # SolidWorks (總機 lmgrd)
+    {"local_port": 25734, "target_host": "140.116.249.45", "target_port": 25734},
+    
+    # SolidWorks (實際授權服務 sw_d)
+    {"local_port": 49171, "target_host": "140.116.249.45", "target_port": 49171},
     ]
+    
     print("[*] 正在啟動多重 Port Forwarding 服務...\n")
     
     print("[*] 正在啟動 Port Forwarding 服務...\n")
