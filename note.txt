@@ -316,6 +316,20 @@ net start wuauserv
 shutdown /r /t 0
 
 
+PC windows KMS 授權 轉發
+slmgr /skms 26.55.45.86:1688
+slmgr /ato
+查看狀態
+slmgr.vbs -dlv
+到期時間
+slmgr.vbs -xpr
+
+solidwork 轉發
+solidnetwork licence manager 中
+伺服器清單新增
+25734@26.55.45.86
+
+
 #########linux 指令###########
 
 資料夾修改成英文
