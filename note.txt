@@ -267,6 +267,48 @@ iisreset、或restart FTP站台
 
 
 
+////////////停止win10更新(鎖定版本)
+
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /v TargetReleaseVersion /t REG_DWORD /d 1 /f
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /v TargetReleaseVersionInfo /t REG_SZ /d 22H2 /f
+
+成功應該會看到：
+
+作業順利完成。
+作業順利完成。
+
+然後確認：
+reg query "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /v TargetReleaseVersion
+reg query "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" /v TargetReleaseVersionInfo
+
+應該看到：
+
+TargetReleaseVersion    REG_DWORD    0x1
+TargetReleaseVersionInfo    REG_SZ    22H2
+
+
+建議再做一次 Windows Update 快取清理，把目前已經下載的 Windows 11 安裝暫存清掉。
+
+先執行：
+net stop wuauserv
+net stop bits
+net stop cryptsvc
+net stop msiserver
+
+如果其中某個顯示服務沒有啟動，不用管，繼續即可。接著：
+
+ren C:\Windows\SoftwareDistribution SoftwareDistribution.old
+ren C:\Windows\System32\catroot2 catroot2.old
+
+net start msiserver
+net start cryptsvc
+net start bits
+net start wuauserv
+
+重新開機。
+shutdown /r /t 0
+
+
 #########linux 指令###########
 
 資料夾修改成英文
