@@ -155,6 +155,10 @@ v4l2-ctl --list-devices
 iwgetid wlan0
 詳細版
 iw dev wlan0 link
+開、關、查看wifi
+sudo nmcli radio wifi off
+sudo nmcli radio wifi on
+sudo nmcli radio wifi
 
 #########cmd 指令###########
 
