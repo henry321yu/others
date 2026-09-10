@@ -81,3 +81,19 @@ HEY-PC
 192.168.159.11
 RTDAS
 192.168.159.12
+
+
+3549b53777	raspt	10.241.20.154	1 minute	v1.16.2	140.116.34.135	linux	arm64	2e:7c:00:82:52:8c
+4a4183c274	my new office	10.241.135.1	2 minutes	v1.14.2	140.116.45.98	windows	x86_64	2e:03:08:b4:a7:8f
+6572095bf2	my phone	10.241.178.17	2 minutes	v1.16.0	140.116.45.26	android	arm64	2e:2c:3b:3e:3e:09
+82c0d174c6	ipc	10.241.183.64	1 minute	v1.14.2	140.116.45.26	windows	x86_64	2e:cb:89:e6:11:3d
+85898763d6	my office	10.241.0.114	1 minute	v1.14.2	140.116.45.26	windows	x86_64	2e:cc:c0:b0:06:2d
+87cb1b667b	fly office	10.241.199.211	1 minute	v1.14.2	140.116.45.14	windows	x86_64	2e:ce:82:2c:03:80
+8e07b0c052	dell	10.241.215.99	4 days	v1.14.2	223.139.43.160	windows	x86_64	2e:c7:4e:87:a5:a9
+9430bb0a67	rasp	10.241.156.153	1 minute	v1.14.2	223.140.69.136	linux	arm64	2e:dd:79:8c:6f:9c
+a24ae8a7a1	rasp3	10.241.136.93	4 days	v1.16.2	223.139.43.160	linux	arm64	2e:eb:03:df:c2:5a
+ecbda0892b	rasp2	10.241.194.18	2 minutes	v1.16.2	140.116.133.211	linux	arm64	2e:a5:f4:97:ec:d0
+c666873b5a	i7 930	10.241.110.243	2e:8f:2f:b0:5e:a1
+0a017df81a	eosss	10.241.252.146	2e:43:48:4a:9d:e1
+
+
