@@ -333,6 +333,12 @@ solidnetwork licence manager 中
 伺服器清單新增
 25734@26.55.45.86
 
+完整網路介面卡
+ipconfig /all
+印出目前網路介面卡網速
+powershell "Get-NetAdapter | Select-Object Name, LinkSpeed"
+印出介面卡名稱
+powershell "Get-NetAdapter | Select-Object Name, InterfaceDescription"
 
 #########linux 指令###########
 
