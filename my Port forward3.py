@@ -1,5 +1,12 @@
 import socket
 import threading
+from datetime import datetime
+
+# 自訂的日誌輸出函式
+def log(msg):
+    ts = datetime.now()
+    line = f"[{ts.strftime('%H:%M:%S')}] {msg}"
+    print(line)
 
 # 轉發資料的核心函式
 def forward(source, destination):
@@ -36,7 +43,7 @@ def handle_client(client_socket, target_host, target_port):
         client_to_target.join()
         target_to_client.join()
     except Exception as e:
-        print(f"[-] 無法連線到目標伺服器 {target_host}:{target_port} -> {e}")
+        log(f"[-] 無法連線到目標伺服器 {target_host}:{target_port} -> {e}")
         client_socket.close()
 
 # 獨立的監聽伺服器函式 (每組規則都會跑一個這個)
@@ -50,11 +57,11 @@ def start_server(local_port, target_host, target_port):
     try:
         server.bind((local_host, local_port))
         server.listen(5)
-        print(f"[*] 成功啟動：本機 Port {local_port} --> 轉發至 {target_host}:{target_port}")
+        log(f"[*] 成功啟動：本機 Port {local_port} --> 轉發至 {target_host}:{target_port}")
         
         while True:
             client_socket, addr = server.accept()
-            print(f"[+] 收到連線: 來自 {addr[0]}:{addr[1]} (目標: {target_host}:{target_port})")
+            log(f"[+] 收到連線: 來自 {addr[0]}:{addr[1]} (目標: {target_host}:{target_port})")
             
             # 每一個新連線開一個獨立執行緒處理
             client_thread = threading.Thread(
@@ -65,7 +72,7 @@ def start_server(local_port, target_host, target_port):
             client_thread.start()
             
     except Exception as e:
-        print(f"[-] 啟動監聽失敗 (Port {local_port}): {e}")
+        log(f"[-] 啟動監聽失敗 (Port {local_port}): {e}")
 
 def main():
     # ==========================================
@@ -81,7 +88,8 @@ def main():
         {"local_port": 2270, "target_host": "10.241.194.18", "target_port": 22},
         {"local_port": 2271, "target_host": "10.241.156.153", "target_port": 22},
     ]
-    print("[*] 正在啟動多重 Port Forwarding 服務...\n")
+    
+    log("[*] 正在啟動多重 Port Forwarding 服務...")
     
     # 存放伺服器執行緒的清單
     server_threads = []
@@ -103,7 +111,7 @@ def main():
             while t.is_alive():
                 t.join(1)
     except KeyboardInterrupt:
-        print("\n[*] 偵測到中斷訊號，正在關閉服務...")
+        log("[*] 偵測到中斷訊號，正在關閉服務...")
 
 if __name__ == '__main__':
     main()
