@@ -75,11 +75,20 @@ def main():
     # Windows KMS
     {"local_port": 1688, "target_host": "140.116.205.75", "target_port": 1688},
     
-    # SolidWorks (總機 lmgrd)
-    {"local_port": 25734, "target_host": "140.116.249.45", "target_port": 25734},
+    # # SolidWorks (總機 lmgrd)
+    # {"local_port": 25734, "target_host": "140.116.249.45", "target_port": 25734},
     
-    # SolidWorks (實際授權服務 sw_d)
-    {"local_port": 49171, "target_host": "140.116.249.45", "target_port": 49171},
+    # # SolidWorks (實際授權服務 sw_d)
+    # find actual port : netstat -ano | findstr 140.116.31.179
+    # {"local_port": 49171, "target_host": "140.116.249.45", "target_port": 49171},
+    # ]    
+    
+    # SolidWorks (總機 lmgrd)
+    {"local_port": 25734, "target_host": "140.116.31.179", "target_port": 25734},
+    
+    # SolidWorks (實際授權服務 sw_d) 
+    # find actual port : netstat -ano | findstr 140.116.31.179
+    {"local_port": 25735, "target_host": "140.116.31.179", "target_port": 25735},
     ]
     
     print("[*] 正在啟動多重 Port Forwarding 服務...\n")
