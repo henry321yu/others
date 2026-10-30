@@ -340,6 +340,12 @@ powershell "Get-NetAdapter | Select-Object Name, LinkSpeed"
 印出介面卡名稱
 powershell "Get-NetAdapter | Select-Object Name, InterfaceDescription"
 
+查看win10金鑰(可ssh):
+reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SoftwareProtectionPlatform" /v BackupProductKeyDefault
+
+查看上次操作時間:
+powershell -NoProfile -Command "$f=Join-Path $env:USERPROFILE 'DesktopIdleResult.txt'; Remove-Item $f -ErrorAction SilentlyContinue; Start-ScheduledTask -TaskName 'DesktopIdleProbe'; Start-Sleep -Seconds 3; Get-Content $f"
+
 #########linux 指令###########
 
 資料夾修改成英文
