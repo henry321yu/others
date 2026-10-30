@@ -46,7 +46,7 @@ user: sgrc-325
 passowrd: eos31470.
 
 IPC
-ip: 10.241.183.64
+ip: 10.241.183.64 or 26.107.7.251
 user: admin
 passowrd: 123
 
@@ -97,3 +97,8 @@ c666873b5a	i7 930	10.241.110.243	2e:8f:2f:b0:5e:a1
 0a017df81a	eosss	10.241.252.146	2e:43:48:4a:9d:e1
 
 
+win key:
+eosss(ncku)
+96YNV-9X4RP-2YYKB-RMQH4-6Q72D
+??
+NPPR9-FWDCX-D2C8J-H872K-2YT43
