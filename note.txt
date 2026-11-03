@@ -1,3 +1,9 @@
+#####temp####
+powershell -NoProfile -Command "$f=Join-Path $env:USERPROFILE 'DesktopIdleResult.txt'; Remove-Item $f -ErrorAction SilentlyContinue; Start-ScheduledTask -TaskName 'DesktopIdleProbe'; Start-Sleep -Seconds 3; Get-Content $f"
+
+
+#####
+
 solidworks
 
 simulation
