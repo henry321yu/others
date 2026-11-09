@@ -112,7 +112,7 @@ class SeismicViewerApp:
         txt_files = glob.glob(os.path.join(self.data_dir,"perm_*.txt"))
         txt_files += glob.glob(os.path.join(self.data_dir,"temp_*.txt"))
 
-        self.files = sorted(txt_files)
+        self.files = sorted(txt_files, reverse=True)
 
         if not self.files:
             self.file_listbox.insert(tk.END,"No files")
