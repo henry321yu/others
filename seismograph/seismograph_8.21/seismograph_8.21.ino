@@ -57,6 +57,8 @@ unsigned long trigger_detected_time = 0;
 bool beep_active = false;
 unsigned long beep_off_time = 0;
 
+float magled = 0.02;
+
 void setup() {
   WDT_timings_t config;
   config.timeout = wdtt;
@@ -167,9 +169,10 @@ void loop() {
   String data = String(nowmillis * 0.001, 3) + "," + timeStamp() + "," + acc_String_data + "," + String(events) + "," + statuss + "," + String(freq, 2);
 
   //  Serial.println(data);
-  //  HC12.println(data + "," + nowfile);
+  HC12.println(data + "," + nowfile);
 
-  if (magnitude > 0.3) { //小型觸發燈
+  if (magnitude > magled) { //小型觸發燈
+    Serial.printf("magnitude > %.2f detected , blinking !\n", magled);
     beep_active = true;
     beep_off_time = millis() + 100;  // 保持 200ms
   }
@@ -381,7 +384,7 @@ void switchTempLogFile() {
 
 // ===== 空間與檔案管理 =====
 void checkStorageLimit() {
-  unsigned long total = 0;
+  uint64_t total = 0;
   float maxx = MAX_STORAGE_MEGABYTES;
   float mbb = (1 << 20);  // 2 的 20 次方 byte to mb
   maxx = maxx * mbb;
