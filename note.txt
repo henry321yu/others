@@ -124,15 +124,16 @@ sudo chmod +x /usr/local/bin/syncdata
 
 ----------------
 開機自動啟動(簡易版?):
-sudo nano /etc/systemd/system/syncdata.service
+sudo nano /etc/systemd/system/cam.service
+----
 
 [Unit]
-Description=Syncdata
+Description=Cam
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /home/admin/Desktop/syndata4.1_zt_ras_bg.py
+ExecStart=/usr/bin/python3 /home/admin/cam.py
 WorkingDirectory=/home/admin/Desktop
 Restart=always
 RestartSec=5
@@ -142,6 +143,18 @@ User=admin
 WantedBy=multi-user.target
 ----------------
 
+sudo systemctl daemon-reexec
+sudo systemctl daemon-reload
+sudo systemctl enable cam.service
+sudo systemctl start cam.service
+sudo systemctl status cam.service
+
+sudo systemctl stop cam.service
+sudo systemctl is-enabled cam.service
+
+----------------
+
+----------------
 
 安裝ZEROTIER
 curl -s https://install.zerotier.com | sudo bash
