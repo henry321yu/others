@@ -83,6 +83,12 @@ HEY-PC
 RTDAS
 192.168.159.12
 
+my_port_forward
+ssh admin@26.155.11.128 -p 2269 #raspt
+ssh admin@26.155.11.128 -p 2270 #rasp2
+ssh raslan@26.155.11.128 -p 2271 #rasp
+ssh admin@26.155.11.128 -p 2272 #raspt2
+
 
 3549b53777	raspt	10.241.20.154	1 minute	v1.16.2	140.116.34.135	linux	arm64	2e:7c:00:82:52:8c
 4a4183c274	my new office	10.241.135.1	2 minutes	v1.14.2	140.116.45.98	windows	x86_64	2e:03:08:b4:a7:8f
