@@ -84,9 +84,10 @@ def main():
         {"local_port": 6970, "target_host": "10.241.194.18", "target_port": 6969},
         
         # SSH
-        {"local_port": 2269, "target_host": "10.241.20.154", "target_port": 22},
-        {"local_port": 2270, "target_host": "10.241.194.18", "target_port": 22},
-        {"local_port": 2271, "target_host": "10.241.156.153", "target_port": 22},
+        {"local_port": 2269, "target_host": "10.241.20.154", "target_port": 22}, #raspt
+        {"local_port": 2270, "target_host": "10.241.194.18", "target_port": 22}, #rasp2
+        {"local_port": 2271, "target_host": "10.241.156.153", "target_port": 22}, #rasp
+        {"local_port": 2272, "target_host": "10.241.11.47", "target_port": 22}, #raspt2
     ]
     
     log("[*] 正在啟動多重 Port Forwarding 服務...")
